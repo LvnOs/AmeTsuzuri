@@ -103,6 +103,7 @@ class _RoomPageState extends State<RoomPage> {
     required double width,
     required double height,
     required Color color,
+    bool showDebugArea = true,
   }) {
     return Positioned(
       left: left,
@@ -113,10 +114,14 @@ class _RoomPageState extends State<RoomPage> {
         behavior: HitTestBehavior.opaque,
         onTap: () => _onAreaTapped(name),
         child: Container(
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.2),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
-          ),
+          decoration: showDebugArea
+              ? BoxDecoration(
+                  color: color.withValues(alpha: 0.2),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.35),
+                  ),
+                )
+              : null,
           alignment: Alignment.center,
           child: Text(
             name,
