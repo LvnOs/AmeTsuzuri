@@ -52,6 +52,7 @@ class _RoomPageState extends State<RoomPage> {
               top: constraints.maxHeight * 0.06,
               width: constraints.maxWidth * 0.36,
               height: constraints.maxHeight * 0.54,
+              color: Colors.blue,
             ),
 
             // 本棚
@@ -61,6 +62,7 @@ class _RoomPageState extends State<RoomPage> {
               top: constraints.maxHeight * 0.10,
               width: constraints.maxWidth * 0.205,
               height: constraints.maxHeight * 0.72,
+              color: Colors.green,
             ),
 
             // 机
@@ -70,6 +72,7 @@ class _RoomPageState extends State<RoomPage> {
               top: constraints.maxHeight * 0.53,
               width: constraints.maxWidth * 0.265,
               height: constraints.maxHeight * 0.42,
+              color: Colors.orange,
             ),
 
             // 瓶
@@ -79,6 +82,7 @@ class _RoomPageState extends State<RoomPage> {
               top: constraints.maxHeight * 0.315,
               width: constraints.maxWidth * 0.105,
               height: constraints.maxHeight * 0.28,
+              color: Colors.yellow,
             ),
           ],
         );
@@ -98,6 +102,7 @@ class _RoomPageState extends State<RoomPage> {
     required double top,
     required double width,
     required double height,
+    required Color color,
   }) {
     return Positioned(
       left: left,
@@ -109,7 +114,7 @@ class _RoomPageState extends State<RoomPage> {
         onTap: () => _onAreaTapped(name),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.08),
+            color: color.withValues(alpha: 0.2),
             border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
           ),
           alignment: Alignment.center,
