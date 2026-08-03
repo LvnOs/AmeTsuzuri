@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart';
 import 'package:ame_tsuzuri/features/catalog/presentation/catalog_page.dart';
-import 'package:ame_tsuzuri/features/letters/presentation/letters_page.dart';
+import 'package:ame_tsuzuri/features/letters/presentation/letter_page.dart';
+import 'package:ame_tsuzuri/features/letters/model/letter.dart';
 
 class RoomPage extends StatefulWidget {
   const RoomPage({super.key});
@@ -34,10 +35,19 @@ class _RoomPageState extends State<RoomPage> {
   }
 
   // 手紙ページへの遷移
-  void _onTapLetters() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (context) => const LettersPage()));
+  void _onTapDesk() {
+    final letter = Letter(
+      id: '2026-08-07',
+      title: '朝顔',
+      date: DateTime(2026, 8, 7),
+      body:
+          '雨の朝、朝顔の花は少しだけ重たそうに揺れていました。\n\n'
+          'けれど、花びらに残った雫は、晴れた朝には見られない光を映しています。',
+    );
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const LetterPage(letter: letter)),
+    );
   }
 
   // 目録ページへの遷移
@@ -104,7 +114,7 @@ class _RoomPageState extends State<RoomPage> {
               width: constraints.maxWidth * 0.265,
               height: constraints.maxHeight * 0.42,
               color: Colors.orange,
-              onTap: _onTapLetters,
+              onTap: _onTapDesk,
             ),
 
             // 瓶
