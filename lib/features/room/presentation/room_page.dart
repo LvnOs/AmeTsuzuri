@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart';
 
 class RoomPage extends StatefulWidget {
   const RoomPage({super.key});
@@ -16,6 +17,12 @@ class _RoomPageState extends State<RoomPage> {
     });
 
     debugPrint('$areaName tapped');
+  }
+
+  void _onTapBookshelf() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (context) => const BookshelfPage()),
+    );
   }
 
   @override
@@ -53,6 +60,7 @@ class _RoomPageState extends State<RoomPage> {
               width: constraints.maxWidth * 0.36,
               height: constraints.maxHeight * 0.54,
               color: Colors.blue,
+              onTap: _onTapBookshelf,
             ),
 
             // 本棚
@@ -63,6 +71,7 @@ class _RoomPageState extends State<RoomPage> {
               width: constraints.maxWidth * 0.205,
               height: constraints.maxHeight * 0.72,
               color: Colors.green,
+              onTap: _onTapBookshelf,
             ),
 
             // 机
@@ -73,6 +82,7 @@ class _RoomPageState extends State<RoomPage> {
               width: constraints.maxWidth * 0.265,
               height: constraints.maxHeight * 0.42,
               color: Colors.orange,
+              onTap: _onTapBookshelf,
             ),
 
             // 瓶
@@ -83,6 +93,7 @@ class _RoomPageState extends State<RoomPage> {
               width: constraints.maxWidth * 0.105,
               height: constraints.maxHeight * 0.28,
               color: Colors.yellow,
+              onTap: _onTapBookshelf,
             ),
           ],
         );
@@ -103,6 +114,7 @@ class _RoomPageState extends State<RoomPage> {
     required double width,
     required double height,
     required Color color,
+    required VoidCallback onTap,
     bool showDebugArea = true,
   }) {
     return Positioned(
@@ -112,7 +124,7 @@ class _RoomPageState extends State<RoomPage> {
       height: height,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => _onAreaTapped(name),
+        onTap: onTap,
         child: Container(
           decoration: showDebugArea
               ? BoxDecoration(
