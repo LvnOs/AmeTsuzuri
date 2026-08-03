@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart';
+import 'package:ame_tsuzuri/features/catalog/presentation/catalog_page.dart';
 
 class RoomPage extends StatefulWidget {
   const RoomPage({super.key});
@@ -19,10 +20,18 @@ class _RoomPageState extends State<RoomPage> {
     debugPrint('$areaName tapped');
   }
 
+  // 本棚ページへの遷移
   void _onTapBookshelf() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (context) => const BookshelfPage()),
     );
+  }
+
+  // 目録ページへの遷移
+  void _onTapCatalog() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (context) => const CatalogPage()));
   }
 
   @override
@@ -93,7 +102,7 @@ class _RoomPageState extends State<RoomPage> {
               width: constraints.maxWidth * 0.105,
               height: constraints.maxHeight * 0.28,
               color: Colors.yellow,
-              onTap: _onTapBookshelf,
+              onTap: _onTapCatalog,
             ),
           ],
         );
