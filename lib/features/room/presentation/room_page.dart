@@ -27,10 +27,7 @@ class _RoomPageState extends State<RoomPage> {
           children: [
             Expanded(
               child: Center(
-                child: AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: _buildRoom(),
-                ),
+                child: AspectRatio(aspectRatio: 16 / 9, child: _buildRoom()),
               ),
             ),
             _buildMessageArea(),
@@ -52,36 +49,36 @@ class _RoomPageState extends State<RoomPage> {
             _buildTapArea(
               name: '窓',
               left: constraints.maxWidth * 0.30,
-              top: constraints.maxHeight * 0.08,
-              width: constraints.maxWidth * 0.40,
-              height: constraints.maxHeight * 0.42,
+              top: constraints.maxHeight * 0.06,
+              width: constraints.maxWidth * 0.36,
+              height: constraints.maxHeight * 0.54,
             ),
 
             // 本棚
             _buildTapArea(
               name: '本棚',
-              left: constraints.maxWidth * 0.05,
-              top: constraints.maxHeight * 0.30,
-              width: constraints.maxWidth * 0.18,
-              height: constraints.maxHeight * 0.48,
+              left: constraints.maxWidth * 0.055,
+              top: constraints.maxHeight * 0.10,
+              width: constraints.maxWidth * 0.205,
+              height: constraints.maxHeight * 0.72,
             ),
 
             // 机
             _buildTapArea(
               name: '机',
-              left: constraints.maxWidth * 0.72,
-              top: constraints.maxHeight * 0.45,
-              width: constraints.maxWidth * 0.23,
-              height: constraints.maxHeight * 0.38,
+              left: constraints.maxWidth * 0.60,
+              top: constraints.maxHeight * 0.53,
+              width: constraints.maxWidth * 0.265,
+              height: constraints.maxHeight * 0.42,
             ),
 
             // 瓶
             _buildTapArea(
               name: '瓶',
-              left: constraints.maxWidth * 0.68,
-              top: constraints.maxHeight * 0.30,
-              width: constraints.maxWidth * 0.08,
-              height: constraints.maxHeight * 0.20,
+              left: constraints.maxWidth * 0.69,
+              top: constraints.maxHeight * 0.315,
+              width: constraints.maxWidth * 0.105,
+              height: constraints.maxHeight * 0.28,
             ),
           ],
         );
@@ -91,38 +88,7 @@ class _RoomPageState extends State<RoomPage> {
 
   Widget _buildBackground() {
     return Positioned.fill(
-      child: Image.asset(
-        'assets/images/background.jpg',
-        fit: BoxFit.cover,
-      ),
-    );
-  }
-
-  Widget _buildTemporaryBackground() {
-    
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF61756B),
-            Color(0xFF3C4A43),
-            Color(0xFF2C2925),
-          ],
-        ),
-      ),
-      child: const Center(
-        child: Text(
-          '雨つづり。\n居間・仮背景',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Colors.white70,
-            fontSize: 24,
-            height: 1.6,
-          ),
-        ),
-      ),
+      child: Image.asset('assets/images/background.jpg', fit: BoxFit.cover),
     );
   }
 
@@ -144,9 +110,7 @@ class _RoomPageState extends State<RoomPage> {
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.08),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.35),
-            ),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
           ),
           alignment: Alignment.center,
           child: Text(
@@ -164,18 +128,12 @@ class _RoomPageState extends State<RoomPage> {
   Widget _buildMessageArea() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        horizontal: 24,
-        vertical: 16,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       color: const Color(0xFF201F1C),
       child: Text(
         _selectedArea,
         textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: Color(0xFFE8E1D4),
-          fontSize: 16,
-        ),
+        style: const TextStyle(color: Color(0xFFE8E1D4), fontSize: 16),
       ),
     );
   }
