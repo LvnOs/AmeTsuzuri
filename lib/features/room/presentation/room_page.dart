@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart';
 import 'package:ame_tsuzuri/features/catalog/presentation/catalog_page.dart';
+import 'package:ame_tsuzuri/features/letters/presentation/letters_page.dart';
 
 class RoomPage extends StatefulWidget {
   const RoomPage({super.key});
@@ -20,11 +21,23 @@ class _RoomPageState extends State<RoomPage> {
     debugPrint('$areaName tapped');
   }
 
+  // 窓の操作
+  void onTapWindow() {
+    _onAreaTapped('窓');
+  }
+
   // 本棚ページへの遷移
   void _onTapBookshelf() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (context) => const BookshelfPage()),
     );
+  }
+
+  // 手紙ページへの遷移
+  void _onTapLetters() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (context) => const LettersPage()));
   }
 
   // 目録ページへの遷移
@@ -69,7 +82,7 @@ class _RoomPageState extends State<RoomPage> {
               width: constraints.maxWidth * 0.36,
               height: constraints.maxHeight * 0.54,
               color: Colors.blue,
-              onTap: _onTapBookshelf,
+              onTap: onTapWindow,
             ),
 
             // 本棚
@@ -91,7 +104,7 @@ class _RoomPageState extends State<RoomPage> {
               width: constraints.maxWidth * 0.265,
               height: constraints.maxHeight * 0.42,
               color: Colors.orange,
-              onTap: _onTapBookshelf,
+              onTap: _onTapLetters,
             ),
 
             // 瓶
