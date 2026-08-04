@@ -29,9 +29,9 @@ class _RoomPageState extends State<RoomPage> {
 
   // 本棚ページへの遷移
   void _onTapBookshelf() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (context) => const BookshelfPage()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (context) => BookshelfPage()));
   }
 
   // 手紙ページへの遷移
