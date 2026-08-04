@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart';
 import 'package:ame_tsuzuri/features/catalog/presentation/catalog_page.dart';
 import 'package:ame_tsuzuri/features/letters/presentation/letter_page.dart';
-import 'package:ame_tsuzuri/features/letters/model/letter.dart';
+import 'package:ame_tsuzuri/features/letters/repository/letter_repository.dart';
 
 class RoomPage extends StatefulWidget {
   const RoomPage({super.key});
@@ -35,15 +35,15 @@ class _RoomPageState extends State<RoomPage> {
   }
 
   // 手紙ページへの遷移
-  void _onTapDesk() {
-    final letter = Letter(
-      id: '2026-08-07',
-      title: '朝顔',
-      date: DateTime(2026, 8, 7),
-      body:
-          '雨の朝、朝顔の花は少しだけ重たそうに揺れていました。\n\n'
-          'けれど、花びらに残った雫は、晴れた朝には見られない光を映しています。',
-    );
+  Future<void> _onTapDesk() async {
+    final repository = LetterRepository();
+    final letters = await repository.getAll();
+
+    if (!mounted || letters.isEmpty) {
+      return;
+    }
+
+    final letter = letters.first;
 
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (context) => LetterPage(letter: letter)),
