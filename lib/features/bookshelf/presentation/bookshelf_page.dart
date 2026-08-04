@@ -2,33 +2,16 @@ import 'package:flutter/material.dart';
 
 import '../../letters/model/letter.dart';
 import '../../letters/presentation/letter_page.dart';
+import '../../letters/repository/letter_repository.dart';
 
 class BookshelfPage extends StatelessWidget {
   BookshelfPage({super.key});
 
-  final List<Letter> letters = [
-    Letter(
-      id: '2026-08-07',
-      title: '朝顔',
-      date: DateTime(2026, 8, 7),
-      body: '朝顔の手紙本文です。',
-    ),
-    Letter(
-      id: '2026-08-08',
-      title: '風鈴',
-      date: DateTime(2026, 8, 8),
-      body: '風鈴の手紙本文です。',
-    ),
-    Letter(
-      id: '2026-08-09',
-      title: 'カエル',
-      date: DateTime(2026, 8, 9),
-      body: 'カエルの手紙本文です。',
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final repository = LetterRepository();
+    final List<Letter> letters = repository.getAll();
+
     return Scaffold(
       appBar: AppBar(title: const Text('本棚')),
       body: ListView.builder(
