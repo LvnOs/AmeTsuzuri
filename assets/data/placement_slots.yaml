@@ -1,0 +1,104 @@
+schema_version: "1.0"
+
+rooms:
+
+  - id: living_room
+    name: 居間
+
+    slots:
+
+      #==================================================
+      # 机
+      #==================================================
+
+      - id: living_room_desk_surface_left
+        name: 机（左）
+        type: surface
+        max_items: 1
+
+      - id: living_room_desk_surface_center
+        name: 机（中央）
+        type: surface
+        max_items: 1
+
+      - id: living_room_desk_surface_right
+        name: 机（右）
+        type: surface
+        max_items: 1
+
+      - id: living_room_desk_surface_front
+        name: 机（手前）
+        type: surface
+        max_items: 1
+
+      - id: living_room_desk_surface_back
+        name: 机（奥）
+        type: surface
+        max_items: 1
+
+      #==================================================
+      # 本棚
+      #==================================================
+
+      - id: living_room_bookshelf_top_left
+        name: 本棚 上段（左）
+        type: surface
+        max_items: 1
+
+      - id: living_room_bookshelf_top_right
+        name: 本棚 上段（右）
+        type: surface
+        max_items: 1
+
+      - id: living_room_bookshelf_bottom_left
+        name: 本棚 下段（左）
+        type: surface
+        max_items: 1
+
+      - id: living_room_bookshelf_bottom_right
+        name: 本棚 下段（右）
+        type: surface
+        max_items: 1
+
+      #==================================================
+      # 窓
+      #==================================================
+
+      - id: living_room_window_vase
+        name: 窓際（一輪挿し）
+        type: surface
+        max_items: 1
+
+      - id: living_room_window_shelf_decor
+        name: 窓際（棚）
+        type: surface
+        max_items: 1
+
+      - id: living_room_window_hanging_decor
+        name: 窓際（吊り飾り）
+        type: hanging
+        max_items: 1
+
+      - id: living_room_window_curtain
+        name: カーテン
+        type: curtain
+        max_items: 1
+
+      #==================================================
+      # 部屋
+      #==================================================
+
+      - id: living_room_lamp
+        name: ランプ
+        type: furniture
+        max_items: 1
+
+      - id: living_room_floor_rug
+        name: ラグ
+        type: floor
+        max_items: 1
+
+      - id: living_room_chair
+        name: 椅子
+        type: furniture
+        max_items: 1

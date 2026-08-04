@@ -1,26 +1,29 @@
+import 'package:flutter/services.dart';
+import 'package:yaml/yaml.dart';
+
 import '../model/letter.dart';
 
 class LetterRepository {
-  List<Letter> getAll() {
-    return [
-      Letter(
-        id: '2026-08-07',
-        title: '朝顔',
-        date: DateTime(2026, 8, 7),
-        body: '朝顔の手紙本文です。',
-      ),
-      Letter(
-        id: '2026-08-08',
-        title: '風鈴',
-        date: DateTime(2026, 8, 8),
-        body: '風鈴の手紙本文です。',
-      ),
-      Letter(
-        id: '2026-08-09',
-        title: 'カエル',
-        date: DateTime(2026, 8, 9),
-        body: 'カエルの手紙本文です。',
-      ),
-    ];
+  Future<List<Letter>> getAll() async {
+    final yamlString = await rootBundle.loadString('assets/data/letters.yaml');
+    // YAMLファイルの構造上、以下の取得方法となる
+    final yaml = loadYaml(yamlString)["letters"];
+
+    final List<Letter> letters = [];
+
+    for (final item in yaml) {
+      final bodyFile = item['body_file'] as String;
+      final body = await rootBundle.loadString('assets/$bodyFile');
+
+      letters.add(
+        Letter(
+          id: item["id"],
+          title: item["title"],
+          date: DateTime.parse(item["date"]),
+          body: body,
+        ),
+      );
+    }
+    return letters;
   }
 }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../letters/model/letter.dart';
+// import '../../letters/model/letter.dart';
 import '../../letters/presentation/letter_page.dart';
 import '../../letters/repository/letter_repository.dart';
 
@@ -10,24 +10,32 @@ class BookshelfPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final repository = LetterRepository();
-    final List<Letter> letters = repository.getAll();
-
     return Scaffold(
       appBar: AppBar(title: const Text('本棚')),
-      body: ListView.builder(
-        itemCount: letters.length,
-        itemBuilder: (context, index) {
-          final letter = letters[index];
+      body: FutureBuilder(
+        future: repository.getAll(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-          return ListTile(
-            title: Text(letter.title),
-            subtitle: Text(_formatDate(letter.date)),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (context) => LetterPage(letter: letter),
-                ),
+          final letters = snapshot.data!;
+          return ListView.builder(
+            itemCount: letters.length,
+            itemBuilder: (context, index) {
+              final letter = letters[index];
+
+              return ListTile(
+                title: Text(letter.title),
+                subtitle: Text(_formatDate(letter.date)),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (context) => LetterPage(letter: letter),
+                    ),
+                  );
+                },
               );
             },
           );

@@ -1,0 +1,478 @@
+schema_version: "1.0"
+
+pricing:
+  drops_per_rainy_visit: 10
+  first_rain_bonus_drops: 30
+  tiers:
+    small:
+      price: 30
+      estimated_rainy_visits: 3
+    medium:
+      price: 50
+      estimated_rainy_visits: 5
+    large:
+      price: 100
+      estimated_rainy_visits: 10
+
+notes:
+  - 価格は通常の雨の日1回につき10滴を基準とする。
+  - 初めて雨の日に訪れたときは、小さい家具を1つ交換できる30滴を受け取る。
+  - 家具説明文と季節制限はプロトタイプでは持たせない。
+  - 配置可能場所は配置スロットIDで管理する。
+  - 画像ファイル名は仮称であり、アセット制作時に変更してよい。
+
+furniture:
+  - id: wooden_mug
+    name: 木のマグカップ
+    price: 30
+    size: small
+    slots:
+      - living_room_desk_surface_left
+      - living_room_desk_surface_center
+      - living_room_desk_surface_right
+    image: furniture/desk/wooden_mug.png
+    initial_available: true
+
+  - id: tea_cup
+    name: ティーカップ
+    price: 30
+    size: small
+    slots:
+      - living_room_desk_surface_left
+      - living_room_desk_surface_center
+      - living_room_desk_surface_right
+    image: furniture/desk/tea_cup.png
+    initial_available: true
+
+  - id: coffee_cup
+    name: コーヒーカップ
+    price: 30
+    size: small
+    slots:
+      - living_room_desk_surface_left
+      - living_room_desk_surface_center
+      - living_room_desk_surface_right
+    image: furniture/desk/coffee_cup.png
+    initial_available: true
+
+  - id: wooden_pen_holder
+    name: 木のペン立て
+    price: 30
+    size: small
+    slots:
+      - living_room_desk_surface_left
+      - living_room_desk_surface_center
+      - living_room_desk_surface_right
+      - living_room_desk_surface_back
+    image: furniture/desk/wooden_pen_holder.png
+    initial_available: true
+
+  - id: fountain_pen
+    name: 万年筆
+    price: 30
+    size: small
+    slots:
+      - living_room_desk_surface_left
+      - living_room_desk_surface_center
+      - living_room_desk_surface_right
+      - living_room_desk_surface_front
+    image: furniture/desk/fountain_pen.png
+    initial_available: true
+
+  - id: ink_bottle
+    name: インク瓶
+    price: 30
+    size: small
+    slots:
+      - living_room_desk_surface_left
+      - living_room_desk_surface_center
+      - living_room_desk_surface_right
+      - living_room_desk_surface_back
+    image: furniture/desk/ink_bottle.png
+    initial_available: true
+
+  - id: quill_pen
+    name: 羽ペン
+    price: 30
+    size: small
+    slots:
+      - living_room_desk_surface_left
+      - living_room_desk_surface_center
+      - living_room_desk_surface_right
+      - living_room_desk_surface_back
+    image: furniture/desk/quill_pen.png
+    initial_available: true
+
+  - id: small_notepad
+    name: 小さなメモ帳
+    price: 30
+    size: small
+    slots:
+      - living_room_desk_surface_left
+      - living_room_desk_surface_center
+      - living_room_desk_surface_right
+      - living_room_desk_surface_front
+    image: furniture/desk/small_notepad.png
+    initial_available: true
+
+  - id: wooden_photo_frame
+    name: 木の写真立て
+    price: 30
+    size: small
+    slots:
+      - living_room_desk_surface_left
+      - living_room_desk_surface_right
+      - living_room_desk_surface_back
+      - living_room_bookshelf_top_left
+      - living_room_bookshelf_top_right
+    image: furniture/decor/wooden_photo_frame.png
+    initial_available: true
+
+  - id: small_frame
+    name: 小さな額縁
+    price: 30
+    size: small
+    slots:
+      - living_room_desk_surface_left
+      - living_room_desk_surface_right
+      - living_room_desk_surface_back
+      - living_room_bookshelf_top_left
+      - living_room_bookshelf_top_right
+    image: furniture/decor/small_frame.png
+    initial_available: true
+
+  - id: wooden_fox_figure
+    name: 木彫りのキツネ
+    price: 30
+    size: small
+    slots:
+      - living_room_desk_surface_left
+      - living_room_desk_surface_right
+      - living_room_bookshelf_top_left
+      - living_room_bookshelf_top_right
+      - living_room_bookshelf_bottom_left
+      - living_room_bookshelf_bottom_right
+    image: furniture/decor/wooden_fox_figure.png
+    initial_available: true
+
+  - id: small_clock
+    name: 小さな時計
+    price: 30
+    size: small
+    slots:
+      - living_room_desk_surface_left
+      - living_room_desk_surface_right
+      - living_room_desk_surface_back
+      - living_room_bookshelf_top_left
+      - living_room_bookshelf_top_right
+    image: furniture/decor/small_clock.png
+    initial_available: true
+
+  - id: wooden_tray
+    name: 木のトレー
+    price: 30
+    size: small
+    slots:
+      - living_room_desk_surface_left
+      - living_room_desk_surface_center
+      - living_room_desk_surface_right
+      - living_room_desk_surface_front
+    image: furniture/desk/wooden_tray.png
+    initial_available: true
+
+  - id: glass_paperweight
+    name: ガラスの文鎮
+    price: 30
+    size: small
+    slots:
+      - living_room_desk_surface_left
+      - living_room_desk_surface_center
+      - living_room_desk_surface_right
+      - living_room_desk_surface_front
+    image: furniture/desk/glass_paperweight.png
+    initial_available: true
+
+  - id: pressed_flower
+    name: 押し花
+    price: 30
+    size: small
+    slots:
+      - living_room_desk_surface_left
+      - living_room_desk_surface_center
+      - living_room_desk_surface_right
+      - living_room_desk_surface_front
+    image: furniture/desk/pressed_flower.png
+    initial_available: true
+
+  - id: wooden_bookends
+    name: 木のブックエンド
+    price: 50
+    size: medium
+    slots:
+      - living_room_bookshelf_top_left
+      - living_room_bookshelf_top_right
+      - living_room_bookshelf_bottom_left
+      - living_room_bookshelf_bottom_right
+    image: furniture/bookshelf/wooden_bookends.png
+    initial_available: true
+
+  - id: small_plant_pot
+    name: 小さな植木鉢
+    price: 50
+    size: medium
+    slots:
+      - living_room_bookshelf_top_left
+      - living_room_bookshelf_top_right
+      - living_room_bookshelf_bottom_left
+      - living_room_bookshelf_bottom_right
+    image: furniture/bookshelf/small_plant_pot.png
+    initial_available: true
+
+  - id: decorative_glass_bottle
+    name: 飾りのガラス瓶
+    price: 50
+    size: medium
+    slots:
+      - living_room_bookshelf_top_left
+      - living_room_bookshelf_top_right
+      - living_room_bookshelf_bottom_left
+      - living_room_bookshelf_bottom_right
+    image: furniture/bookshelf/decorative_glass_bottle.png
+    initial_available: true
+
+  - id: small_lantern
+    name: 小さなランタン
+    price: 50
+    size: medium
+    slots:
+      - living_room_bookshelf_top_left
+      - living_room_bookshelf_top_right
+      - living_room_bookshelf_bottom_left
+      - living_room_bookshelf_bottom_right
+    image: furniture/bookshelf/small_lantern.png
+    initial_available: true
+
+  - id: dried_flowers
+    name: ドライフラワー
+    price: 50
+    size: medium
+    slots:
+      - living_room_bookshelf_top_left
+      - living_room_bookshelf_top_right
+      - living_room_bookshelf_bottom_left
+      - living_room_bookshelf_bottom_right
+    image: furniture/bookshelf/dried_flowers.png
+    initial_available: true
+
+  - id: small_wooden_box
+    name: 小さな木箱
+    price: 50
+    size: medium
+    slots:
+      - living_room_bookshelf_top_left
+      - living_room_bookshelf_top_right
+      - living_room_bookshelf_bottom_left
+      - living_room_bookshelf_bottom_right
+    image: furniture/bookshelf/small_wooden_box.png
+    initial_available: true
+
+  - id: small_globe
+    name: 小さな地球儀
+    price: 50
+    size: medium
+    slots:
+      - living_room_bookshelf_top_left
+      - living_room_bookshelf_top_right
+      - living_room_bookshelf_bottom_left
+      - living_room_bookshelf_bottom_right
+    image: furniture/bookshelf/small_globe.png
+    initial_available: true
+
+  - id: wooden_bird_figure
+    name: 木彫りの鳥
+    price: 50
+    size: medium
+    slots:
+      - living_room_bookshelf_top_left
+      - living_room_bookshelf_top_right
+      - living_room_bookshelf_bottom_left
+      - living_room_bookshelf_bottom_right
+      - living_room_window_shelf_decor
+    image: furniture/decor/wooden_bird_figure.png
+    initial_available: true
+
+  - id: music_box
+    name: オルゴール
+    price: 50
+    size: medium
+    slots:
+      - living_room_bookshelf_top_left
+      - living_room_bookshelf_top_right
+      - living_room_bookshelf_bottom_left
+      - living_room_bookshelf_bottom_right
+    image: furniture/bookshelf/music_box.png
+    initial_available: true
+
+  - id: single_flower_vase
+    name: 一輪挿し
+    price: 50
+    size: medium
+    slots:
+      - living_room_window_vase
+    image: furniture/window/single_flower_vase.png
+    initial_available: true
+
+  - id: sun_catcher
+    name: サンキャッチャー
+    price: 50
+    size: medium
+    slots:
+      - living_room_window_hanging_decor
+    image: furniture/window/sun_catcher.png
+    initial_available: true
+
+  - id: small_glass_ornament
+    name: 小さなガラス細工
+    price: 50
+    size: medium
+    slots:
+      - living_room_window_shelf_decor
+      - living_room_bookshelf_top_left
+      - living_room_bookshelf_top_right
+    image: furniture/window/small_glass_ornament.png
+    initial_available: true
+
+  - id: white_linen_curtains
+    name: 白いリネンのカーテン
+    price: 100
+    size: large
+    slots:
+      - living_room_window_curtain
+    image: furniture/curtain/white_linen_curtains.png
+    initial_available: true
+
+  - id: beige_curtains
+    name: ベージュのカーテン
+    price: 100
+    size: large
+    slots:
+      - living_room_window_curtain
+    image: furniture/curtain/beige_curtains.png
+    initial_available: true
+
+  - id: deep_green_curtains
+    name: 深緑のカーテン
+    price: 100
+    size: large
+    slots:
+      - living_room_window_curtain
+    image: furniture/curtain/deep_green_curtains.png
+    initial_available: true
+
+  - id: rain_blue_curtains
+    name: 雨色のカーテン
+    price: 100
+    size: large
+    slots:
+      - living_room_window_curtain
+    image: furniture/curtain/rain_blue_curtains.png
+    initial_available: true
+
+  - id: wooden_stand_lamp
+    name: 木製スタンドランプ
+    price: 50
+    size: medium
+    slots:
+      - living_room_lamp
+    image: furniture/lamp/wooden_stand_lamp.png
+    initial_available: true
+
+  - id: brass_lamp
+    name: 真鍮ランプ
+    price: 50
+    size: medium
+    slots:
+      - living_room_lamp
+    image: furniture/lamp/brass_lamp.png
+    initial_available: true
+
+  - id: glass_lamp
+    name: ガラスランプ
+    price: 50
+    size: medium
+    slots:
+      - living_room_lamp
+    image: furniture/lamp/glass_lamp.png
+    initial_available: true
+
+  - id: antique_lantern_lamp
+    name: アンティークランタン
+    price: 50
+    size: medium
+    slots:
+      - living_room_lamp
+    image: furniture/lamp/antique_lantern_lamp.png
+    initial_available: true
+
+  - id: round_rug
+    name: 丸いラグ
+    price: 100
+    size: large
+    slots:
+      - living_room_floor_rug
+    image: furniture/rug/round_rug.png
+    initial_available: true
+
+  - id: rectangular_rug
+    name: 四角いラグ
+    price: 100
+    size: large
+    slots:
+      - living_room_floor_rug
+    image: furniture/rug/rectangular_rug.png
+    initial_available: true
+
+  - id: patchwork_rug
+    name: パッチワークラグ
+    price: 100
+    size: large
+    slots:
+      - living_room_floor_rug
+    image: furniture/rug/patchwork_rug.png
+    initial_available: true
+
+  - id: wool_rug
+    name: 毛織りのラグ
+    price: 100
+    size: large
+    slots:
+      - living_room_floor_rug
+    image: furniture/rug/wool_rug.png
+    initial_available: true
+
+  - id: wooden_chair
+    name: 木製チェア
+    price: 100
+    size: large
+    slots:
+      - living_room_chair
+    image: furniture/chair/wooden_chair.png
+    initial_available: true
+
+  - id: cushioned_chair
+    name: クッション付きチェア
+    price: 100
+    size: large
+    slots:
+      - living_room_chair
+    image: furniture/chair/cushioned_chair.png
+    initial_available: true
+
+  - id: rocking_chair
+    name: ロッキングチェア
+    price: 100
+    size: large
+    slots:
+      - living_room_chair
+    image: furniture/chair/rocking_chair.png
+    initial_available: true
