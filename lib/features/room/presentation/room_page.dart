@@ -46,7 +46,7 @@ class _RoomPageState extends State<RoomPage> {
     );
 
     Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const LetterPage(letter: letter)),
+      MaterialPageRoute<void>(builder: (context) => LetterPage(letter: letter)),
     );
   }
 

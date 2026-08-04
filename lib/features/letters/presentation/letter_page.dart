@@ -21,9 +21,12 @@ class LetterPage extends StatelessWidget {
             children: [
               Text(
                 letter.title,
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(
                 _formatDate(letter.date),
                 style: TextStyle(fontSize: 14, color: Colors.black54),
