@@ -3,6 +3,7 @@ import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart'
 import 'package:ame_tsuzuri/features/catalog/presentation/catalog_page.dart';
 import 'package:ame_tsuzuri/features/letters/presentation/letter_page.dart';
 import 'package:ame_tsuzuri/features/letters/repository/letter_repository.dart';
+import 'package:ame_tsuzuri/features/letters/repository/read_letter_repository.dart';
 
 class RoomPage extends StatefulWidget {
   const RoomPage({super.key});
@@ -13,7 +14,36 @@ class RoomPage extends StatefulWidget {
 
 class _RoomPageState extends State<RoomPage> {
   String _selectedArea = '部屋の中をタップしてみてください';
-  final Set<String> _readLetterIds = {};
+
+  final ReadLetterRepository _readLetterRepository = ReadLetterRepository();
+
+  Set<String> _readLetterIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReadLetterIds();
+  }
+
+  Future<void> _loadReadLetterIds() async {
+    final ids = await _readLetterRepository.loadReadLetterIds();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _readLetterIds = ids;
+    });
+  }
+
+  Future<void> _markLetterAsRead(String letterId) async {
+    setState(() {
+      _readLetterIds.add(letterId);
+    });
+
+    await _readLetterRepository.saveReadLetterIds(_readLetterIds);
+  }
 
   void _onAreaTapped(String areaName) {
     setState(() {
@@ -53,9 +83,7 @@ class _RoomPageState extends State<RoomPage> {
       return;
     }
 
-    setState(() {
-      _readLetterIds.add(letter.id);
-    });
+    await _markLetterAsRead(letter.id);
 
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (context) => LetterPage(letter: letter)),
