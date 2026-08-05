@@ -3,6 +3,7 @@ import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart'
 import 'package:ame_tsuzuri/features/catalog/presentation/catalog_page.dart';
 import 'package:ame_tsuzuri/features/letters/presentation/letter_page.dart';
 import 'package:ame_tsuzuri/features/letters/repository/letter_repository.dart';
+import 'package:ame_tsuzuri/features/letters/provider/read_letter_provider.dart';
 import 'package:provider/provider.dart';
 
 class RoomPage extends StatefulWidget {
@@ -52,7 +53,7 @@ class _RoomPageState extends State<RoomPage> {
       return;
     }
 
-    await context.read().markAsRead(letter.id);
+    await context.read<ReadLetterProvider>().markAsRead(letter.id);
 
     if (!mounted) {
       return;
