@@ -3,7 +3,7 @@ import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart'
 import 'package:ame_tsuzuri/features/catalog/presentation/catalog_page.dart';
 import 'package:ame_tsuzuri/features/letters/presentation/letter_page.dart';
 import 'package:ame_tsuzuri/features/letters/repository/letter_repository.dart';
-import 'package:ame_tsuzuri/features/letters/repository/read_letter_repository.dart';
+import 'package:provider/provider.dart';
 
 class RoomPage extends StatefulWidget {
   const RoomPage({super.key});
@@ -14,36 +14,6 @@ class RoomPage extends StatefulWidget {
 
 class _RoomPageState extends State<RoomPage> {
   String _selectedArea = '部屋の中をタップしてみてください';
-
-  final ReadLetterRepository _readLetterRepository = ReadLetterRepository();
-
-  Set<String> _readLetterIds = {};
-
-  @override
-  void initState() {
-    super.initState();
-    _loadReadLetterIds();
-  }
-
-  Future<void> _loadReadLetterIds() async {
-    final ids = await _readLetterRepository.loadReadLetterIds();
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _readLetterIds = ids;
-    });
-  }
-
-  Future<void> _markLetterAsRead(String letterId) async {
-    setState(() {
-      _readLetterIds.add(letterId);
-    });
-
-    await _readLetterRepository.saveReadLetterIds(_readLetterIds);
-  }
 
   void _onAreaTapped(String areaName) {
     setState(() {
@@ -61,9 +31,7 @@ class _RoomPageState extends State<RoomPage> {
   // 本棚ページへの遷移
   void _onTapBookshelf() {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (context) => BookshelfPage(readLetterIds: _readLetterIds),
-      ),
+      MaterialPageRoute<void>(builder: (context) => const BookshelfPage()),
     );
   }
 
@@ -75,6 +43,7 @@ class _RoomPageState extends State<RoomPage> {
     if (!mounted) {
       return;
     }
+
     if (letter == null) {
       ScaffoldMessenger.of(
         context,
@@ -83,7 +52,11 @@ class _RoomPageState extends State<RoomPage> {
       return;
     }
 
-    await _markLetterAsRead(letter.id);
+    await context.read().markAsRead(letter.id);
+
+    if (!mounted) {
+      return;
+    }
 
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (context) => LetterPage(letter: letter)),

@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-// import '../../letters/model/letter.dart';
 import '../../letters/presentation/letter_page.dart';
 import '../../letters/repository/letter_repository.dart';
+import '../../letters/provider/read_letter_provider.dart';
 
 class BookshelfPage extends StatelessWidget {
-  BookshelfPage({super.key, required this.readLetterIds});
-
-  final Set<String> readLetterIds;
+  const BookshelfPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final readLetterIds = context.watch<ReadLetterProvider>().readLetterIds;
     final repository = LetterRepository();
+
     return Scaffold(
       appBar: AppBar(title: const Text('本棚')),
       body: FutureBuilder(
