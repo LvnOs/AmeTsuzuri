@@ -13,6 +13,7 @@ class RoomPage extends StatefulWidget {
 
 class _RoomPageState extends State<RoomPage> {
   String _selectedArea = '部屋の中をタップしてみてください';
+  final Set<String> _readLetterIds = {};
 
   void _onAreaTapped(String areaName) {
     setState(() {
@@ -29,9 +30,11 @@ class _RoomPageState extends State<RoomPage> {
 
   // 本棚ページへの遷移
   void _onTapBookshelf() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (context) => BookshelfPage()));
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => BookshelfPage(readLetterIds: _readLetterIds),
+      ),
+    );
   }
 
   // 手紙ページへの遷移
@@ -49,6 +52,10 @@ class _RoomPageState extends State<RoomPage> {
 
       return;
     }
+
+    setState(() {
+      _readLetterIds.add(letter.id);
+    });
 
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (context) => LetterPage(letter: letter)),

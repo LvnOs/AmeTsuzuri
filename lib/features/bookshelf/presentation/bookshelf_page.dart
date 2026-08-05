@@ -5,7 +5,9 @@ import '../../letters/presentation/letter_page.dart';
 import '../../letters/repository/letter_repository.dart';
 
 class BookshelfPage extends StatelessWidget {
-  BookshelfPage({super.key});
+  BookshelfPage({super.key, required this.readLetterIds});
+
+  final Set<String> readLetterIds;
 
   @override
   Widget build(BuildContext context) {
@@ -15,15 +17,27 @@ class BookshelfPage extends StatelessWidget {
       body: FutureBuilder(
         future: repository.getAll(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final letters = snapshot.data!;
+          if (snapshot.hasError) {
+            return Center(child: Text('手紙の読み込みに失敗しました\n${snapshot.error}'));
+          }
+
+          final allLetters = snapshot.data ?? [];
+
+          final readLetters = allLetters
+              .where((letter) => readLetterIds.contains(letter.id))
+              .toList();
+
+          if (readLetters.isEmpty) {
+            return const Center(child: Text('まだ読んだ手紙はありません'));
+          }
           return ListView.builder(
-            itemCount: letters.length,
+            itemCount: readLetters.length,
             itemBuilder: (context, index) {
-              final letter = letters[index];
+              final letter = readLetters[index];
 
               return ListTile(
                 title: Text(letter.title),
