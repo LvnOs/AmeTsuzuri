@@ -37,13 +37,18 @@ class _RoomPageState extends State<RoomPage> {
   // 手紙ページへの遷移
   Future<void> _onTapDesk() async {
     final repository = LetterRepository();
-    final letters = await repository.getAll();
+    final letter = await repository.getTodayLetter();
 
-    if (!mounted || letters.isEmpty) {
+    if (!mounted) {
       return;
     }
+    if (letter == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('今日の手紙はまだ届いていません')));
 
-    final letter = letters.first;
+      return;
+    }
 
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (context) => LetterPage(letter: letter)),

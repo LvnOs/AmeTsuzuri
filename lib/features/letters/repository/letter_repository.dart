@@ -26,4 +26,24 @@ class LetterRepository {
     }
     return letters;
   }
+
+  Future<Letter?> getByDate(DateTime date) async {
+    List<Letter> letters = await getAll();
+    for (final letter in letters) {
+      if (_isSameDate(letter.date, date)) {
+        return letter;
+      }
+    }
+
+    return null;
+  }
+
+  Future<Letter?> getTodayLetter() async {
+    final today = DateTime.now();
+    return getByDate(today);
+  }
+
+  bool _isSameDate(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
 }
