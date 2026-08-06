@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart';
-import 'package:ame_tsuzuri/features/catalog/presentation/catalog_page.dart';
+import 'package:ame_tsuzuri/features/furniture/presentation/catalog_page.dart';
 import 'package:ame_tsuzuri/features/letters/presentation/letter_page.dart';
 import 'package:ame_tsuzuri/features/letters/repository/letter_repository.dart';
 import 'package:ame_tsuzuri/features/letters/provider/read_letter_provider.dart';
 import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
-import 'package:ame_tsuzuri/features/shizuku/provider/shizuku_provider.dart';
+import 'package:ame_tsuzuri/features/letters/provider/shizuku_provider.dart';
+import 'package:ame_tsuzuri/features/furniture/provider/catalog_provider.dart';
 
 class RoomPage extends StatefulWidget {
   const RoomPage({super.key});
@@ -86,6 +87,7 @@ class _RoomPageState extends State<RoomPage> {
   Future<void> _resetPrototypeData() async {
     await context.read<ReadLetterProvider>().reset();
     await context.read<ShizukuProvider>().reset();
+    await context.read<CatalogProvider>().reset();
 
     if (!mounted) {
       return;
@@ -204,7 +206,7 @@ class _RoomPageState extends State<RoomPage> {
         child: Container(
           decoration: showDebugArea
               ? BoxDecoration(
-                  color: color.withValues(alpha: 0.2),
+                  color: color.withValues(alpha: 0.01),
                   border: Border.all(
                     color: Colors.white.withValues(alpha: 0.35),
                   ),
@@ -249,11 +251,13 @@ class _RoomPageState extends State<RoomPage> {
                 context.read<AppDateProvider>().moveToNextDay();
               },
               child: const Text('翌日'),
+              style: ElevatedButton.styleFrom(minimumSize: Size(100, 50)),
             ),
             const SizedBox(height: 8),
             ElevatedButton(
               onPressed: _resetPrototypeData,
               child: const Text('リセット'),
+              style: ElevatedButton.styleFrom(minimumSize: Size(100, 50)),
             ),
           ],
         ),

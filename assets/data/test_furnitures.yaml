@@ -1,0 +1,14 @@
+schema_version: "1.0"
+
+furnitures:
+  - id: furniture_lamp
+    name: ランプ
+    price: 30
+
+  - id: furniture_chair
+    name: 木の椅子
+    price: 50
+
+  - id: furniture_plant
+    name: 観葉植物
+    price: 100

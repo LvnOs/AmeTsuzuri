@@ -21,16 +21,20 @@ class ShizukuProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> consumeShizuku(int amount) async {
-    if (_currentShizuku < amount) {
-      return;
+  Future<bool> consumeShizuku(int amount) async {
+    if (amount <= 0) {
+      return false;
     }
 
+    if (_currentShizuku < amount) {
+      return false;
+    }
     _currentShizuku -= amount;
 
     await _repository.saveCurrentShizuku(_currentShizuku);
 
     notifyListeners();
+    return true;
   }
 
   Future<void> reset() async {
