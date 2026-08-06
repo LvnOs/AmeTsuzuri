@@ -8,6 +8,7 @@ import 'package:ame_tsuzuri/features/letters/provider/read_letter_provider.dart'
 import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
 import 'package:ame_tsuzuri/features/letters/provider/shizuku_provider.dart';
 import 'package:ame_tsuzuri/features/furniture/provider/catalog_provider.dart';
+import 'package:ame_tsuzuri/features/furniture/provider/placed_furniture_provider.dart';
 
 class RoomPage extends StatefulWidget {
   const RoomPage({super.key});
@@ -88,6 +89,7 @@ class _RoomPageState extends State<RoomPage> {
     await context.read<ReadLetterProvider>().reset();
     await context.read<ShizukuProvider>().reset();
     await context.read<CatalogProvider>().reset();
+    await context.read<PlacedFurnitureProvider>().reset();
 
     if (!mounted) {
       return;
@@ -102,14 +104,20 @@ class _RoomPageState extends State<RoomPage> {
 
   @override
   Widget build(BuildContext context) {
+    final placedFurnitureIds = context
+        .watch<PlacedFurnitureProvider>()
+        .placedFurnitureIds;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF2F3A35),
       body: SafeArea(
         child: Column(
           children: [
             Expanded(
               child: Center(
-                child: AspectRatio(aspectRatio: 16 / 9, child: _buildRoom()),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: _buildRoom(placedFurnitureIds),
+                ),
               ),
             ),
             _buildMessageArea(),
@@ -119,13 +127,34 @@ class _RoomPageState extends State<RoomPage> {
     );
   }
 
-  Widget _buildRoom() {
+  Widget _buildRoom(Map<String, String> placedFurnitureIds) {
     return LayoutBuilder(
       builder: (context, constraints) {
         return Stack(
           fit: StackFit.expand,
           children: [
             _buildBackground(),
+
+            if (placedFurnitureIds['desk_top'] == 'furniture_lamp')
+              Positioned(
+                left: constraints.maxWidth * 0.68,
+                top: constraints.maxHeight * 0.46,
+                child: const Text('💡', style: TextStyle(fontSize: 40)),
+              ),
+
+            if (placedFurnitureIds['desk_front'] == 'furniture_chair')
+              Positioned(
+                left: constraints.maxWidth * 0.75,
+                top: constraints.maxHeight * 0.72,
+                child: const Text('🪑', style: TextStyle(fontSize: 44)),
+              ),
+
+            if (placedFurnitureIds['window_side'] == 'furniture_plant')
+              Positioned(
+                left: constraints.maxWidth * 0.62,
+                top: constraints.maxHeight * 0.38,
+                child: const Text('🪴', style: TextStyle(fontSize: 40)),
+              ),
 
             // 窓
             _buildTapArea(
@@ -251,13 +280,13 @@ class _RoomPageState extends State<RoomPage> {
                 context.read<AppDateProvider>().moveToNextDay();
               },
               child: const Text('翌日'),
-              style: ElevatedButton.styleFrom(minimumSize: Size(100, 50)),
+              style: ElevatedButton.styleFrom(minimumSize: Size(80, 40)),
             ),
             const SizedBox(height: 8),
             ElevatedButton(
               onPressed: _resetPrototypeData,
               child: const Text('リセット'),
-              style: ElevatedButton.styleFrom(minimumSize: Size(100, 50)),
+              style: ElevatedButton.styleFrom(minimumSize: Size(80, 40)),
             ),
           ],
         ),

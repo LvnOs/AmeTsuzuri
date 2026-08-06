@@ -20,6 +20,7 @@ class FurnitureRepository {
           id: item['id'] as String,
           name: item['name'] as String,
           price: item['price'] as int,
+          placementSlotId: item['placement_slot_id'] as String,
         ),
       );
     }

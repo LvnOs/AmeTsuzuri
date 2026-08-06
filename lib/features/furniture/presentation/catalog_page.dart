@@ -5,6 +5,7 @@ import '../../letters/provider/shizuku_provider.dart';
 import '../../furniture/model/furniture.dart';
 import '../../furniture/provider/catalog_provider.dart';
 import '../../furniture/repository/furniture_repository.dart';
+import '../provider/placed_furniture_provider.dart';
 
 class CatalogPage extends StatefulWidget {
   const CatalogPage({super.key});
@@ -77,10 +78,14 @@ class _CatalogPageState extends State<CatalogPage> {
                 trailing: isPurchased
                     ? const Icon(Icons.check)
                     : const Icon(Icons.chevron_right),
-                enabled: !isPurchased,
-                onTap: isPurchased
-                    ? null
-                    : () => _showPurchaseDialog(context, furniture),
+                // enabled: !isPurchased,
+                onTap: () {
+                  if (isPurchased) {
+                    _showPlacementDialog(context, furniture);
+                  } else {
+                    _showPurchaseDialog(context, furniture);
+                  }
+                },
               );
             },
           );
@@ -143,5 +148,51 @@ class _CatalogPageState extends State<CatalogPage> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _showPlacementDialog(
+    BuildContext context,
+    Furniture furniture,
+  ) async {
+    final shouldPlace = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(furniture.name),
+          content: const Text('この家具を部屋に配置しますか？'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(false);
+              },
+              child: const Text('やめる'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(true);
+              },
+              child: const Text('配置する'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldPlace != true || !context.mounted) {
+      return;
+    }
+
+    await context.read<PlacedFurnitureProvider>().place(
+      slotId: furniture.placementSlotId,
+      furnitureId: furniture.id,
+    );
+
+    if (!context.mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('${furniture.name}を配置しました')));
   }
 }

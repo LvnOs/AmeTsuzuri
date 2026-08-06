@@ -4,11 +4,14 @@ furnitures:
   - id: furniture_lamp
     name: ランプ
     price: 30
+    placement_slot_id: desk_top
 
   - id: furniture_chair
     name: 木の椅子
     price: 50
+    placement_slot_id: desk_front
 
   - id: furniture_plant
     name: 観葉植物
     price: 100
+    placement_slot_id: window_side
