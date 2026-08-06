@@ -16,11 +16,23 @@ class ReadLetterProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> markAsRead(String letterId) async {
+  Future<bool> markAsRead(String letterId) async {
+    if (_readLetterIds.contains(letterId)) {
+      return false;
+    }
+
     _readLetterIds.add(letterId);
 
     await _repository.saveReadLetterIds(_readLetterIds);
 
+    notifyListeners();
+
+    return true;
+  }
+
+  Future<void> reset() async {
+    await _repository.clear();
+    _readLetterIds = {};
     notifyListeners();
   }
 }

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart';
 import 'package:ame_tsuzuri/features/catalog/presentation/catalog_page.dart';
 import 'package:ame_tsuzuri/features/letters/presentation/letter_page.dart';
 import 'package:ame_tsuzuri/features/letters/repository/letter_repository.dart';
 import 'package:ame_tsuzuri/features/letters/provider/read_letter_provider.dart';
-import 'package:provider/provider.dart';
+import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
+import 'package:ame_tsuzuri/features/shizuku/provider/shizuku_provider.dart';
 
 class RoomPage extends StatefulWidget {
   const RoomPage({super.key});
@@ -39,7 +41,10 @@ class _RoomPageState extends State<RoomPage> {
   // 手紙ページへの遷移
   Future<void> _onTapDesk() async {
     final repository = LetterRepository();
-    final letter = await repository.getTodayLetter();
+    final readLetterProvider = context.read<ReadLetterProvider>();
+    final shizukuProvider = context.read<ShizukuProvider>();
+    final today = context.read<AppDateProvider>().today;
+    final letter = await repository.getByDate(today);
 
     if (!mounted) {
       return;
@@ -53,7 +58,14 @@ class _RoomPageState extends State<RoomPage> {
       return;
     }
 
-    await context.read<ReadLetterProvider>().markAsRead(letter.id);
+    final isFirstLetter = readLetterProvider.readLetterIds.isEmpty;
+
+    final isFirstRead = await readLetterProvider.markAsRead(letter.id);
+
+    if (isFirstRead) {
+      final reward = isFirstLetter ? 30 : 10;
+      await shizukuProvider.addShizuku(reward);
+    }
 
     if (!mounted) {
       return;
@@ -69,6 +81,21 @@ class _RoomPageState extends State<RoomPage> {
     Navigator.of(
       context,
     ).push(MaterialPageRoute<void>(builder: (context) => const CatalogPage()));
+  }
+
+  Future<void> _resetPrototypeData() async {
+    await context.read<ReadLetterProvider>().reset();
+    await context.read<ShizukuProvider>().reset();
+
+    if (!mounted) {
+      return;
+    }
+
+    context.read<AppDateProvider>().startPrototypePeriod();
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('テストデータをリセットしました')));
   }
 
   @override
@@ -141,6 +168,9 @@ class _RoomPageState extends State<RoomPage> {
               color: Colors.yellow,
               onTap: _onTapCatalog,
             ),
+
+            // デバッグ用ボタン
+            _buildDebugButton(),
           ],
         );
       },
@@ -204,5 +234,30 @@ class _RoomPageState extends State<RoomPage> {
         style: const TextStyle(color: Color(0xFFE8E1D4), fontSize: 16),
       ),
     );
+  }
+
+  Widget _buildDebugButton() {
+    const bool prototypeTestMode = true;
+    if (prototypeTestMode) {
+      return Positioned(
+        right: 12,
+        top: 12,
+        child: Column(
+          children: [
+            ElevatedButton(
+              onPressed: () {
+                context.read<AppDateProvider>().moveToNextDay();
+              },
+              child: const Text('翌日'),
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: _resetPrototypeData,
+              child: const Text('リセット'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 }

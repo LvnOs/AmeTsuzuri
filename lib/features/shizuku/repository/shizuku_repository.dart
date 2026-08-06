@@ -1,19 +1,19 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-class ReadLetterRepository {
-  static const String _key = 'readLetterIds';
+class ShizukuRepository {
+  static const String _key = 'currentShizuku';
 
-  Future<Set<String>> loadReadLetterIds() async {
+  Future<int> loadCurrentShizuku() async {
     final prefs = await SharedPreferences.getInstance();
-    final ids = prefs.getStringList(_key) ?? [];
+    final currentShizuku = prefs.getInt(_key) ?? 0;
 
-    return ids.toSet();
+    return currentShizuku;
   }
 
-  Future<void> saveReadLetterIds(Set<String> ids) async {
+  Future<void> saveCurrentShizuku(int shizuku) async {
     final prefs = await SharedPreferences.getInstance();
 
-    await prefs.setStringList(_key, ids.toList());
+    await prefs.setInt(_key, shizuku);
   }
 
   Future<void> clear() async {
