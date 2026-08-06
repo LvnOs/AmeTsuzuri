@@ -222,7 +222,7 @@ class _RoomPageState extends State<RoomPage> {
     required double height,
     required Color color,
     required VoidCallback onTap,
-    bool showDebugArea = true,
+    bool showDebugArea = false,
   }) {
     return Positioned(
       left: left,
@@ -280,13 +280,13 @@ class _RoomPageState extends State<RoomPage> {
                 context.read<AppDateProvider>().moveToNextDay();
               },
               child: const Text('翌日'),
-              style: ElevatedButton.styleFrom(minimumSize: Size(80, 40)),
+              style: ElevatedButton.styleFrom(minimumSize: Size(60, 30)),
             ),
             const SizedBox(height: 8),
             ElevatedButton(
               onPressed: _resetPrototypeData,
               child: const Text('リセット'),
-              style: ElevatedButton.styleFrom(minimumSize: Size(80, 40)),
+              style: ElevatedButton.styleFrom(minimumSize: Size(60, 30)),
             ),
           ],
         ),

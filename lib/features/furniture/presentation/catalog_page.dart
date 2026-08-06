@@ -71,10 +71,22 @@ class _CatalogPageState extends State<CatalogPage> {
               final furniture = furnitures[index];
 
               final isPurchased = catalogProvider.isPurchased(furniture.id);
+              final placedFurnitureIds = context
+                  .watch<PlacedFurnitureProvider>()
+                  .placedFurnitureIds;
+
+              final isPlaced =
+                  placedFurnitureIds[furniture.placementSlotId] == furniture.id;
 
               return ListTile(
                 title: Text(furniture.name),
-                subtitle: Text(isPurchased ? '購入済み' : '${furniture.price}滴'),
+                subtitle: Text(
+                  !isPurchased
+                      ? '${furniture.price}滴'
+                      : isPlaced
+                      ? '配置中'
+                      : '購入済み',
+                ),
                 trailing: isPurchased
                     ? const Icon(Icons.check)
                     : const Icon(Icons.chevron_right),
