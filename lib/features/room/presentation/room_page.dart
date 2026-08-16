@@ -242,13 +242,6 @@ class _RoomPageState extends State<RoomPage> {
                 )
               : null,
           alignment: Alignment.center,
-          child: Text(
-            name,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
         ),
       ),
     );
