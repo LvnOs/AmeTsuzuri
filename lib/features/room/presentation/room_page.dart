@@ -7,8 +7,10 @@ import 'package:ame_tsuzuri/features/letters/repository/letter_repository.dart';
 import 'package:ame_tsuzuri/features/letters/provider/read_letter_provider.dart';
 import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
 import 'package:ame_tsuzuri/features/letters/provider/shizuku_provider.dart';
+import 'package:ame_tsuzuri/features/furniture/model/furniture.dart';
 import 'package:ame_tsuzuri/features/furniture/provider/catalog_provider.dart';
 import 'package:ame_tsuzuri/features/furniture/provider/placed_furniture_provider.dart';
+import 'package:ame_tsuzuri/features/furniture/repository/furniture_repository.dart';
 
 class RoomPage extends StatefulWidget {
   const RoomPage({super.key});
@@ -18,7 +20,37 @@ class RoomPage extends StatefulWidget {
 }
 
 class _RoomPageState extends State<RoomPage> {
+  static const Map<String, _SlotLayout> _slotLayouts = {
+    'living_room_desk_surface_left': _SlotLayout(0.61, 0.48, 0.07, 0.12),
+    'living_room_desk_surface_center': _SlotLayout(0.69, 0.48, 0.07, 0.12),
+    'living_room_desk_surface_right': _SlotLayout(0.77, 0.48, 0.07, 0.12),
+    'living_room_desk_surface_front': _SlotLayout(0.69, 0.57, 0.08, 0.12),
+    'living_room_desk_surface_back': _SlotLayout(0.69, 0.43, 0.08, 0.12),
+    'living_room_bookshelf_top_left': _SlotLayout(0.07, 0.19, 0.08, 0.15),
+    'living_room_bookshelf_top_right': _SlotLayout(0.16, 0.19, 0.08, 0.15),
+    'living_room_bookshelf_bottom_left': _SlotLayout(0.07, 0.47, 0.08, 0.15),
+    'living_room_bookshelf_bottom_right': _SlotLayout(0.16, 0.47, 0.08, 0.15),
+    'living_room_window_vase': _SlotLayout(0.61, 0.35, 0.07, 0.18),
+    'living_room_window_shelf_decor': _SlotLayout(0.54, 0.43, 0.07, 0.13),
+    'living_room_window_hanging_decor': _SlotLayout(0.49, 0.12, 0.08, 0.16),
+    'living_room_window_curtain': _SlotLayout(0.29, 0.05, 0.38, 0.56),
+    'living_room_lamp': _SlotLayout(0.85, 0.47, 0.09, 0.30),
+    'living_room_floor_rug': _SlotLayout(0.43, 0.72, 0.30, 0.20),
+    'living_room_chair': _SlotLayout(0.73, 0.65, 0.13, 0.28),
+  };
+
+  final FurnitureRepository _furnitureRepository = FurnitureRepository();
+
+  late final Future<List<Furniture>> _furnituresFuture;
+
   String _selectedArea = '部屋の中をタップしてみてください';
+
+  @override
+  void initState() {
+    super.initState();
+
+    _furnituresFuture = _furnitureRepository.getAll();
+  }
 
   void _onAreaTapped(String areaName) {
     setState(() {
@@ -116,7 +148,15 @@ class _RoomPageState extends State<RoomPage> {
               child: Center(
                 child: AspectRatio(
                   aspectRatio: 16 / 9,
-                  child: _buildRoom(placedFurnitureIds),
+                  child: FutureBuilder<List<Furniture>>(
+                    future: _furnituresFuture,
+                    builder: (context, snapshot) {
+                      return _buildRoom(
+                        placedFurnitureIds,
+                        snapshot.data ?? [],
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
@@ -127,34 +167,25 @@ class _RoomPageState extends State<RoomPage> {
     );
   }
 
-  Widget _buildRoom(Map<String, String> placedFurnitureIds) {
+  Widget _buildRoom(
+    Map<String, String> placedFurnitureIds,
+    List<Furniture> furnitures,
+  ) {
+    final furnitureById = {
+      for (final furniture in furnitures) furniture.id: furniture,
+    };
+
     return LayoutBuilder(
       builder: (context, constraints) {
         return Stack(
           fit: StackFit.expand,
           children: [
             _buildBackground(),
-
-            if (placedFurnitureIds['desk_top'] == 'furniture_lamp')
-              Positioned(
-                left: constraints.maxWidth * 0.68,
-                top: constraints.maxHeight * 0.46,
-                child: const Text('💡', style: TextStyle(fontSize: 40)),
-              ),
-
-            if (placedFurnitureIds['desk_front'] == 'furniture_chair')
-              Positioned(
-                left: constraints.maxWidth * 0.75,
-                top: constraints.maxHeight * 0.72,
-                child: const Text('🪑', style: TextStyle(fontSize: 44)),
-              ),
-
-            if (placedFurnitureIds['window_side'] == 'furniture_plant')
-              Positioned(
-                left: constraints.maxWidth * 0.62,
-                top: constraints.maxHeight * 0.38,
-                child: const Text('🪴', style: TextStyle(fontSize: 40)),
-              ),
+            ..._buildPlacedFurniture(
+              placedFurnitureIds,
+              furnitureById,
+              constraints,
+            ),
 
             // 窓
             _buildTapArea(
@@ -205,6 +236,62 @@ class _RoomPageState extends State<RoomPage> {
           ],
         );
       },
+    );
+  }
+
+  List<Widget> _buildPlacedFurniture(
+    Map<String, String> placedFurnitureIds,
+    Map<String, Furniture> furnitureById,
+    BoxConstraints constraints,
+  ) {
+    final widgets = <Widget>[];
+
+    for (final entry in placedFurnitureIds.entries) {
+      final layout = _slotLayouts[entry.key];
+      final furniture = furnitureById[entry.value];
+
+      if (layout == null || furniture == null) {
+        continue;
+      }
+
+      widgets.add(
+        Positioned(
+          left: constraints.maxWidth * layout.left,
+          top: constraints.maxHeight * layout.top,
+          width: constraints.maxWidth * layout.width,
+          height: constraints.maxHeight * layout.height,
+          child: Image.asset(
+            'assets/images/${furniture.imagePath}',
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              return _buildFurniturePlaceholder(furniture.name);
+            },
+          ),
+        ),
+      );
+    }
+
+    return widgets;
+  }
+
+  Widget _buildFurniturePlaceholder(String furnitureName) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFD8C9AE).withValues(alpha: 0.9),
+        border: Border.all(color: const Color(0xFF6B5A45)),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.chair_outlined),
+            Text(furnitureName, textAlign: TextAlign.center),
+          ],
+        ),
+      ),
     );
   }
 
@@ -286,4 +373,13 @@ class _RoomPageState extends State<RoomPage> {
       );
     }
   }
+}
+
+class _SlotLayout {
+  const _SlotLayout(this.left, this.top, this.width, this.height);
+
+  final double left;
+  final double top;
+  final double width;
+  final double height;
 }
