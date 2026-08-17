@@ -34,10 +34,13 @@ class _CatalogPageState extends State<CatalogPage> {
 
   @override
   Widget build(BuildContext context) {
-    final currentShizuku = context.watch<ShizukuProvider>().currentShizuku;
-
+    final shizukuProvider = context.watch<ShizukuProvider>();
     final catalogProvider = context.watch<CatalogProvider>();
     final placedFurnitureProvider = context.watch<PlacedFurnitureProvider>();
+    final areProvidersLoaded =
+        shizukuProvider.isLoaded &&
+        catalogProvider.isLoaded &&
+        placedFurnitureProvider.isLoaded;
 
     return Scaffold(
       appBar: AppBar(
@@ -45,14 +48,21 @@ class _CatalogPageState extends State<CatalogPage> {
         actions: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Center(child: Text('雫 $currentShizuku')),
+            child: Center(
+              child: Text(
+                shizukuProvider.isLoaded
+                    ? '雫 ${shizukuProvider.currentShizuku}'
+                    : '雫 --',
+              ),
+            ),
           ),
         ],
       ),
       body: FutureBuilder<List<Furniture>>(
         future: _furnituresFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (!areProvidersLoaded ||
+              snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 

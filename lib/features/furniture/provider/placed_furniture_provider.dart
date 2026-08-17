@@ -14,12 +14,15 @@ class PlacedFurnitureProvider extends ChangeNotifier {
   final PlacedFurnitureRepository _repository;
 
   Map<String, String> _placedFurnitureIds = {};
+  bool _isLoaded = false;
 
   Map<String, String> get placedFurnitureIds =>
       Map.unmodifiable(_placedFurnitureIds);
+  bool get isLoaded => _isLoaded;
 
   Future<void> load() async {
     _placedFurnitureIds = await _repository.loadPlacedFurnitureIds();
+    _isLoaded = true;
 
     notifyListeners();
   }

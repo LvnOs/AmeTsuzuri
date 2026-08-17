@@ -12,9 +12,11 @@ class CatalogProvider extends ChangeNotifier {
   final PurchasedFurnitureRepository _repository;
 
   Set<String> _purchasedFurnitureIds = {};
+  bool _isLoaded = false;
 
   Set<String> get purchasedFurnitureIds =>
       Set.unmodifiable(_purchasedFurnitureIds);
+  bool get isLoaded => _isLoaded;
 
   bool isPurchased(String furnitureId) {
     return _purchasedFurnitureIds.contains(furnitureId);
@@ -22,6 +24,7 @@ class CatalogProvider extends ChangeNotifier {
 
   Future<void> load() async {
     _purchasedFurnitureIds = await _repository.loadPurchasedFurnitureIds();
+    _isLoaded = true;
 
     notifyListeners();
   }

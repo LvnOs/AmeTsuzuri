@@ -5,10 +5,14 @@ class ShizukuProvider extends ChangeNotifier {
   ShizukuProvider(this._repository);
   final ShizukuRepository _repository;
   int _currentShizuku = 0;
+  bool _isLoaded = false;
+
   int get currentShizuku => _currentShizuku;
+  bool get isLoaded => _isLoaded;
 
   Future<void> load() async {
     _currentShizuku = await _repository.loadCurrentShizuku();
+    _isLoaded = true;
 
     notifyListeners();
   }
