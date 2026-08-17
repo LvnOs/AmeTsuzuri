@@ -13,7 +13,9 @@ import 'package:ame_tsuzuri/features/furniture/provider/placed_furniture_provide
 import 'package:ame_tsuzuri/features/furniture/repository/furniture_repository.dart';
 
 class RoomPage extends StatefulWidget {
-  const RoomPage({super.key});
+  const RoomPage({super.key, this.letterRepository});
+
+  final LetterRepository? letterRepository;
 
   @override
   State<RoomPage> createState() => _RoomPageState();
@@ -42,14 +44,17 @@ class _RoomPageState extends State<RoomPage> {
   final FurnitureRepository _furnitureRepository = FurnitureRepository();
 
   late final Future<List<Furniture>> _furnituresFuture;
+  late final LetterRepository _letterRepository;
 
   String _selectedArea = '部屋の中をタップしてみてください';
+  bool _isOpeningLetter = false;
 
   @override
   void initState() {
     super.initState();
 
     _furnituresFuture = _furnitureRepository.getAll();
+    _letterRepository = widget.letterRepository ?? LetterRepository();
   }
 
   void _onAreaTapped(String areaName) {
@@ -74,7 +79,6 @@ class _RoomPageState extends State<RoomPage> {
 
   // 手紙ページへの遷移
   Future<void> _onTapDesk() async {
-    final repository = LetterRepository();
     final readLetterProvider = context.read<ReadLetterProvider>();
     final shizukuProvider = context.read<ShizukuProvider>();
 
@@ -85,37 +89,67 @@ class _RoomPageState extends State<RoomPage> {
       return;
     }
 
-    final today = context.read<AppDateProvider>().today;
-    final letter = await repository.getByDate(today);
-
-    if (!mounted) {
+    if (_isOpeningLetter) {
       return;
     }
 
-    if (letter == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('今日の手紙はまだ届いていません')));
+    _isOpeningLetter = true;
 
-      return;
+    try {
+      final today = context.read<AppDateProvider>().today;
+      final letter = await _letterRepository.getByDate(today);
+
+      if (!mounted) {
+        return;
+      }
+
+      if (letter == null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('今日の手紙はまだ届いていません')));
+        return;
+      }
+
+      try {
+        await shizukuProvider.rewardForLetter(letter.id);
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('雫の受け取りに失敗しました')));
+        }
+        return;
+      }
+
+      try {
+        await readLetterProvider.markAsRead(letter.id);
+      } catch (_) {
+        try {
+          await readLetterProvider.load();
+        } catch (_) {
+          // 次回起動時の初期ロードでも永続状態と再同期される。
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('手紙の保存に失敗しました')));
+        }
+        return;
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (context) => LetterPage(letter: letter),
+        ),
+      );
+    } finally {
+      _isOpeningLetter = false;
     }
-
-    final isFirstLetter = readLetterProvider.readLetterIds.isEmpty;
-
-    final isFirstRead = await readLetterProvider.markAsRead(letter.id);
-
-    if (isFirstRead) {
-      final reward = isFirstLetter ? 30 : 10;
-      await shizukuProvider.addShizuku(reward);
-    }
-
-    if (!mounted) {
-      return;
-    }
-
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (context) => LetterPage(letter: letter)),
-    );
   }
 
   // 目録ページへの遷移
@@ -229,6 +263,7 @@ class _RoomPageState extends State<RoomPage> {
 
             // 机
             _buildTapArea(
+              key: const ValueKey('deskTapArea'),
               name: '机',
               left: constraints.maxWidth * 0.60,
               top: constraints.maxHeight * 0.53,
@@ -320,6 +355,7 @@ class _RoomPageState extends State<RoomPage> {
   }
 
   Widget _buildTapArea({
+    Key? key,
     required String name,
     required double left,
     required double top,
@@ -330,6 +366,7 @@ class _RoomPageState extends State<RoomPage> {
     bool showDebugArea = false,
   }) {
     return Positioned(
+      key: key,
       left: left,
       top: top,
       width: width,
