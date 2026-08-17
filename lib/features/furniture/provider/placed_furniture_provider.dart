@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../repository/placed_furniture_repository.dart';
 
+enum PlaceFurnitureResult {
+  success,
+  notPurchased,
+  invalidSlot,
+}
+
 class PlacedFurnitureProvider extends ChangeNotifier {
   PlacedFurnitureProvider(this._repository);
 
@@ -18,15 +24,69 @@ class PlacedFurnitureProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> place({
+  Future<PlaceFurnitureResult> place({
     required String slotId,
     required String furnitureId,
+    required bool isPurchased,
+    required List<String> allowedSlotIds,
   }) async {
-    _placedFurnitureIds[slotId] = furnitureId;
+    if (!isPurchased) {
+      return PlaceFurnitureResult.notPurchased;
+    }
 
-    await _repository.savePlacedFurnitureIds(_placedFurnitureIds);
+    if (!allowedSlotIds.contains(slotId)) {
+      return PlaceFurnitureResult.invalidSlot;
+    }
+
+    final currentSlotId = getSlotIdByFurnitureId(furnitureId);
+    if (currentSlotId == slotId) {
+      return PlaceFurnitureResult.success;
+    }
+
+    final updatedPlacedFurnitureIds = Map<String, String>.from(
+      _placedFurnitureIds,
+    );
+
+    if (currentSlotId != null) {
+      updatedPlacedFurnitureIds.remove(currentSlotId);
+    }
+
+    updatedPlacedFurnitureIds[slotId] = furnitureId;
+
+    await _repository.savePlacedFurnitureIds(updatedPlacedFurnitureIds);
+
+    _placedFurnitureIds = updatedPlacedFurnitureIds;
 
     notifyListeners();
+
+    return PlaceFurnitureResult.success;
+  }
+
+  Future<void> remove(String furnitureId) async {
+    final slotId = getSlotIdByFurnitureId(furnitureId);
+    if (slotId == null) {
+      return;
+    }
+
+    final updatedPlacedFurnitureIds = Map<String, String>.from(
+      _placedFurnitureIds,
+    )..remove(slotId);
+
+    await _repository.savePlacedFurnitureIds(updatedPlacedFurnitureIds);
+
+    _placedFurnitureIds = updatedPlacedFurnitureIds;
+
+    notifyListeners();
+  }
+
+  String? getSlotIdByFurnitureId(String furnitureId) {
+    for (final entry in _placedFurnitureIds.entries) {
+      if (entry.value == furnitureId) {
+        return entry.key;
+      }
+    }
+
+    return null;
   }
 
   Future<void> reset() async {
