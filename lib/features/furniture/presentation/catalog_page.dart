@@ -10,7 +10,14 @@ import '../../furniture/repository/placement_slot_repository.dart';
 import '../provider/placed_furniture_provider.dart';
 
 class CatalogPage extends StatefulWidget {
-  const CatalogPage({super.key});
+  const CatalogPage({
+    super.key,
+    this.furnitureRepository,
+    this.placementSlotRepository,
+  });
+
+  final FurnitureRepository? furnitureRepository;
+  final PlacementSlotRepository? placementSlotRepository;
 
   @override
   State<CatalogPage> createState() => _CatalogPageState();
@@ -19,9 +26,8 @@ class CatalogPage extends StatefulWidget {
 class _CatalogPageState extends State<CatalogPage> {
   static const String _removeAction = '__remove__';
 
-  final FurnitureRepository _furnitureRepository = FurnitureRepository();
-  final PlacementSlotRepository _placementSlotRepository =
-      PlacementSlotRepository();
+  late final FurnitureRepository _furnitureRepository;
+  late final PlacementSlotRepository _placementSlotRepository;
 
   late final Future<List<Furniture>> _furnituresFuture;
 
@@ -29,6 +35,9 @@ class _CatalogPageState extends State<CatalogPage> {
   void initState() {
     super.initState();
 
+    _furnitureRepository = widget.furnitureRepository ?? FurnitureRepository();
+    _placementSlotRepository =
+        widget.placementSlotRepository ?? PlacementSlotRepository();
     _furnituresFuture = _furnitureRepository.getAll();
   }
 
@@ -88,6 +97,8 @@ class _CatalogPageState extends State<CatalogPage> {
               final furniture = furnitures[index];
 
               final isPurchased = catalogProvider.isPurchased(furniture.id);
+              final isPurchasing =
+                  catalogProvider.purchasingFurnitureId == furniture.id;
               final isPlaced =
                   placedFurnitureProvider.getSlotIdByFurnitureId(
                     furniture.id,
@@ -103,17 +114,24 @@ class _CatalogPageState extends State<CatalogPage> {
                       ? '配置中'
                       : '購入済み',
                 ),
-                trailing: isPurchased
+                trailing: isPurchasing
+                    ? const SizedBox.square(
+                        dimension: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : isPurchased
                     ? const Icon(Icons.check)
                     : const Icon(Icons.chevron_right),
                 // enabled: !isPurchased,
-                onTap: () {
-                  if (isPurchased) {
-                    _showPlacementDialog(context, furniture);
-                  } else {
-                    _showPurchaseDialog(context, furniture);
-                  }
-                },
+                onTap: !isPurchased && catalogProvider.isPurchasing
+                    ? null
+                    : () {
+                        if (isPurchased) {
+                          _showPlacementDialog(context, furniture);
+                        } else {
+                          _showPurchaseDialog(context, furniture);
+                        }
+                      },
               );
             },
           );
@@ -171,6 +189,7 @@ class _CatalogPageState extends State<CatalogPage> {
       FurniturePurchaseResult.success => '${furniture.name}を購入しました',
       FurniturePurchaseResult.alreadyPurchased => 'この家具は購入済みです',
       FurniturePurchaseResult.notEnoughShizuku => '雫が足りません',
+      FurniturePurchaseResult.purchaseInProgress => '購入処理中です',
     };
 
     ScaffoldMessenger.of(
