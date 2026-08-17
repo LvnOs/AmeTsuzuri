@@ -7,11 +7,14 @@ class ReadLetterProvider extends ChangeNotifier {
   final ReadLetterRepository _repository;
 
   Set<String> _readLetterIds = {};
+  bool _isLoaded = false;
 
   Set<String> get readLetterIds => _readLetterIds;
+  bool get isLoaded => _isLoaded;
 
   Future<void> load() async {
     _readLetterIds = await _repository.loadReadLetterIds();
+    _isLoaded = true;
 
     notifyListeners();
   }

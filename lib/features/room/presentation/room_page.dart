@@ -77,6 +77,14 @@ class _RoomPageState extends State<RoomPage> {
     final repository = LetterRepository();
     final readLetterProvider = context.read<ReadLetterProvider>();
     final shizukuProvider = context.read<ShizukuProvider>();
+
+    if (!readLetterProvider.isLoaded || !shizukuProvider.isLoaded) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('読み込み中です')));
+      return;
+    }
+
     final today = context.read<AppDateProvider>().today;
     final letter = await repository.getByDate(today);
 
@@ -118,8 +126,18 @@ class _RoomPageState extends State<RoomPage> {
   }
 
   Future<void> _resetPrototypeData() async {
-    await context.read<ReadLetterProvider>().reset();
-    await context.read<ShizukuProvider>().reset();
+    final readLetterProvider = context.read<ReadLetterProvider>();
+    final shizukuProvider = context.read<ShizukuProvider>();
+
+    if (!readLetterProvider.isLoaded || !shizukuProvider.isLoaded) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('読み込み中です')));
+      return;
+    }
+
+    await readLetterProvider.reset();
+    await shizukuProvider.reset();
     await context.read<CatalogProvider>().reset();
     await context.read<PlacedFurnitureProvider>().reset();
 
