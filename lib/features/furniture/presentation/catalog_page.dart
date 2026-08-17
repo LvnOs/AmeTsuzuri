@@ -3,8 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../../letters/provider/shizuku_provider.dart';
 import '../../furniture/model/furniture.dart';
+import '../../furniture/model/placement_slot.dart';
 import '../../furniture/provider/catalog_provider.dart';
 import '../../furniture/repository/furniture_repository.dart';
+import '../../furniture/repository/placement_slot_repository.dart';
 import '../provider/placed_furniture_provider.dart';
 
 class CatalogPage extends StatefulWidget {
@@ -15,7 +17,11 @@ class CatalogPage extends StatefulWidget {
 }
 
 class _CatalogPageState extends State<CatalogPage> {
+  static const String _removeAction = '__remove__';
+
   final FurnitureRepository _furnitureRepository = FurnitureRepository();
+  final PlacementSlotRepository _placementSlotRepository =
+      PlacementSlotRepository();
 
   late final Future<List<Furniture>> _furnituresFuture;
 
@@ -31,6 +37,7 @@ class _CatalogPageState extends State<CatalogPage> {
     final currentShizuku = context.watch<ShizukuProvider>().currentShizuku;
 
     final catalogProvider = context.watch<CatalogProvider>();
+    final placedFurnitureProvider = context.watch<PlacedFurnitureProvider>();
 
     return Scaffold(
       appBar: AppBar(
@@ -71,12 +78,11 @@ class _CatalogPageState extends State<CatalogPage> {
               final furniture = furnitures[index];
 
               final isPurchased = catalogProvider.isPurchased(furniture.id);
-              final placedFurnitureIds = context
-                  .watch<PlacedFurnitureProvider>()
-                  .placedFurnitureIds;
-
               final isPlaced =
-                  placedFurnitureIds[furniture.placementSlotId] == furniture.id;
+                  placedFurnitureProvider.getSlotIdByFurnitureId(
+                    furniture.id,
+                  ) !=
+                  null;
 
               return ListTile(
                 title: Text(furniture.name),
@@ -166,45 +172,149 @@ class _CatalogPageState extends State<CatalogPage> {
     BuildContext context,
     Furniture furniture,
   ) async {
-    final shouldPlace = await showDialog<bool>(
+    final placedFurnitureProvider = context.read<PlacedFurnitureProvider>();
+    final currentSlotId = placedFurnitureProvider.getSlotIdByFurnitureId(
+      furniture.id,
+    );
+    final slotResults = await Future.wait(
+      furniture.slotIds.map(_placementSlotRepository.getById),
+    );
+    final slots = slotResults.whereType<PlacementSlot>().toList();
+    final currentSlot = currentSlotId == null
+        ? null
+        : await _placementSlotRepository.getById(currentSlotId);
+
+    if (!context.mounted) {
+      return;
+    }
+
+    final selectedAction = await showDialog<String>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
           title: Text(furniture.name),
-          content: const Text('この家具を部屋に配置しますか？'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                currentSlot == null
+                    ? '現在の配置場所：未配置'
+                    : '現在の配置場所：${currentSlot.name}',
+              ),
+              const SizedBox(height: 16),
+              const Text('配置可能な場所'),
+              const SizedBox(height: 8),
+              ...slots.map(
+                (slot) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(slot.name),
+                  trailing: slot.id == currentSlotId
+                      ? const Icon(Icons.check)
+                      : null,
+                  onTap: () {
+                    Navigator.of(dialogContext).pop(slot.id);
+                  },
+                ),
+              ),
+            ],
+          ),
+          scrollable: true,
           actions: [
+            if (currentSlotId != null)
+              TextButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop(_removeAction);
+                },
+                child: const Text('取り外す'),
+              ),
             TextButton(
               onPressed: () {
-                Navigator.of(dialogContext).pop(false);
+                Navigator.of(dialogContext).pop();
               },
-              child: const Text('やめる'),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop(true);
-              },
-              child: const Text('配置する'),
+              child: const Text('キャンセル'),
             ),
           ],
         );
       },
     );
 
-    if (shouldPlace != true || !context.mounted) {
+    if (selectedAction == null || !context.mounted) {
       return;
     }
 
-    await context.read<PlacedFurnitureProvider>().place(
-      slotId: furniture.placementSlotId,
+    if (selectedAction == _removeAction) {
+      await placedFurnitureProvider.remove(furniture.id);
+
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${furniture.name}を取り外しました')),
+      );
+      return;
+    }
+
+    final furnitureAtSelectedSlot =
+        placedFurnitureProvider.placedFurnitureIds[selectedAction];
+    if (furnitureAtSelectedSlot != null &&
+        furnitureAtSelectedSlot != furniture.id) {
+      final shouldReplace = await _showReplacementConfirmation(context);
+
+      if (shouldReplace != true || !context.mounted) {
+        return;
+      }
+    }
+
+    final catalogProvider = context.read<CatalogProvider>();
+    final result = await placedFurnitureProvider.place(
+      slotId: selectedAction,
       furnitureId: furniture.id,
+      isPurchased: catalogProvider.isPurchased(furniture.id),
+      allowedSlotIds: furniture.slotIds,
     );
 
     if (!context.mounted) {
       return;
     }
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('${furniture.name}を配置しました')));
+    final message = switch (result) {
+      PlaceFurnitureResult.success => '${furniture.name}を配置しました',
+      PlaceFurnitureResult.notPurchased => '未購入の家具は配置できません',
+      PlaceFurnitureResult.invalidSlot => 'この場所には配置できません',
+    };
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<bool?> _showReplacementConfirmation(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          content: const Text(
+            'この場所にはすでに家具が配置されています。\n'
+            '置き換えますか？',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(false);
+              },
+              child: const Text('キャンセル'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(true);
+              },
+              child: const Text('置き換える'),
+            ),
+          ],
+        );
+      },
+    );
   }
 }
