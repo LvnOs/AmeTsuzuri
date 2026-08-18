@@ -1,11 +1,19 @@
 import 'package:flutter/services.dart';
 import 'package:yaml/yaml.dart';
 
+import '../../../shared/model/weather_type.dart';
 import '../model/letter.dart';
 
 class LetterRepository {
+  LetterRepository({AssetBundle? assetBundle})
+    : _assetBundle = assetBundle ?? rootBundle;
+
+  final AssetBundle _assetBundle;
+
   Future<List<Letter>> getAll() async {
-    final yamlString = await rootBundle.loadString('assets/data/letters.yaml');
+    final yamlString = await _assetBundle.loadString(
+      'assets/data/letters.yaml',
+    );
     // YAMLファイルの構造上、以下の取得方法となる
     final yaml = loadYaml(yamlString)["letters"];
 
@@ -13,7 +21,7 @@ class LetterRepository {
 
     for (final item in yaml) {
       final bodyFile = item['body_file'] as String;
-      final body = await rootBundle.loadString('assets/$bodyFile');
+      final body = await _assetBundle.loadString('assets/$bodyFile');
 
       letters.add(
         Letter(
@@ -21,6 +29,7 @@ class LetterRepository {
           title: item["title"],
           date: DateTime.parse(item["date"]),
           body: body,
+          requiredWeather: WeatherType.fromYaml(item['weather'] as String),
         ),
       );
     }
