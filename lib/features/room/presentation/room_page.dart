@@ -4,6 +4,7 @@ import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart'
 import 'package:ame_tsuzuri/features/furniture/presentation/catalog_page.dart';
 import 'package:ame_tsuzuri/features/letters/presentation/letter_page.dart';
 import 'package:ame_tsuzuri/features/letters/repository/letter_repository.dart';
+import 'package:ame_tsuzuri/features/letters/service/letter_delivery_service.dart';
 import 'package:ame_tsuzuri/features/letters/provider/read_letter_provider.dart';
 import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
 import 'package:ame_tsuzuri/shared/provider/weather_provider.dart';
@@ -46,6 +47,8 @@ class _RoomPageState extends State<RoomPage> {
 
   late final Future<List<Furniture>> _furnituresFuture;
   late final LetterRepository _letterRepository;
+  final LetterDeliveryService _letterDeliveryService =
+      const LetterDeliveryService();
 
   String _selectedArea = '部屋の中をタップしてみてください';
   bool _isOpeningLetter = false;
@@ -126,7 +129,13 @@ class _RoomPageState extends State<RoomPage> {
         return;
       }
 
-      final letter = await _letterRepository.getByDate(today);
+      final letters = await _letterRepository.getAll();
+      final letter = _letterDeliveryService.selectLetter(
+        letters: letters,
+        currentSeason: appDateProvider.currentSeason,
+        currentWeather: currentWeather,
+        readLetterIds: readLetterProvider.readLetterIds,
+      );
 
       if (!mounted) {
         return;
@@ -136,13 +145,6 @@ class _RoomPageState extends State<RoomPage> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('今日の手紙はまだ届いていません')));
-        return;
-      }
-
-      if (currentWeather != letter.requiredWeather) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('今日の手紙はまだ届いていません')),
-        );
         return;
       }
 

@@ -24,7 +24,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
-  testWidgets('初回30滴、2通目10滴、再読0滴で手紙を開ける', (tester) async {
+  testWidgets('同じ日にYAML順で未読A、Bを配信し既読Aは再配信しない', (tester) async {
     final harness = await _pumpRoom(tester);
 
     await _openDesk(tester);
@@ -35,7 +35,6 @@ void main() {
 
     await tester.pageBack();
     await tester.pumpAndSettle();
-    await harness.dateProvider.setDebugDate(DateTime(2026, 8, 8));
     await _openDesk(tester);
     expect(harness.shizukuProvider.currentShizuku, 40);
     expect(harness.shizukuProvider.rewardedLetterIds, {'letterA', 'letterB'});
@@ -43,10 +42,11 @@ void main() {
 
     await tester.pageBack();
     await tester.pumpAndSettle();
-    await harness.dateProvider.setDebugDate(DateTime(2026, 8, 7));
     await _openDesk(tester);
     expect(harness.shizukuProvider.currentShizuku, 40);
     expect(harness.shizukuRepository.saveCallCount, 2);
+    expect(find.byType(LetterPage), findsNothing);
+    expect(find.text('今日の手紙はまだ届いていません'), findsOneWidget);
   });
 
   testWidgets('報酬保存失敗時は既読保存と画面遷移を行わず再試行できる', (tester) async {
@@ -141,6 +141,7 @@ void main() {
     expect(find.text('今日の天候を確認できませんでした'), findsOneWidget);
     expect(harness.shizukuRepository.saveCallCount, 0);
     expect(harness.readLetterRepository.saveCallCount, 0);
+    expect(harness.letterRepository.getAllCallCount, 0);
     expect(find.byType(LetterPage), findsNothing);
   });
 
@@ -152,6 +153,7 @@ void main() {
     expect(find.text('天候の読み込みに失敗しました'), findsOneWidget);
     expect(harness.shizukuRepository.saveCallCount, 0);
     expect(harness.readLetterRepository.saveCallCount, 0);
+    expect(harness.letterRepository.getAllCallCount, 0);
     expect(find.byType(LetterPage), findsNothing);
 
     await _openDesk(tester);
@@ -188,6 +190,52 @@ void main() {
     expect(harness.shizukuProvider.currentShizuku, 30);
     expect(harness.readLetterProvider.readLetterIds, {'letterA'});
   });
+
+  testWidgets('先頭の季節不一致を飛ばしてanyの手紙を配信する', (tester) async {
+    final harness = await _pumpRoom(
+      tester,
+      date: DateTime(2026, 9, 1),
+      letters: [
+        _letter('summer'),
+        _letter('any', season: SeasonType.any),
+      ],
+    );
+
+    await _openDesk(tester);
+
+    expect(harness.readLetterProvider.readLetterIds, {'any'});
+    expect(find.byType(LetterPage), findsOneWidget);
+  });
+
+  testWidgets('先頭の天候不一致を飛ばして次の一致手紙を配信する', (tester) async {
+    final harness = await _pumpRoom(
+      tester,
+      letters: [
+        _letter('sunny', weather: WeatherType.sunny),
+        _letter('rain'),
+      ],
+    );
+
+    await _openDesk(tester);
+
+    expect(harness.readLetterProvider.readLetterIds, {'rain'});
+    expect(find.byType(LetterPage), findsOneWidget);
+  });
+
+  testWidgets('未来日でもYAML順先頭の条件一致手紙を配信する', (tester) async {
+    final harness = await _pumpRoom(
+      tester,
+      letters: [
+        _letter('future', date: DateTime(9999, 12, 31)),
+        _letter('past', date: DateTime(2020, 1, 1)),
+      ],
+    );
+
+    await _openDesk(tester);
+
+    expect(harness.readLetterProvider.readLetterIds, {'future'});
+    expect(harness.letterRepository.getByDateCallCount, 0);
+  });
 }
 
 Future<void> _openDesk(WidgetTester tester) async {
@@ -201,6 +249,8 @@ Future<_RoomHarness> _pumpRoom(
   bool blockRewardSave = false,
   WeatherType? weather = WeatherType.rain,
   bool failNextWeatherLoad = false,
+  List<Letter>? letters,
+  DateTime? date,
 }) async {
   final shizukuRepository = _FakeShizukuRepository(blockSave: blockRewardSave);
   final readLetterRepository = _FakeReadLetterRepository();
@@ -211,13 +261,14 @@ Future<_RoomHarness> _pumpRoom(
     _FakePlacedFurnitureRepository(),
   );
   final dateProvider = AppDateProvider(
-    _FakeAppDateRepository(DateTime(2026, 8, 7)),
+    _FakeAppDateRepository(date ?? DateTime(2026, 8, 7)),
   );
   final weatherRepository = _FakeWeatherRepository(
     weather: weather,
     failNextLoad: failNextWeatherLoad,
   );
   final weatherProvider = WeatherProvider(weatherRepository);
+  final letterRepository = _FakeLetterRepository(letters ?? _defaultLetters);
 
   if (loadProviders) {
     await Future.wait([
@@ -240,7 +291,7 @@ Future<_RoomHarness> _pumpRoom(
         ChangeNotifierProvider.value(value: weatherProvider),
       ],
       child: MaterialApp(
-        home: RoomPage(letterRepository: _FakeLetterRepository()),
+        home: RoomPage(letterRepository: letterRepository),
       ),
     ),
   );
@@ -253,6 +304,7 @@ Future<_RoomHarness> _pumpRoom(
     readLetterProvider: readLetterProvider,
     dateProvider: dateProvider,
     weatherRepository: weatherRepository,
+    letterRepository: letterRepository,
   );
 }
 
@@ -264,6 +316,7 @@ class _RoomHarness {
     required this.readLetterProvider,
     required this.dateProvider,
     required this.weatherRepository,
+    required this.letterRepository,
   });
 
   final _FakeShizukuRepository shizukuRepository;
@@ -272,6 +325,7 @@ class _RoomHarness {
   final ReadLetterProvider readLetterProvider;
   final AppDateProvider dateProvider;
   final _FakeWeatherRepository weatherRepository;
+  final _FakeLetterRepository letterRepository;
 }
 
 class _FakeWeatherRepository extends WeatherRepository {
@@ -293,28 +347,44 @@ class _FakeWeatherRepository extends WeatherRepository {
 }
 
 class _FakeLetterRepository extends LetterRepository {
+  _FakeLetterRepository(this.letters);
+
+  final List<Letter> letters;
+  int getAllCallCount = 0;
+  int getByDateCallCount = 0;
+
+  @override
+  Future<List<Letter>> getAll() async {
+    getAllCallCount++;
+    return letters;
+  }
+
   @override
   Future<Letter?> getByDate(DateTime date) async {
-    return switch (date.day) {
-      7 => Letter(
-        id: 'letterA',
-        title: '手紙A',
-        date: DateTime(2026, 8, 7),
-        requiredSeason: SeasonType.summer,
-        requiredWeather: WeatherType.rain,
-        body: '本文A',
-      ),
-      8 => Letter(
-        id: 'letterB',
-        title: '手紙B',
-        date: DateTime(2026, 8, 8),
-        requiredSeason: SeasonType.summer,
-        requiredWeather: WeatherType.rain,
-        body: '本文B',
-      ),
-      _ => null,
-    };
+    getByDateCallCount++;
+    throw StateError('RoomPage must not call getByDate.');
   }
+}
+
+final List<Letter> _defaultLetters = [
+  _letter('letterA', date: DateTime(2026, 8, 7)),
+  _letter('letterB', date: DateTime(2026, 8, 8)),
+];
+
+Letter _letter(
+  String id, {
+  DateTime? date,
+  SeasonType season = SeasonType.summer,
+  WeatherType weather = WeatherType.rain,
+}) {
+  return Letter(
+    id: id,
+    title: id,
+    date: date ?? DateTime(2026, 8, 7),
+    requiredSeason: season,
+    requiredWeather: weather,
+    body: id,
+  );
 }
 
 class _FakeShizukuRepository extends ShizukuRepository {
