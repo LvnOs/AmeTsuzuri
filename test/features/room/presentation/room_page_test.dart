@@ -14,6 +14,7 @@ import 'package:ame_tsuzuri/features/letters/repository/read_letter_repository.d
 import 'package:ame_tsuzuri/features/letters/repository/shizuku_repository.dart';
 import 'package:ame_tsuzuri/features/room/presentation/room_page.dart';
 import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
+import 'package:ame_tsuzuri/shared/repository/app_date_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -30,7 +31,7 @@ void main() {
 
     await tester.pageBack();
     await tester.pumpAndSettle();
-    harness.dateProvider.setDebugDate(DateTime(2026, 8, 8));
+    await harness.dateProvider.setDebugDate(DateTime(2026, 8, 8));
     await _openDesk(tester);
     expect(harness.shizukuProvider.currentShizuku, 40);
     expect(harness.shizukuProvider.rewardedLetterIds, {'letterA', 'letterB'});
@@ -38,7 +39,7 @@ void main() {
 
     await tester.pageBack();
     await tester.pumpAndSettle();
-    harness.dateProvider.setDebugDate(DateTime(2026, 8, 7));
+    await harness.dateProvider.setDebugDate(DateTime(2026, 8, 7));
     await _openDesk(tester);
     expect(harness.shizukuProvider.currentShizuku, 40);
     expect(harness.shizukuRepository.saveCallCount, 2);
@@ -125,7 +126,9 @@ Future<_RoomHarness> _pumpRoom(
   final placedProvider = PlacedFurnitureProvider(
     _FakePlacedFurnitureRepository(),
   );
-  final dateProvider = AppDateProvider()..setDebugDate(DateTime(2026, 8, 7));
+  final dateProvider = AppDateProvider(
+    _FakeAppDateRepository(DateTime(2026, 8, 7)),
+  );
 
   if (loadProviders) {
     await Future.wait([
@@ -133,6 +136,7 @@ Future<_RoomHarness> _pumpRoom(
       readLetterProvider.load(),
       catalogProvider.load(),
       placedProvider.load(),
+      dateProvider.load(),
     ]);
   }
 
@@ -260,4 +264,23 @@ class _FakePurchasedFurnitureRepository extends PurchasedFurnitureRepository {
 class _FakePlacedFurnitureRepository extends PlacedFurnitureRepository {
   @override
   Future<Map<String, String>> loadPlacedFurnitureIds() async => {};
+}
+
+class _FakeAppDateRepository extends AppDateRepository {
+  _FakeAppDateRepository(this.savedDate);
+
+  DateTime? savedDate;
+
+  @override
+  Future<DateTime?> load() async => savedDate;
+
+  @override
+  Future<void> save(DateTime date) async {
+    savedDate = date;
+  }
+
+  @override
+  Future<void> clear() async {
+    savedDate = null;
+  }
 }

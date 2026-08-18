@@ -81,8 +81,11 @@ class _RoomPageState extends State<RoomPage> {
   Future<void> _onTapDesk() async {
     final readLetterProvider = context.read<ReadLetterProvider>();
     final shizukuProvider = context.read<ShizukuProvider>();
+    final appDateProvider = context.read<AppDateProvider>();
 
-    if (!readLetterProvider.isLoaded || !shizukuProvider.isLoaded) {
+    if (!readLetterProvider.isLoaded ||
+        !shizukuProvider.isLoaded ||
+        !appDateProvider.isLoaded) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('読み込み中です')));
@@ -96,7 +99,7 @@ class _RoomPageState extends State<RoomPage> {
     _isOpeningLetter = true;
 
     try {
-      final today = context.read<AppDateProvider>().today;
+      final today = appDateProvider.today;
       final letter = await _letterRepository.getByDate(today);
 
       if (!mounted) {
@@ -162,8 +165,13 @@ class _RoomPageState extends State<RoomPage> {
   Future<void> _resetPrototypeData() async {
     final readLetterProvider = context.read<ReadLetterProvider>();
     final shizukuProvider = context.read<ShizukuProvider>();
+    final appDateProvider = context.read<AppDateProvider>();
+    final catalogProvider = context.read<CatalogProvider>();
+    final placedFurnitureProvider = context.read<PlacedFurnitureProvider>();
 
-    if (!readLetterProvider.isLoaded || !shizukuProvider.isLoaded) {
+    if (!readLetterProvider.isLoaded ||
+        !shizukuProvider.isLoaded ||
+        !appDateProvider.isLoaded) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('読み込み中です')));
@@ -172,14 +180,13 @@ class _RoomPageState extends State<RoomPage> {
 
     await readLetterProvider.reset();
     await shizukuProvider.reset();
-    await context.read<CatalogProvider>().reset();
-    await context.read<PlacedFurnitureProvider>().reset();
+    await catalogProvider.reset();
+    await placedFurnitureProvider.reset();
+    await appDateProvider.startPrototypePeriod();
 
     if (!mounted) {
       return;
     }
-
-    context.read<AppDateProvider>().startPrototypePeriod();
 
     ScaffoldMessenger.of(
       context,
@@ -405,15 +412,17 @@ class _RoomPageState extends State<RoomPage> {
   Widget _buildDebugButton() {
     const bool prototypeTestMode = true;
     if (prototypeTestMode) {
+      final appDateProvider = context.watch<AppDateProvider>();
+
       return Positioned(
         right: 12,
         top: 12,
         child: Column(
           children: [
             ElevatedButton(
-              onPressed: () {
-                context.read<AppDateProvider>().moveToNextDay();
-              },
+              onPressed: appDateProvider.isLoaded
+                  ? () => appDateProvider.moveToNextDay()
+                  : null,
               child: const Text('翌日'),
               style: ElevatedButton.styleFrom(minimumSize: Size(60, 30)),
             ),

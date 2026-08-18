@@ -7,6 +7,7 @@ import '../features/letters/repository/read_letter_repository.dart';
 import '../features/letters/provider/shizuku_provider.dart';
 import '../features/letters/repository/shizuku_repository.dart';
 import '../shared/provider/app_data_provider.dart';
+import '../shared/repository/app_date_repository.dart';
 import '../features/furniture/provider/catalog_provider.dart';
 import '../features/furniture/repository/purchased_furniture_repository.dart';
 import '../features/furniture/provider/placed_furniture_provider.dart';
@@ -25,7 +26,9 @@ class AmeTsuzuriApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => ShizukuProvider(ShizukuRepository())..load(),
         ),
-        ChangeNotifierProvider(create: (_) => AppDateProvider()),
+        ChangeNotifierProvider(
+          create: (_) => AppDateProvider(AppDateRepository())..load(),
+        ),
         ChangeNotifierProvider(
           create: (_) =>
               CatalogProvider(PurchasedFurnitureRepository())..load(),

@@ -26,7 +26,12 @@ class ReadLetterProvider extends ChangeNotifier {
 
     _readLetterIds.add(letterId);
 
-    await _repository.saveReadLetterIds(_readLetterIds);
+    try {
+      await _repository.saveReadLetterIds(_readLetterIds);
+    } catch (_) {
+      _readLetterIds.remove(letterId);
+      rethrow;
+    }
 
     notifyListeners();
 
