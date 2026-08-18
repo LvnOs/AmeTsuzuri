@@ -6,6 +6,7 @@ import 'package:ame_tsuzuri/features/letters/presentation/letter_page.dart';
 import 'package:ame_tsuzuri/features/letters/repository/letter_repository.dart';
 import 'package:ame_tsuzuri/features/letters/provider/read_letter_provider.dart';
 import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
+import 'package:ame_tsuzuri/shared/provider/weather_provider.dart';
 import 'package:ame_tsuzuri/features/letters/provider/shizuku_provider.dart';
 import 'package:ame_tsuzuri/features/furniture/model/furniture.dart';
 import 'package:ame_tsuzuri/features/furniture/provider/catalog_provider.dart';
@@ -82,6 +83,7 @@ class _RoomPageState extends State<RoomPage> {
     final readLetterProvider = context.read<ReadLetterProvider>();
     final shizukuProvider = context.read<ShizukuProvider>();
     final appDateProvider = context.read<AppDateProvider>();
+    final weatherProvider = context.read<WeatherProvider>();
 
     if (!readLetterProvider.isLoaded ||
         !shizukuProvider.isLoaded ||
@@ -100,6 +102,30 @@ class _RoomPageState extends State<RoomPage> {
 
     try {
       final today = appDateProvider.today;
+
+      try {
+        await weatherProvider.loadForDate(today);
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('天候の読み込みに失敗しました')),
+          );
+        }
+        return;
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      final currentWeather = weatherProvider.currentWeather;
+      if (currentWeather == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('今日の天候を確認できませんでした')),
+        );
+        return;
+      }
+
       final letter = await _letterRepository.getByDate(today);
 
       if (!mounted) {
@@ -110,6 +136,13 @@ class _RoomPageState extends State<RoomPage> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('今日の手紙はまだ届いていません')));
+        return;
+      }
+
+      if (currentWeather != letter.requiredWeather) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('今日の手紙はまだ届いていません')),
+        );
         return;
       }
 

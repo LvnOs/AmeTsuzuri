@@ -15,7 +15,9 @@ import 'package:ame_tsuzuri/features/letters/repository/shizuku_repository.dart'
 import 'package:ame_tsuzuri/features/room/presentation/room_page.dart';
 import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
 import 'package:ame_tsuzuri/shared/model/weather_type.dart';
+import 'package:ame_tsuzuri/shared/provider/weather_provider.dart';
 import 'package:ame_tsuzuri/shared/repository/app_date_repository.dart';
+import 'package:ame_tsuzuri/shared/repository/weather_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -107,6 +109,84 @@ void main() {
     expect(harness.shizukuProvider.currentShizuku, 30);
     expect(find.byType(LetterPage), findsOneWidget);
   });
+
+  testWidgets('雨の日は雨条件の手紙を開いて報酬と既読を保存する', (tester) async {
+    final harness = await _pumpRoom(tester);
+
+    await _openDesk(tester);
+
+    expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
+    expect(harness.shizukuProvider.currentShizuku, 30);
+    expect(harness.readLetterProvider.readLetterIds, {'letterA'});
+    expect(find.byType(LetterPage), findsOneWidget);
+  });
+
+  testWidgets('晴れの日は雨条件の手紙を開かず副作用を起こさない', (tester) async {
+    final harness = await _pumpRoom(tester, weather: WeatherType.sunny);
+
+    await _openDesk(tester);
+
+    expect(find.text('今日の手紙はまだ届いていません'), findsOneWidget);
+    expect(harness.shizukuRepository.saveCallCount, 0);
+    expect(harness.readLetterRepository.saveCallCount, 0);
+    expect(find.byType(LetterPage), findsNothing);
+  });
+
+  testWidgets('天候データがない日は副作用を起こさず遷移しない', (tester) async {
+    final harness = await _pumpRoom(tester, weather: null);
+
+    await _openDesk(tester);
+
+    expect(find.text('今日の天候を確認できませんでした'), findsOneWidget);
+    expect(harness.shizukuRepository.saveCallCount, 0);
+    expect(harness.readLetterRepository.saveCallCount, 0);
+    expect(find.byType(LetterPage), findsNothing);
+  });
+
+  testWidgets('天候ロード失敗後は副作用なしで再操作できる', (tester) async {
+    final harness = await _pumpRoom(tester, failNextWeatherLoad: true);
+
+    await _openDesk(tester);
+
+    expect(find.text('天候の読み込みに失敗しました'), findsOneWidget);
+    expect(harness.shizukuRepository.saveCallCount, 0);
+    expect(harness.readLetterRepository.saveCallCount, 0);
+    expect(find.byType(LetterPage), findsNothing);
+
+    await _openDesk(tester);
+    expect(find.byType(LetterPage), findsOneWidget);
+    expect(harness.shizukuProvider.currentShizuku, 30);
+  });
+
+  testWidgets('日付変更後は変更後の日付の天候を取得する', (tester) async {
+    final harness = await _pumpRoom(tester);
+
+    await _openDesk(tester);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await harness.dateProvider.setDebugDate(DateTime(2026, 8, 8));
+    await _openDesk(tester);
+
+    expect(harness.weatherRepository.requestedDates, [
+      DateTime(2026, 8, 7),
+      DateTime(2026, 8, 8),
+    ]);
+    expect(find.byType(LetterPage), findsOneWidget);
+  });
+
+  testWidgets('天候不一致後に一致すれば再操作で手紙を開ける', (tester) async {
+    final harness = await _pumpRoom(tester, weather: WeatherType.sunny);
+
+    await _openDesk(tester);
+    expect(find.byType(LetterPage), findsNothing);
+
+    harness.weatherRepository.weather = WeatherType.rain;
+    await _openDesk(tester);
+
+    expect(find.byType(LetterPage), findsOneWidget);
+    expect(harness.shizukuProvider.currentShizuku, 30);
+    expect(harness.readLetterProvider.readLetterIds, {'letterA'});
+  });
 }
 
 Future<void> _openDesk(WidgetTester tester) async {
@@ -118,6 +198,8 @@ Future<_RoomHarness> _pumpRoom(
   WidgetTester tester, {
   bool loadProviders = true,
   bool blockRewardSave = false,
+  WeatherType? weather = WeatherType.rain,
+  bool failNextWeatherLoad = false,
 }) async {
   final shizukuRepository = _FakeShizukuRepository(blockSave: blockRewardSave);
   final readLetterRepository = _FakeReadLetterRepository();
@@ -130,6 +212,11 @@ Future<_RoomHarness> _pumpRoom(
   final dateProvider = AppDateProvider(
     _FakeAppDateRepository(DateTime(2026, 8, 7)),
   );
+  final weatherRepository = _FakeWeatherRepository(
+    weather: weather,
+    failNextLoad: failNextWeatherLoad,
+  );
+  final weatherProvider = WeatherProvider(weatherRepository);
 
   if (loadProviders) {
     await Future.wait([
@@ -149,6 +236,7 @@ Future<_RoomHarness> _pumpRoom(
         ChangeNotifierProvider.value(value: catalogProvider),
         ChangeNotifierProvider.value(value: placedProvider),
         ChangeNotifierProvider.value(value: dateProvider),
+        ChangeNotifierProvider.value(value: weatherProvider),
       ],
       child: MaterialApp(
         home: RoomPage(letterRepository: _FakeLetterRepository()),
@@ -163,6 +251,7 @@ Future<_RoomHarness> _pumpRoom(
     shizukuProvider: shizukuProvider,
     readLetterProvider: readLetterProvider,
     dateProvider: dateProvider,
+    weatherRepository: weatherRepository,
   );
 }
 
@@ -173,6 +262,7 @@ class _RoomHarness {
     required this.shizukuProvider,
     required this.readLetterProvider,
     required this.dateProvider,
+    required this.weatherRepository,
   });
 
   final _FakeShizukuRepository shizukuRepository;
@@ -180,6 +270,25 @@ class _RoomHarness {
   final ShizukuProvider shizukuProvider;
   final ReadLetterProvider readLetterProvider;
   final AppDateProvider dateProvider;
+  final _FakeWeatherRepository weatherRepository;
+}
+
+class _FakeWeatherRepository extends WeatherRepository {
+  _FakeWeatherRepository({required this.weather, required this.failNextLoad});
+
+  WeatherType? weather;
+  bool failNextLoad;
+  final List<DateTime> requestedDates = [];
+
+  @override
+  Future<WeatherType?> getByDate(DateTime date) async {
+    requestedDates.add(DateTime(date.year, date.month, date.day));
+    if (failNextLoad) {
+      failNextLoad = false;
+      throw StateError('weather load failed');
+    }
+    return weather;
+  }
 }
 
 class _FakeLetterRepository extends LetterRepository {
