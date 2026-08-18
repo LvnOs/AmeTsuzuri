@@ -1,0 +1,23 @@
+schema_version: "1.0"
+
+weather:
+  - date: "2026-08-07"
+    weather: rain
+  - date: "2026-08-08"
+    weather: rain
+  - date: "2026-08-09"
+    weather: rain
+  - date: "2026-08-10"
+    weather: rain
+  - date: "2026-08-11"
+    weather: rain
+  - date: "2026-08-12"
+    weather: rain
+  - date: "2026-08-13"
+    weather: rain
+  - date: "2026-08-14"
+    weather: rain
+  - date: "2026-08-15"
+    weather: rain
+  - date: "2026-08-16"
+    weather: rain
