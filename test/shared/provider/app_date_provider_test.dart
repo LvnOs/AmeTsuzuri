@@ -1,5 +1,6 @@
 import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
 import 'package:ame_tsuzuri/shared/repository/app_date_repository.dart';
+import 'package:ame_tsuzuri/shared/model/season_type.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -43,6 +44,7 @@ void main() {
     await reloadedProvider.load();
 
     expect(reloadedProvider.today, DateTime(2026, 8, 7));
+    expect(reloadedProvider.currentSeason, SeasonType.summer);
   });
 
   test('デバッグ日付をクリアすると次回ロードで実日付へ戻る', () async {

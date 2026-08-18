@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:yaml/yaml.dart';
 
 import '../../../shared/model/weather_type.dart';
+import '../../../shared/model/season_type.dart';
 import '../model/letter.dart';
 
 class LetterRepository {
@@ -29,6 +30,7 @@ class LetterRepository {
           title: item["title"],
           date: DateTime.parse(item["date"]),
           body: body,
+          requiredSeason: SeasonType.fromYaml(item['season'] as String),
           requiredWeather: WeatherType.fromYaml(item['weather'] as String),
         ),
       );

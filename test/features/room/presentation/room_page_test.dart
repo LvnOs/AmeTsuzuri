@@ -15,6 +15,7 @@ import 'package:ame_tsuzuri/features/letters/repository/shizuku_repository.dart'
 import 'package:ame_tsuzuri/features/room/presentation/room_page.dart';
 import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
 import 'package:ame_tsuzuri/shared/model/weather_type.dart';
+import 'package:ame_tsuzuri/shared/model/season_type.dart';
 import 'package:ame_tsuzuri/shared/provider/weather_provider.dart';
 import 'package:ame_tsuzuri/shared/repository/app_date_repository.dart';
 import 'package:ame_tsuzuri/shared/repository/weather_repository.dart';
@@ -299,6 +300,7 @@ class _FakeLetterRepository extends LetterRepository {
         id: 'letterA',
         title: '手紙A',
         date: DateTime(2026, 8, 7),
+        requiredSeason: SeasonType.summer,
         requiredWeather: WeatherType.rain,
         body: '本文A',
       ),
@@ -306,6 +308,7 @@ class _FakeLetterRepository extends LetterRepository {
         id: 'letterB',
         title: '手紙B',
         date: DateTime(2026, 8, 8),
+        requiredSeason: SeasonType.summer,
         requiredWeather: WeatherType.rain,
         body: '本文B',
       ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../model/season_type.dart';
 import '../repository/app_date_repository.dart';
 
 class AppDateProvider extends ChangeNotifier {
@@ -10,6 +11,7 @@ class AppDateProvider extends ChangeNotifier {
   bool _isLoaded = false;
 
   DateTime get today => _debugDate ?? DateTime.now();
+  SeasonType get currentSeason => SeasonType.fromDate(today);
 
   bool get isDebugDateEnabled => _debugDate != null;
   bool get isLoaded => _isLoaded;
