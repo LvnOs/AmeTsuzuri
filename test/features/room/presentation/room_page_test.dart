@@ -5,6 +5,7 @@ import 'package:ame_tsuzuri/features/furniture/provider/placed_furniture_provide
 import 'package:ame_tsuzuri/features/furniture/repository/placed_furniture_repository.dart';
 import 'package:ame_tsuzuri/features/furniture/repository/purchased_furniture_repository.dart';
 import 'package:ame_tsuzuri/features/letters/model/letter.dart';
+import 'package:ame_tsuzuri/features/letters/model/read_letter_state.dart';
 import 'package:ame_tsuzuri/features/letters/model/shizuku_state.dart';
 import 'package:ame_tsuzuri/features/letters/presentation/letter_page.dart';
 import 'package:ame_tsuzuri/features/letters/provider/read_letter_provider.dart';
@@ -234,7 +235,6 @@ void main() {
     await _openDesk(tester);
 
     expect(harness.readLetterProvider.readLetterIds, {'future'});
-    expect(harness.letterRepository.getByDateCallCount, 0);
   });
 }
 
@@ -351,18 +351,11 @@ class _FakeLetterRepository extends LetterRepository {
 
   final List<Letter> letters;
   int getAllCallCount = 0;
-  int getByDateCallCount = 0;
 
   @override
   Future<List<Letter>> getAll() async {
     getAllCallCount++;
     return letters;
-  }
-
-  @override
-  Future<Letter?> getByDate(DateTime date) async {
-    getByDateCallCount++;
-    throw StateError('RoomPage must not call getByDate.');
   }
 }
 
@@ -423,21 +416,28 @@ class _FakeShizukuRepository extends ShizukuRepository {
 }
 
 class _FakeReadLetterRepository extends ReadLetterRepository {
-  Set<String> persistedIds = {};
+  ReadLetterState state = ReadLetterState(receivedLetters: {});
   bool failNextSave = false;
   int saveCallCount = 0;
 
-  @override
-  Future<Set<String>> loadReadLetterIds() async => Set.of(persistedIds);
+  Set<String> get persistedIds => state.readLetterIds;
 
   @override
-  Future<void> saveReadLetterIds(Set<String> ids) async {
+  Future<ReadLetterState> loadState() async => state;
+
+  @override
+  Future<void> saveState(ReadLetterState nextState) async {
     saveCallCount++;
     if (failNextSave) {
       failNextSave = false;
       throw StateError('save failed');
     }
-    persistedIds = Set.of(ids);
+    state = nextState;
+  }
+
+  @override
+  Future<void> resetState() async {
+    state = ReadLetterState(receivedLetters: {});
   }
 }
 

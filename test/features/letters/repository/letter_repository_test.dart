@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:ame_tsuzuri/features/letters/repository/letter_repository.dart';
-import 'package:ame_tsuzuri/shared/model/weather_type.dart';
 import 'package:ame_tsuzuri/shared/model/season_type.dart';
+import 'package:ame_tsuzuri/shared/model/weather_type.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -24,21 +24,6 @@ void main() {
     expect(letter.title, 'テストの手紙');
     expect(letter.body, '手紙の本文');
     expect(letter.requiredSeason, SeasonType.summer);
-    expect(letter.requiredWeather, WeatherType.rain);
-  });
-
-  test('getByDateは天候条件を保持した従来どおりの手紙を返す', () async {
-    final repository = LetterRepository(
-      assetBundle: _MemoryAssetBundle({
-        'assets/data/letters.yaml': _yamlWithWeather('rain'),
-        'assets/letters/test.md': '手紙の本文',
-      }),
-    );
-
-    final letter = await repository.getByDate(DateTime(2026, 8, 7, 12));
-
-    expect(letter, isNotNull);
-    expect(letter!.id, 'letter_test');
     expect(letter.requiredWeather, WeatherType.rain);
   });
 

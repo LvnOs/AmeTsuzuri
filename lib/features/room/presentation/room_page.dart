@@ -160,7 +160,7 @@ class _RoomPageState extends State<RoomPage> {
       }
 
       try {
-        await readLetterProvider.markAsRead(letter.id);
+        await readLetterProvider.markAsRead(letter.id, receivedDate: today);
       } catch (_) {
         try {
           await readLetterProvider.load();

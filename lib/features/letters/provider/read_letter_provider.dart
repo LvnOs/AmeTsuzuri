@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../model/read_letter_state.dart';
 import '../repository/read_letter_repository.dart';
 
 class ReadLetterProvider extends ChangeNotifier {
@@ -6,41 +8,53 @@ class ReadLetterProvider extends ChangeNotifier {
 
   final ReadLetterRepository _repository;
 
-  Set<String> _readLetterIds = {};
+  ReadLetterState _state = ReadLetterState(receivedLetters: {});
   bool _isLoaded = false;
 
-  Set<String> get readLetterIds => _readLetterIds;
+  Set<String> get readLetterIds => _state.readLetterIds;
+  Map<String, DateTime?> get receivedLetters => _state.receivedLetters;
+  DateTime? receivedDateFor(String letterId) => receivedLetters[letterId];
   bool get isLoaded => _isLoaded;
 
   Future<void> load() async {
-    _readLetterIds = await _repository.loadReadLetterIds();
+    final state = await _repository.loadState();
+    _state = state;
     _isLoaded = true;
 
     notifyListeners();
   }
 
-  Future<bool> markAsRead(String letterId) async {
-    if (_readLetterIds.contains(letterId)) {
+  Future<bool> markAsRead(
+    String letterId, {
+    required DateTime receivedDate,
+  }) async {
+    if (_state.receivedLetters.containsKey(letterId)) {
       return false;
     }
 
-    _readLetterIds.add(letterId);
+    final normalizedDate = DateTime(
+      receivedDate.year,
+      receivedDate.month,
+      receivedDate.day,
+    );
+    final nextState = ReadLetterState(
+      receivedLetters: {
+        ..._state.receivedLetters,
+        letterId: normalizedDate,
+      },
+    );
 
-    try {
-      await _repository.saveReadLetterIds(_readLetterIds);
-    } catch (_) {
-      _readLetterIds.remove(letterId);
-      rethrow;
-    }
+    await _repository.saveState(nextState);
 
+    _state = nextState;
     notifyListeners();
 
     return true;
   }
 
   Future<void> reset() async {
-    await _repository.clear();
-    _readLetterIds = {};
+    await _repository.resetState();
+    _state = ReadLetterState(receivedLetters: {});
     notifyListeners();
   }
 }

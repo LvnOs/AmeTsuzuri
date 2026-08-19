@@ -1,64 +1,170 @@
+import 'package:ame_tsuzuri/features/letters/model/read_letter_state.dart';
 import 'package:ame_tsuzuri/features/letters/provider/read_letter_provider.dart';
 import 'package:ame_tsuzuri/features/letters/repository/read_letter_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('未読手紙を保存して通知しtrueを返す', () async {
-    final repository = _FakeReadLetterRepository();
+  test('受取日ありと不明のStateをロードする', () async {
+    final repository = _FakeReadLetterRepository(
+      ReadLetterState(
+        receivedLetters: {
+          'letterA': DateTime(2026, 8, 8),
+          'legacy': null,
+        },
+      ),
+    );
+    final provider = ReadLetterProvider(repository);
+
+    await provider.load();
+
+    expect(provider.isLoaded, isTrue);
+    expect(provider.readLetterIds, {'letterA', 'legacy'});
+    expect(provider.receivedDateFor('letterA'), DateTime(2026, 8, 8));
+    expect(provider.receivedDateFor('legacy'), isNull);
+  });
+
+  test('ロード失敗時は既存状態を維持して例外を伝える', () async {
+    final repository = _FakeReadLetterRepository(
+      ReadLetterState(receivedLetters: {'letterA': DateTime(2026, 8, 8)}),
+    );
+    final provider = await _loadProvider(repository);
+    repository.failLoad = true;
+
+    await expectLater(provider.load(), throwsA(isA<StateError>()));
+
+    expect(provider.isLoaded, isTrue);
+    expect(provider.readLetterIds, {'letterA'});
+    expect(provider.receivedDateFor('letterA'), DateTime(2026, 8, 8));
+  });
+
+  test('新規手紙の日付を正規化して保存成功後に反映する', () async {
+    final repository = _FakeReadLetterRepository(_emptyState());
     final provider = await _loadProvider(repository);
     var notificationCount = 0;
     provider.addListener(() => notificationCount++);
 
-    final result = await provider.markAsRead('letterA');
+    final result = await provider.markAsRead(
+      'letterA',
+      receivedDate: DateTime(2026, 8, 8, 23, 59),
+    );
 
     expect(result, isTrue);
     expect(provider.readLetterIds, {'letterA'});
-    expect(repository.persistedIds, {'letterA'});
+    expect(provider.receivedDateFor('letterA'), DateTime(2026, 8, 8));
+    expect(repository.state.receivedLetters, {
+      'letterA': DateTime(2026, 8, 8),
+    });
     expect(repository.saveCallCount, 1);
     expect(notificationCount, 1);
   });
 
-  test('既読手紙は保存も通知もせずfalseを返す', () async {
-    final repository = _FakeReadLetterRepository({'letterA'});
+  test('既読手紙は保存・通知・受取日の上書きをしない', () async {
+    final repository = _FakeReadLetterRepository(
+      ReadLetterState(receivedLetters: {'letterA': DateTime(2026, 8, 8)}),
+    );
     final provider = await _loadProvider(repository);
     var notificationCount = 0;
     provider.addListener(() => notificationCount++);
 
-    final result = await provider.markAsRead('letterA');
+    final result = await provider.markAsRead(
+      'letterA',
+      receivedDate: DateTime(2026, 8, 12),
+    );
 
     expect(result, isFalse);
-    expect(provider.readLetterIds, {'letterA'});
+    expect(provider.receivedDateFor('letterA'), DateTime(2026, 8, 8));
     expect(repository.saveCallCount, 0);
     expect(notificationCount, 0);
   });
 
-  test('保存失敗時は追加IDを取り除き通知せず例外を伝える', () async {
-    final repository = _FakeReadLetterRepository()..failSave = true;
+  test('受取日不明の既読手紙も新しい日付で上書きしない', () async {
+    final repository = _FakeReadLetterRepository(
+      ReadLetterState(receivedLetters: {'legacy': null}),
+    );
+    final provider = await _loadProvider(repository);
+
+    final result = await provider.markAsRead(
+      'legacy',
+      receivedDate: DateTime(2026, 8, 12),
+    );
+
+    expect(result, isFalse);
+    expect(provider.readLetterIds, {'legacy'});
+    expect(provider.receivedLetters.containsKey('legacy'), isTrue);
+    expect(provider.receivedDateFor('legacy'), isNull);
+    expect(repository.saveCallCount, 0);
+  });
+
+  test('新しい手紙を追加しても既存手紙を維持する', () async {
+    final repository = _FakeReadLetterRepository(
+      ReadLetterState(receivedLetters: {'letterA': DateTime(2026, 8, 8)}),
+    );
+    final provider = await _loadProvider(repository);
+
+    await provider.markAsRead(
+      'letterB',
+      receivedDate: DateTime(2026, 8, 10),
+    );
+
+    expect(provider.receivedLetters, {
+      'letterA': DateTime(2026, 8, 8),
+      'letterB': DateTime(2026, 8, 10),
+    });
+  });
+
+  test('保存失敗時は新規手紙を反映せず既存状態を維持する', () async {
+    final repository = _FakeReadLetterRepository(
+      ReadLetterState(receivedLetters: {'letterA': DateTime(2026, 8, 8)}),
+    )..failSave = true;
     final provider = await _loadProvider(repository);
     var notificationCount = 0;
     provider.addListener(() => notificationCount++);
 
     await expectLater(
-      provider.markAsRead('letterA'),
-      throwsA(isA<StateError>()),
-    );
-
-    expect(provider.readLetterIds, isEmpty);
-    expect(repository.persistedIds, isEmpty);
-    expect(notificationCount, 0);
-  });
-
-  test('保存失敗時も既存の既読IDを維持する', () async {
-    final repository = _FakeReadLetterRepository({'letterA'})..failSave = true;
-    final provider = await _loadProvider(repository);
-
-    await expectLater(
-      provider.markAsRead('letterB'),
+      provider.markAsRead(
+        'letterB',
+        receivedDate: DateTime(2026, 8, 10),
+      ),
       throwsA(isA<StateError>()),
     );
 
     expect(provider.readLetterIds, {'letterA'});
-    expect(repository.persistedIds, {'letterA'});
+    expect(provider.receivedDateFor('letterA'), DateTime(2026, 8, 8));
+    expect(provider.receivedLetters.containsKey('letterB'), isFalse);
+    expect(repository.state.receivedLetters.keys, {'letterA'});
+    expect(notificationCount, 0);
+  });
+
+  test('resetはRepository成功後に空Stateへ変更してロード済みを維持する', () async {
+    final repository = _FakeReadLetterRepository(
+      ReadLetterState(receivedLetters: {'letterA': DateTime(2026, 8, 8)}),
+    );
+    final provider = await _loadProvider(repository);
+    var notificationCount = 0;
+    provider.addListener(() => notificationCount++);
+
+    await provider.reset();
+
+    expect(provider.isLoaded, isTrue);
+    expect(provider.readLetterIds, isEmpty);
+    expect(provider.receivedLetters, isEmpty);
+    expect(provider.receivedDateFor('letterA'), isNull);
+    expect(repository.resetCallCount, 1);
+    expect(notificationCount, 1);
+  });
+
+  test('受取履歴と既読集合を外部から変更できない', () async {
+    final provider = await _loadProvider(
+      _FakeReadLetterRepository(
+        ReadLetterState(receivedLetters: {'letterA': DateTime(2026, 8, 8)}),
+      ),
+    );
+
+    expect(
+      () => provider.receivedLetters['letterB'] = DateTime(2026, 8, 9),
+      throwsUnsupportedError,
+    );
+    expect(() => provider.readLetterIds.add('letterB'), throwsUnsupportedError);
   });
 }
 
@@ -70,23 +176,37 @@ Future<ReadLetterProvider> _loadProvider(
   return provider;
 }
 
-class _FakeReadLetterRepository extends ReadLetterRepository {
-  _FakeReadLetterRepository([Set<String>? initialIds])
-    : persistedIds = Set.of(initialIds ?? {});
+ReadLetterState _emptyState() => ReadLetterState(receivedLetters: {});
 
-  Set<String> persistedIds;
+class _FakeReadLetterRepository extends ReadLetterRepository {
+  _FakeReadLetterRepository(this.state);
+
+  ReadLetterState state;
+  bool failLoad = false;
   bool failSave = false;
   int saveCallCount = 0;
+  int resetCallCount = 0;
 
   @override
-  Future<Set<String>> loadReadLetterIds() async => Set.of(persistedIds);
+  Future<ReadLetterState> loadState() async {
+    if (failLoad) {
+      throw StateError('load failed');
+    }
+    return state;
+  }
 
   @override
-  Future<void> saveReadLetterIds(Set<String> ids) async {
+  Future<void> saveState(ReadLetterState nextState) async {
     saveCallCount++;
     if (failSave) {
       throw StateError('save failed');
     }
-    persistedIds = Set.of(ids);
+    state = nextState;
+  }
+
+  @override
+  Future<void> resetState() async {
+    resetCallCount++;
+    state = _emptyState();
   }
 }
