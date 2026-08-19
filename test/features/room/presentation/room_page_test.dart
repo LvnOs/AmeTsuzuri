@@ -123,6 +123,21 @@ void main() {
     expect(find.byType(LetterPage), findsOneWidget);
   });
 
+  testWidgets('AppDateProvider.todayを年月日の受取日として保存する', (tester) async {
+    final harness = await _pumpRoom(tester, date: DateTime(2026, 8, 10));
+
+    await _openDesk(tester);
+
+    expect(
+      harness.readLetterProvider.receivedDateFor('letterA'),
+      DateTime(2026, 8, 10),
+    );
+    expect(
+      harness.readLetterRepository.state.receivedLetters['letterA'],
+      DateTime(2026, 8, 10),
+    );
+  });
+
   testWidgets('晴れの日は雨条件の手紙を開かず副作用を起こさない', (tester) async {
     final harness = await _pumpRoom(tester, weather: WeatherType.sunny);
 
@@ -162,7 +177,7 @@ void main() {
     expect(harness.shizukuProvider.currentShizuku, 30);
   });
 
-  testWidgets('日付変更後は変更後の日付の天候を取得する', (tester) async {
+  testWidgets('日付変更後は新しい日付を天候取得と次の手紙の受取日に使う', (tester) async {
     final harness = await _pumpRoom(tester);
 
     await _openDesk(tester);
@@ -175,6 +190,14 @@ void main() {
       DateTime(2026, 8, 7),
       DateTime(2026, 8, 8),
     ]);
+    expect(
+      harness.readLetterProvider.receivedDateFor('letterA'),
+      DateTime(2026, 8, 7),
+    );
+    expect(
+      harness.readLetterProvider.receivedDateFor('letterB'),
+      DateTime(2026, 8, 8),
+    );
     expect(find.byType(LetterPage), findsOneWidget);
   });
 

@@ -6,12 +6,15 @@ import '../../letters/repository/letter_repository.dart';
 import '../../letters/provider/read_letter_provider.dart';
 
 class BookshelfPage extends StatelessWidget {
-  const BookshelfPage({super.key});
+  const BookshelfPage({super.key, this.letterRepository});
+
+  final LetterRepository? letterRepository;
 
   @override
   Widget build(BuildContext context) {
-    final readLetterIds = context.watch<ReadLetterProvider>().readLetterIds;
-    final repository = LetterRepository();
+    final readLetterProvider = context.watch<ReadLetterProvider>();
+    final readLetterIds = readLetterProvider.readLetterIds;
+    final repository = letterRepository ?? LetterRepository();
 
     return Scaffold(
       appBar: AppBar(title: const Text('本棚')),
@@ -42,7 +45,11 @@ class BookshelfPage extends StatelessWidget {
 
               return ListTile(
                 title: Text(letter.title),
-                subtitle: Text(_formatDate(letter.date)),
+                subtitle: Text(
+                  _formatReceivedDate(
+                    readLetterProvider.receivedDateFor(letter.id),
+                  ),
+                ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.of(context).push(
@@ -59,7 +66,10 @@ class BookshelfPage extends StatelessWidget {
     );
   }
 
-  String _formatDate(DateTime date) {
+  String _formatReceivedDate(DateTime? date) {
+    if (date == null) {
+      return '受取日不明';
+    }
     return '${date.year}年${date.month}月${date.day}日';
   }
 }
