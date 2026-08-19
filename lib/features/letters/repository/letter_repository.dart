@@ -28,7 +28,6 @@ class LetterRepository {
         Letter(
           id: item["id"],
           title: item["title"],
-          date: DateTime.parse(item["date"]),
           body: body,
           requiredSeason: SeasonType.fromYaml(item['season'] as String),
           requiredWeather: WeatherType.fromYaml(item['weather'] as String),

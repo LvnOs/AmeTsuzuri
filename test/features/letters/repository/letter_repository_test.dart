@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('weatherと既存フィールドをYAMLから読み込む', () async {
+  test('dateなしYAMLから配信と表示に必要なフィールドを読み込む', () async {
     final repository = LetterRepository(
       assetBundle: _MemoryAssetBundle({
         'assets/data/letters.yaml': _yamlWithWeather('rain'),
@@ -20,7 +20,6 @@ void main() {
     expect(letters, hasLength(1));
     final letter = letters.single;
     expect(letter.id, 'letter_test');
-    expect(letter.date, DateTime(2026, 8, 7));
     expect(letter.title, 'テストの手紙');
     expect(letter.body, '手紙の本文');
     expect(letter.requiredSeason, SeasonType.summer);
@@ -53,7 +52,6 @@ void main() {
 String _yamlWithWeather(String weather, {String season = 'summer'}) => '''
 letters:
   - id: letter_test
-    date: "2026-08-07"
     title: "テストの手紙"
     season: $season
     weather: $weather

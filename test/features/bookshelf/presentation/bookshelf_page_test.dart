@@ -30,9 +30,9 @@ void main() {
         child: MaterialApp(
           home: BookshelfPage(
             letterRepository: _FakeLetterRepository([
-              _letter('letterA', '手紙A', DateTime(2020, 1, 1)),
-              _letter('legacyLetter', '昔の手紙', DateTime(2019, 2, 2)),
-              _letter('unreadLetter', '未読の手紙', DateTime(2026, 8, 10)),
+              _letter('letterA', '手紙A'),
+              _letter('legacyLetter', '昔の手紙'),
+              _letter('unreadLetter', '未読の手紙'),
             ]),
           ),
         ),
@@ -45,16 +45,13 @@ void main() {
     expect(find.text('昔の手紙'), findsOneWidget);
     expect(find.text('受取日不明'), findsOneWidget);
     expect(find.text('未読の手紙'), findsNothing);
-    expect(find.text('2020年1月1日'), findsNothing);
-    expect(find.text('2019年2月2日'), findsNothing);
   });
 }
 
-Letter _letter(String id, String title, DateTime masterDate) {
+Letter _letter(String id, String title) {
   return Letter(
     id: id,
     title: title,
-    date: masterDate,
     body: id,
     requiredSeason: SeasonType.any,
     requiredWeather: WeatherType.rain,

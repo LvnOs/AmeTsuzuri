@@ -57,8 +57,8 @@ void main() {
 
   test('複数候補では元List順で最初の手紙を選ぶ', () {
     final selected = select([
-      _letter('first', date: DateTime(2030, 1, 1)),
-      _letter('second', date: DateTime(2020, 1, 1)),
+      _letter('first'),
+      _letter('second'),
     ]);
 
     expect(selected?.id, 'first');
@@ -91,23 +91,16 @@ void main() {
     expect(selected?.id, 'rain');
   });
 
-  test('未来日でも未読かつ季節・天候一致なら選ぶ', () {
-    final futureLetter = _letter('future', date: DateTime(9999, 12, 31));
-
-    expect(select([futureLetter])?.id, 'future');
-  });
 }
 
 Letter _letter(
   String id, {
-  DateTime? date,
   SeasonType season = SeasonType.summer,
   WeatherType weather = WeatherType.rain,
 }) {
   return Letter(
     id: id,
     title: id,
-    date: date ?? DateTime(2026, 8, 7),
     body: id,
     requiredSeason: season,
     requiredWeather: weather,

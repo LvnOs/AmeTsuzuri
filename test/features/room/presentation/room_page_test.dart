@@ -246,19 +246,6 @@ void main() {
     expect(find.byType(LetterPage), findsOneWidget);
   });
 
-  testWidgets('未来日でもYAML順先頭の条件一致手紙を配信する', (tester) async {
-    final harness = await _pumpRoom(
-      tester,
-      letters: [
-        _letter('future', date: DateTime(9999, 12, 31)),
-        _letter('past', date: DateTime(2020, 1, 1)),
-      ],
-    );
-
-    await _openDesk(tester);
-
-    expect(harness.readLetterProvider.readLetterIds, {'future'});
-  });
 }
 
 Future<void> _openDesk(WidgetTester tester) async {
@@ -383,20 +370,18 @@ class _FakeLetterRepository extends LetterRepository {
 }
 
 final List<Letter> _defaultLetters = [
-  _letter('letterA', date: DateTime(2026, 8, 7)),
-  _letter('letterB', date: DateTime(2026, 8, 8)),
+  _letter('letterA'),
+  _letter('letterB'),
 ];
 
 Letter _letter(
   String id, {
-  DateTime? date,
   SeasonType season = SeasonType.summer,
   WeatherType weather = WeatherType.rain,
 }) {
   return Letter(
     id: id,
     title: id,
-    date: date ?? DateTime(2026, 8, 7),
     requiredSeason: season,
     requiredWeather: weather,
     body: id,

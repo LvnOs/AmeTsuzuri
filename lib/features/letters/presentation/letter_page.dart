@@ -26,11 +26,6 @@ class LetterPage extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                _formatDate(letter.date),
-                style: TextStyle(fontSize: 14, color: Colors.black54),
-              ),
               SizedBox(height: 32),
               Text(letter.body, style: TextStyle(fontSize: 18, height: 1.9)),
             ],
@@ -38,9 +33,5 @@ class LetterPage extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.year}年${date.month}月${date.day}日';
   }
 }
