@@ -166,6 +166,79 @@ void main() {
     );
     expect(() => provider.readLetterIds.add('letterB'), throwsUnsupportedError);
   });
+
+  group('hasReceivedLetterOn', () {
+    test('同じ年月日の受取履歴があればtrueを返す', () async {
+      final provider = await _loadProvider(
+        _FakeReadLetterRepository(
+          ReadLetterState(
+            receivedLetters: {'letterA': DateTime(2026, 8, 8)},
+          ),
+        ),
+      );
+
+      expect(
+        provider.hasReceivedLetterOn(DateTime(2026, 8, 8, 23, 59)),
+        isTrue,
+      );
+    });
+
+    test('別日の受取履歴だけならfalseを返す', () async {
+      final provider = await _loadProvider(
+        _FakeReadLetterRepository(
+          ReadLetterState(
+            receivedLetters: {'letterA': DateTime(2026, 8, 7)},
+          ),
+        ),
+      );
+
+      expect(provider.hasReceivedLetterOn(DateTime(2026, 8, 8)), isFalse);
+    });
+
+    test('受取日がnullの旧履歴は判定対象外', () async {
+      final provider = await _loadProvider(
+        _FakeReadLetterRepository(
+          ReadLetterState(receivedLetters: {'legacy': null}),
+        ),
+      );
+
+      expect(provider.hasReceivedLetterOn(DateTime(2026, 8, 8)), isFalse);
+    });
+
+    test('複数履歴のうち1件でも同日ならtrueを返す', () async {
+      final provider = await _loadProvider(
+        _FakeReadLetterRepository(
+          ReadLetterState(
+            receivedLetters: {
+              'letterA': DateTime(2026, 8, 7),
+              'letterB': DateTime(2026, 8, 8),
+              'legacy': null,
+            },
+          ),
+        ),
+      );
+
+      expect(provider.hasReceivedLetterOn(DateTime(2026, 8, 8)), isTrue);
+    });
+
+    test('問い合わせでは状態変更も通知も行わない', () async {
+      final provider = await _loadProvider(
+        _FakeReadLetterRepository(
+          ReadLetterState(
+            receivedLetters: {'letterA': DateTime(2026, 8, 8)},
+          ),
+        ),
+      );
+      var notificationCount = 0;
+      provider.addListener(() => notificationCount++);
+
+      expect(provider.hasReceivedLetterOn(DateTime(2026, 8, 8)), isTrue);
+      expect(provider.receivedLetters, {
+        'letterA': DateTime(2026, 8, 8),
+      });
+      expect(notificationCount, 0);
+    });
+  });
 }
 
 Future<ReadLetterProvider> _loadProvider(

@@ -16,6 +16,15 @@ class ReadLetterProvider extends ChangeNotifier {
   DateTime? receivedDateFor(String letterId) => receivedLetters[letterId];
   bool get isLoaded => _isLoaded;
 
+  bool hasReceivedLetterOn(DateTime date) {
+    return _state.receivedLetters.values.any((receivedDate) {
+      return receivedDate != null &&
+          receivedDate.year == date.year &&
+          receivedDate.month == date.month &&
+          receivedDate.day == date.day;
+    });
+  }
+
   Future<void> load() async {
     final state = await _repository.loadState();
     _state = state;

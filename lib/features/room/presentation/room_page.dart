@@ -106,6 +106,13 @@ class _RoomPageState extends State<RoomPage> {
     try {
       final today = appDateProvider.today;
 
+      if (readLetterProvider.hasReceivedLetterOn(today)) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('今日の手紙はもう受け取りました')));
+        return;
+      }
+
       try {
         await weatherProvider.loadForDate(today);
       } catch (_) {

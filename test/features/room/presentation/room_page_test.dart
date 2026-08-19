@@ -25,7 +25,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
-  testWidgets('同じ日にYAML順で未読A、Bを配信し既読Aは再配信しない', (tester) async {
+  testWidgets('同じ日は2通目を受け取らず配信処理を開始しない', (tester) async {
     final harness = await _pumpRoom(tester);
 
     await _openDesk(tester);
@@ -37,17 +37,48 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
     await _openDesk(tester);
-    expect(harness.shizukuProvider.currentShizuku, 40);
-    expect(harness.shizukuProvider.rewardedLetterIds, {'letterA', 'letterB'});
-    expect(harness.readLetterProvider.readLetterIds, {'letterA', 'letterB'});
+    expect(harness.shizukuProvider.currentShizuku, 30);
+    expect(harness.shizukuProvider.rewardedLetterIds, {'letterA'});
+    expect(harness.readLetterProvider.readLetterIds, {'letterA'});
+    expect(harness.shizukuRepository.saveCallCount, 1);
+    expect(harness.readLetterRepository.saveCallCount, 1);
+    expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
+    expect(harness.letterRepository.getAllCallCount, 1);
+    expect(find.byType(LetterPage), findsNothing);
+    expect(find.text('今日の手紙はもう受け取りました'), findsOneWidget);
+  });
 
+  testWidgets('再ロード後も同じ日の2通目を受け取らない', (tester) async {
+    final harness = await _pumpRoom(tester);
+
+    await _openDesk(tester);
     await tester.pageBack();
     await tester.pumpAndSettle();
+    await harness.readLetterProvider.load();
     await _openDesk(tester);
-    expect(harness.shizukuProvider.currentShizuku, 40);
-    expect(harness.shizukuRepository.saveCallCount, 2);
-    expect(find.byType(LetterPage), findsNothing);
-    expect(find.text('今日の手紙はまだ届いていません'), findsOneWidget);
+
+    expect(harness.readLetterProvider.readLetterIds, {'letterA'});
+    expect(harness.shizukuProvider.currentShizuku, 30);
+    expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
+    expect(harness.letterRepository.getAllCallCount, 1);
+    expect(find.text('今日の手紙はもう受け取りました'), findsOneWidget);
+  });
+
+  testWidgets('履歴をresetすると同じ日でも再び1通受け取れる', (tester) async {
+    final harness = await _pumpRoom(tester);
+
+    await _openDesk(tester);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await harness.readLetterProvider.reset();
+    await _openDesk(tester);
+
+    expect(harness.readLetterProvider.readLetterIds, {'letterA'});
+    expect(find.byType(LetterPage), findsOneWidget);
+    expect(harness.weatherRepository.requestedDates, [
+      DateTime(2026, 8, 7),
+      DateTime(2026, 8, 7),
+    ]);
   });
 
   testWidgets('報酬保存失敗時は既読保存と画面遷移を行わず再試行できる', (tester) async {
