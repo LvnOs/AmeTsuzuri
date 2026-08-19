@@ -117,9 +117,9 @@ class _RoomPageState extends State<RoomPage> {
         await weatherProvider.loadForDate(today);
       } catch (_) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('天候の読み込みに失敗しました')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('天候の読み込みに失敗しました')));
         }
         return;
       }
@@ -130,9 +130,9 @@ class _RoomPageState extends State<RoomPage> {
 
       final currentWeather = weatherProvider.currentWeather;
       if (currentWeather == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('今日の天候を確認できませんでした')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('今日の天候を確認できませんでした')));
         return;
       }
 

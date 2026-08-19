@@ -11,9 +11,33 @@ class LetterDeliveryService {
     required WeatherType currentWeather,
     required Set<String> readLetterIds,
   }) {
+    final seasonalLetter = _selectFirstMatching(
+      letters: letters,
+      requiredSeason: currentSeason,
+      currentWeather: currentWeather,
+      readLetterIds: readLetterIds,
+    );
+    if (seasonalLetter != null) {
+      return seasonalLetter;
+    }
+
+    return _selectFirstMatching(
+      letters: letters,
+      requiredSeason: SeasonType.any,
+      currentWeather: currentWeather,
+      readLetterIds: readLetterIds,
+    );
+  }
+
+  Letter? _selectFirstMatching({
+    required List<Letter> letters,
+    required SeasonType requiredSeason,
+    required WeatherType currentWeather,
+    required Set<String> readLetterIds,
+  }) {
     for (final letter in letters) {
       if (readLetterIds.contains(letter.id) ||
-          !_matchesSeason(letter.requiredSeason, currentSeason) ||
+          letter.requiredSeason != requiredSeason ||
           letter.requiredWeather != currentWeather) {
         continue;
       }
@@ -22,9 +46,5 @@ class LetterDeliveryService {
     }
 
     return null;
-  }
-
-  bool _matchesSeason(SeasonType required, SeasonType current) {
-    return required == SeasonType.any || required == current;
   }
 }

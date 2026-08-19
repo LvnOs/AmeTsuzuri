@@ -91,6 +91,101 @@ void main() {
     expect(selected?.id, 'rain');
   });
 
+  group('季節手紙から通年手紙へのフォールバック', () {
+    test('anyがList上で先でも配信可能な現在季節の手紙を優先する', () {
+      final selected = select([
+        _letter('any', season: SeasonType.any),
+        _letter('summer'),
+      ]);
+
+      expect(selected?.id, 'summer');
+    });
+
+    test('現在季節の手紙がList上で先ならその手紙を選ぶ', () {
+      final selected = select([
+        _letter('summer'),
+        _letter('any', season: SeasonType.any),
+      ]);
+
+      expect(selected?.id, 'summer');
+    });
+
+    test('現在季節の手紙が既読なら未読のanyへフォールバックする', () {
+      final selected = select([
+        _letter('summer'),
+        _letter('any', season: SeasonType.any),
+      ], readIds: {'summer'});
+
+      expect(selected?.id, 'any');
+    });
+
+    test('現在季節の手紙が天候不一致なら天候一致のanyへフォールバックする', () {
+      final selected = select([
+        _letter('summer-sunny', weather: WeatherType.sunny),
+        _letter('any-rain', season: SeasonType.any),
+      ]);
+
+      expect(selected?.id, 'any-rain');
+    });
+
+    test('配信可能な現在季節の手紙同士ではList順先頭を選ぶ', () {
+      final selected = select([
+        _letter('summer-first'),
+        _letter('summer-second'),
+      ]);
+
+      expect(selected?.id, 'summer-first');
+    });
+
+    test('季節候補がなければany手紙同士のList順先頭を選ぶ', () {
+      final selected = select([
+        _letter('any-first', season: SeasonType.any),
+        _letter('any-second', season: SeasonType.any),
+      ]);
+
+      expect(selected?.id, 'any-first');
+    });
+
+    test('先頭にanyが複数あっても後方の現在季節候補を優先する', () {
+      final selected = select([
+        _letter('any-first', season: SeasonType.any),
+        _letter('any-second', season: SeasonType.any),
+        _letter('summer'),
+      ]);
+
+      expect(selected?.id, 'summer');
+    });
+
+    test('現在季節以外の季節手紙を無視してanyへフォールバックする', () {
+      final selected = select([
+        _letter('autumn', season: SeasonType.autumn),
+        _letter('any', season: SeasonType.any),
+      ]);
+
+      expect(selected?.id, 'any');
+    });
+
+    test('現在季節候補もany候補もなければnullを返す', () {
+      final selected = select([
+        _letter('autumn', season: SeasonType.autumn),
+        _letter('read-any', season: SeasonType.any),
+      ], readIds: {'read-any'});
+
+      expect(selected, isNull);
+    });
+
+    test('anyでも天候不一致なら選ばない', () {
+      final selected = select([
+        _letter(
+          'any-sunny',
+          season: SeasonType.any,
+          weather: WeatherType.sunny,
+        ),
+      ]);
+
+      expect(selected, isNull);
+    });
+  });
 }
 
 Letter _letter(
