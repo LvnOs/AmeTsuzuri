@@ -23,6 +23,9 @@ class ShizukuProvider extends ChangeNotifier {
   int get currentShizuku => _currentShizuku;
   Set<String> get rewardedLetterIds => Set.unmodifiable(_rewardedLetterIds);
   bool get isLoaded => _isLoaded;
+  int get bottleRecordCount => _rewardedLetterIds.length;
+  int get fullBottleCount => bottleRecordCount ~/ 30;
+  int get currentBottleProgress => bottleRecordCount % 30;
 
   Future<void> load() async {
     final state = await _repository.loadState();
@@ -76,7 +79,7 @@ class ShizukuProvider extends ChangeNotifier {
   }
 
   Future<LetterRewardResult> _saveLetterReward(String letterId) async {
-    final amount = _rewardedLetterIds.isEmpty ? 30 : 10;
+    const amount = 10;
     final nextRewardedLetterIds = Set<String>.of(_rewardedLetterIds)
       ..add(letterId);
     final nextState = ShizukuState(
@@ -117,7 +120,12 @@ class ShizukuProvider extends ChangeNotifier {
 
   Future<void> reset() async {
     await _repository.resetState();
-    _applyState(const ShizukuState(currentShizuku: 0, rewardedLetterIds: {}));
+    _applyState(
+      const ShizukuState(
+        currentShizuku: ShizukuRepository.initialShizuku,
+        rewardedLetterIds: {},
+      ),
+    );
     notifyListeners();
   }
 

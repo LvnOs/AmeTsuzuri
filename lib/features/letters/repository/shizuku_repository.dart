@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../model/shizuku_state.dart';
 
 class ShizukuRepository {
+  static const int initialShizuku = 30;
   static const String _stateKey = 'shizukuState';
   static const String _legacyShizukuKey = 'currentShizuku';
   static const String _readLetterIdsKey = 'readLetterIds';
@@ -42,7 +43,10 @@ class ShizukuRepository {
 
   Future<void> resetState() async {
     await saveState(
-      const ShizukuState(currentShizuku: 0, rewardedLetterIds: {}),
+      const ShizukuState(
+        currentShizuku: initialShizuku,
+        rewardedLetterIds: {},
+      ),
     );
 
     final prefs = await SharedPreferences.getInstance();
@@ -78,7 +82,7 @@ class ShizukuRepository {
     return ShizukuState(
       currentShizuku: legacyShizuku is int && legacyShizuku >= 0
           ? legacyShizuku
-          : 0,
+          : initialShizuku,
       rewardedLetterIds: legacyReadLetterIds is List
           ? legacyReadLetterIds.whereType<String>().toSet()
           : {},

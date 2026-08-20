@@ -29,7 +29,7 @@ void main() {
     final harness = await _pumpRoom(tester);
 
     await _openDesk(tester);
-    expect(harness.shizukuProvider.currentShizuku, 30);
+    expect(harness.shizukuProvider.currentShizuku, 40);
     expect(harness.shizukuProvider.rewardedLetterIds, {'letterA'});
     expect(harness.readLetterProvider.readLetterIds, {'letterA'});
     expect(find.byType(LetterPage), findsOneWidget);
@@ -37,7 +37,7 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
     await _openDesk(tester);
-    expect(harness.shizukuProvider.currentShizuku, 30);
+    expect(harness.shizukuProvider.currentShizuku, 40);
     expect(harness.shizukuProvider.rewardedLetterIds, {'letterA'});
     expect(harness.readLetterProvider.readLetterIds, {'letterA'});
     expect(harness.shizukuRepository.saveCallCount, 1);
@@ -58,7 +58,7 @@ void main() {
     await _openDesk(tester);
 
     expect(harness.readLetterProvider.readLetterIds, {'letterA'});
-    expect(harness.shizukuProvider.currentShizuku, 30);
+    expect(harness.shizukuProvider.currentShizuku, 40);
     expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
     expect(harness.letterRepository.getAllCallCount, 1);
     expect(find.text('今日の手紙はもう受け取りました'), findsOneWidget);
@@ -87,11 +87,11 @@ void main() {
     expect(find.text('雫の受け取りに失敗しました'), findsOneWidget);
     expect(find.byType(LetterPage), findsNothing);
     expect(harness.readLetterRepository.saveCallCount, 0);
-    expect(harness.shizukuProvider.currentShizuku, 0);
+    expect(harness.shizukuProvider.currentShizuku, 30);
 
     await _openDesk(tester);
     expect(find.byType(LetterPage), findsOneWidget);
-    expect(harness.shizukuProvider.currentShizuku, 30);
+    expect(harness.shizukuProvider.currentShizuku, 40);
     expect(harness.readLetterProvider.readLetterIds, {'letterA'});
   });
 
@@ -103,12 +103,12 @@ void main() {
 
     expect(find.text('手紙の保存に失敗しました'), findsOneWidget);
     expect(find.byType(LetterPage), findsNothing);
-    expect(harness.shizukuProvider.currentShizuku, 30);
+    expect(harness.shizukuProvider.currentShizuku, 40);
     expect(harness.readLetterProvider.readLetterIds, isEmpty);
 
     await _openDesk(tester);
     expect(find.byType(LetterPage), findsOneWidget);
-    expect(harness.shizukuProvider.currentShizuku, 30);
+    expect(harness.shizukuProvider.currentShizuku, 40);
     expect(harness.shizukuRepository.saveCallCount, 1);
     expect(harness.readLetterProvider.readLetterIds, {'letterA'});
   });
@@ -136,7 +136,7 @@ void main() {
     harness.shizukuRepository.completeSave();
     await tester.pumpAndSettle();
 
-    expect(harness.shizukuProvider.currentShizuku, 30);
+    expect(harness.shizukuProvider.currentShizuku, 40);
     expect(find.byType(LetterPage), findsOneWidget);
   });
 
@@ -146,7 +146,7 @@ void main() {
     await _openDesk(tester);
 
     expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
-    expect(harness.shizukuProvider.currentShizuku, 30);
+    expect(harness.shizukuProvider.currentShizuku, 40);
     expect(harness.readLetterProvider.readLetterIds, {'letterA'});
     expect(find.byType(LetterPage), findsOneWidget);
   });
@@ -195,7 +195,7 @@ void main() {
     await _openDesk(tester);
 
     expect(find.byType(LetterPage), findsOneWidget);
-    expect(harness.shizukuProvider.currentShizuku, 30);
+    expect(harness.shizukuProvider.currentShizuku, 40);
     expect(harness.weatherRepository.requestedDates, [
       DateTime(2026, 8, 7),
       DateTime(2026, 8, 7),
@@ -236,7 +236,7 @@ void main() {
     await _openDesk(tester);
 
     expect(find.byType(LetterPage), findsNothing);
-    expect(harness.shizukuProvider.currentShizuku, 0);
+    expect(harness.shizukuProvider.currentShizuku, 30);
     expect(harness.readLetterProvider.readLetterIds, isEmpty);
     expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
   });
@@ -450,7 +450,7 @@ class _FakeShizukuRepository extends ShizukuRepository {
   final bool blockSave;
   final Completer<void> _saveCompleter = Completer<void>();
   ShizukuState state = const ShizukuState(
-    currentShizuku: 0,
+    currentShizuku: 30,
     rewardedLetterIds: {},
   );
   bool failNextSave = false;

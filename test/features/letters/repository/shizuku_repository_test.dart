@@ -17,11 +17,20 @@ void main() {
 
     final state = await repository.loadState();
 
-    expect(state.currentShizuku, 0);
+    expect(state.currentShizuku, 30);
     expect(state.rewardedLetterIds, isEmpty);
 
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getString(stateKey), isNotNull);
+  });
+
+  test('旧残高だけがある場合は30滴で上書きせず移行する', () async {
+    SharedPreferences.setMockInitialValues({'currentShizuku': 17});
+
+    final state = await ShizukuRepository().loadState();
+
+    expect(state.currentShizuku, 17);
+    expect(state.rewardedLetterIds, isEmpty);
   });
 
   test('旧残高と既読IDから新状態へ移行する', () async {
@@ -113,7 +122,7 @@ void main() {
     await repository.resetState();
     final state = await repository.loadState();
 
-    expect(state.currentShizuku, 0);
+    expect(state.currentShizuku, 30);
     expect(state.rewardedLetterIds, isEmpty);
 
     final prefs = await SharedPreferences.getInstance();
