@@ -75,10 +75,7 @@ void main() {
 
     expect(harness.readLetterProvider.readLetterIds, {'letterA'});
     expect(find.byType(LetterPage), findsOneWidget);
-    expect(harness.weatherRepository.requestedDates, [
-      DateTime(2026, 8, 7),
-      DateTime(2026, 8, 7),
-    ]);
+    expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
   });
 
   testWidgets('報酬保存失敗時は既読保存と画面遷移を行わず再試行できる', (tester) async {
@@ -197,15 +194,12 @@ void main() {
 
     await _openDesk(tester);
 
-    expect(find.text('天候の読み込みに失敗しました'), findsOneWidget);
-    expect(harness.shizukuRepository.saveCallCount, 0);
-    expect(harness.readLetterRepository.saveCallCount, 0);
-    expect(harness.letterRepository.getAllCallCount, 0);
-    expect(find.byType(LetterPage), findsNothing);
-
-    await _openDesk(tester);
     expect(find.byType(LetterPage), findsOneWidget);
     expect(harness.shizukuProvider.currentShizuku, 30);
+    expect(harness.weatherRepository.requestedDates, [
+      DateTime(2026, 8, 7),
+      DateTime(2026, 8, 7),
+    ]);
   });
 
   testWidgets('日付変更後は新しい日付を天候取得と次の手紙の受取日に使う', (tester) async {
@@ -232,7 +226,7 @@ void main() {
     expect(find.byType(LetterPage), findsOneWidget);
   });
 
-  testWidgets('天候不一致後に一致すれば再操作で手紙を開ける', (tester) async {
+  testWidgets('手紙操作では表示中の日付の天候を再ロードしない', (tester) async {
     final harness = await _pumpRoom(tester, weather: WeatherType.sunny);
 
     await _openDesk(tester);
@@ -241,9 +235,46 @@ void main() {
     harness.weatherRepository.weather = WeatherType.rain;
     await _openDesk(tester);
 
-    expect(find.byType(LetterPage), findsOneWidget);
-    expect(harness.shizukuProvider.currentShizuku, 30);
-    expect(harness.readLetterProvider.readLetterIds, {'letterA'});
+    expect(find.byType(LetterPage), findsNothing);
+    expect(harness.shizukuProvider.currentShizuku, 0);
+    expect(harness.readLetterProvider.readLetterIds, isEmpty);
+    expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
+  });
+
+  testWidgets('初期表示で当日の天候を読み込み雨なら演出を表示する', (tester) async {
+    final harness = await _pumpRoom(tester);
+
+    await tester.pumpAndSettle();
+
+    expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
+    expect(find.byKey(const ValueKey('rain-overlay')), findsOneWidget);
+  });
+
+  testWidgets('晴れまたは天候データなしなら雨演出を表示しない', (tester) async {
+    await _pumpRoom(tester, weather: WeatherType.sunny);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('rain-overlay')), findsNothing);
+
+    await _pumpRoom(tester, weather: null);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('rain-overlay')), findsNothing);
+    expect(find.byType(RoomPage), findsOneWidget);
+  });
+
+  testWidgets('日付変更で天候と雨演出を更新する', (tester) async {
+    final harness = await _pumpRoom(tester);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('rain-overlay')), findsOneWidget);
+
+    harness.weatherRepository.weather = WeatherType.sunny;
+    await harness.dateProvider.setDebugDate(DateTime(2026, 8, 8));
+    await tester.pumpAndSettle();
+
+    expect(harness.weatherRepository.requestedDates, [
+      DateTime(2026, 8, 7),
+      DateTime(2026, 8, 8),
+    ]);
+    expect(find.byKey(const ValueKey('rain-overlay')), findsNothing);
   });
 
   testWidgets('先頭の季節不一致を飛ばしてanyの手紙を配信する', (tester) async {
@@ -276,7 +307,6 @@ void main() {
     expect(harness.readLetterProvider.readLetterIds, {'rain'});
     expect(find.byType(LetterPage), findsOneWidget);
   });
-
 }
 
 Future<void> _openDesk(WidgetTester tester) async {
@@ -331,9 +361,7 @@ Future<_RoomHarness> _pumpRoom(
         ChangeNotifierProvider.value(value: dateProvider),
         ChangeNotifierProvider.value(value: weatherProvider),
       ],
-      child: MaterialApp(
-        home: RoomPage(letterRepository: letterRepository),
-      ),
+      child: MaterialApp(home: RoomPage(letterRepository: letterRepository)),
     ),
   );
   await tester.pump();
@@ -400,10 +428,7 @@ class _FakeLetterRepository extends LetterRepository {
   }
 }
 
-final List<Letter> _defaultLetters = [
-  _letter('letterA'),
-  _letter('letterB'),
-];
+final List<Letter> _defaultLetters = [_letter('letterA'), _letter('letterB')];
 
 Letter _letter(
   String id, {

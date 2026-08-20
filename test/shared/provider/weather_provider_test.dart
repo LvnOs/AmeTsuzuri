@@ -20,6 +20,7 @@ void main() {
 
     expect(provider.isLoaded, isTrue);
     expect(provider.currentWeather, WeatherType.rain);
+    expect(provider.loadedDate, DateTime(2026, 8, 7));
   });
 
   test('未定義日付のロード完了後は天候がnullになる', () async {
@@ -29,6 +30,7 @@ void main() {
 
     expect(provider.isLoaded, isTrue);
     expect(provider.currentWeather, isNull);
+    expect(provider.loadedDate, DateTime(2026, 8, 20));
   });
 
   test('同じProviderで別の日付を再ロードできる', () async {

@@ -13,6 +13,8 @@ import 'package:ame_tsuzuri/features/furniture/model/furniture.dart';
 import 'package:ame_tsuzuri/features/furniture/provider/catalog_provider.dart';
 import 'package:ame_tsuzuri/features/furniture/provider/placed_furniture_provider.dart';
 import 'package:ame_tsuzuri/features/furniture/repository/furniture_repository.dart';
+import 'package:ame_tsuzuri/features/room/presentation/widgets/rain_overlay.dart';
+import 'package:ame_tsuzuri/shared/model/weather_type.dart';
 
 class RoomPage extends StatefulWidget {
   const RoomPage({super.key, this.letterRepository});
@@ -52,6 +54,7 @@ class _RoomPageState extends State<RoomPage> {
 
   String _selectedArea = '部屋の中をタップしてみてください';
   bool _isOpeningLetter = false;
+  DateTime? _requestedWeatherDate;
 
   @override
   void initState() {
@@ -59,6 +62,30 @@ class _RoomPageState extends State<RoomPage> {
 
     _furnituresFuture = _furnitureRepository.getAll();
     _letterRepository = widget.letterRepository ?? LetterRepository();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final appDateProvider = context.watch<AppDateProvider>();
+    if (!appDateProvider.isLoaded) {
+      return;
+    }
+
+    final today = _dateOnly(appDateProvider.today);
+    if (_requestedWeatherDate == today) {
+      return;
+    }
+
+    _requestedWeatherDate = today;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _requestedWeatherDate != today) {
+        return;
+      }
+      context.read<WeatherProvider>().loadForDate(today).catchError((_) {
+        // Weather is optional. A later date change or desk tap retries.
+      });
+    });
   }
 
   void _onAreaTapped(String areaName) {
@@ -114,7 +141,9 @@ class _RoomPageState extends State<RoomPage> {
       }
 
       try {
-        await weatherProvider.loadForDate(today);
+        if (weatherProvider.loadedDate != _dateOnly(today)) {
+          await weatherProvider.loadForDate(today);
+        }
       } catch (_) {
         if (mounted) {
           ScaffoldMessenger.of(
@@ -240,6 +269,7 @@ class _RoomPageState extends State<RoomPage> {
     final placedFurnitureIds = context
         .watch<PlacedFurnitureProvider>()
         .placedFurnitureIds;
+    final weatherProvider = context.watch<WeatherProvider>();
 
     return Scaffold(
       body: SafeArea(
@@ -255,6 +285,7 @@ class _RoomPageState extends State<RoomPage> {
                       return _buildRoom(
                         placedFurnitureIds,
                         snapshot.data ?? [],
+                        weatherProvider.currentWeather,
                       );
                     },
                   ),
@@ -271,6 +302,7 @@ class _RoomPageState extends State<RoomPage> {
   Widget _buildRoom(
     Map<String, String> placedFurnitureIds,
     List<Furniture> furnitures,
+    WeatherType? weather,
   ) {
     final furnitureById = {
       for (final furniture in furnitures) furniture.id: furniture,
@@ -282,6 +314,7 @@ class _RoomPageState extends State<RoomPage> {
           fit: StackFit.expand,
           children: [
             _buildBackground(),
+            if (weather == WeatherType.rain) const RainOverlay(),
             ..._buildPlacedFurniture(
               placedFurnitureIds,
               furnitureById,
@@ -465,14 +498,14 @@ class _RoomPageState extends State<RoomPage> {
               onPressed: appDateProvider.isLoaded
                   ? () => appDateProvider.moveToNextDay()
                   : null,
-              child: const Text('翌日'),
               style: ElevatedButton.styleFrom(minimumSize: Size(60, 30)),
+              child: const Text('翌日'),
             ),
             const SizedBox(height: 8),
             ElevatedButton(
               onPressed: _resetPrototypeData,
-              child: const Text('リセット'),
               style: ElevatedButton.styleFrom(minimumSize: Size(60, 30)),
+              child: const Text('リセット'),
             ),
           ],
         ),
@@ -480,6 +513,8 @@ class _RoomPageState extends State<RoomPage> {
     }
   }
 }
+
+DateTime _dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
 
 class _SlotLayout {
   const _SlotLayout(this.left, this.top, this.width, this.height);
