@@ -55,7 +55,7 @@ class _RoomPageState extends State<RoomPage> {
   final LetterDeliveryService _letterDeliveryService =
       const LetterDeliveryService();
 
-  String _selectedArea = '部屋の中をタップしてみてください';
+  String _selectedArea = '机や本棚など、気になる場所をタップしてみてください';
   bool _isOpeningLetter = false;
   DateTime? _requestedWeatherDate;
   ShizukuProvider? _observedShizukuProvider;
@@ -315,11 +315,17 @@ class _RoomPageState extends State<RoomPage> {
 
   @override
   Widget build(BuildContext context) {
+    final appDateProvider = context.watch<AppDateProvider>();
+    final readLetterProvider = context.watch<ReadLetterProvider>();
     final placedFurnitureIds = context
         .watch<PlacedFurnitureProvider>()
         .placedFurnitureIds;
     final weatherProvider = context.watch<WeatherProvider>();
     final shizukuProvider = context.watch<ShizukuProvider>();
+    final isRoomReady =
+        appDateProvider.isLoaded &&
+        readLetterProvider.isLoaded &&
+        shizukuProvider.isLoaded;
 
     return Scaffold(
       body: SafeArea(
@@ -343,7 +349,7 @@ class _RoomPageState extends State<RoomPage> {
                 ),
               ),
             ),
-            _buildMessageArea(),
+            _buildMessageArea(isRoomReady),
           ],
         ),
       ),
@@ -534,13 +540,15 @@ class _RoomPageState extends State<RoomPage> {
     );
   }
 
-  Widget _buildMessageArea() {
+  Widget _buildMessageArea(bool isRoomReady) {
+    final message = isRoomReady ? _selectedArea : '読み込み中です…';
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       color: const Color(0xFF201F1C),
       child: Text(
-        _selectedArea,
+        message,
         textAlign: TextAlign.center,
         style: const TextStyle(color: Color(0xFFE8E1D4), fontSize: 16),
       ),

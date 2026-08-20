@@ -25,6 +25,88 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
+  const roomHint = '机や本棚など、気になる場所をタップしてみてください';
+
+  testWidgets('AppDateProvider未ロード中は読み込み表示にする', (tester) async {
+    await _pumpRoom(tester, loadAppDateProvider: false);
+
+    expect(find.text('読み込み中です…'), findsOneWidget);
+    expect(find.text(roomHint), findsNothing);
+  });
+
+  testWidgets('ReadLetterProvider未ロード中は読み込み表示にする', (tester) async {
+    await _pumpRoom(tester, loadReadLetterProvider: false);
+
+    expect(find.text('読み込み中です…'), findsOneWidget);
+    expect(find.text(roomHint), findsNothing);
+  });
+
+  testWidgets('ShizukuProvider未ロード中は読み込み表示にする', (tester) async {
+    await _pumpRoom(tester, loadShizukuProvider: false);
+
+    expect(find.text('読み込み中です…'), findsOneWidget);
+    expect(find.text(roomHint), findsNothing);
+  });
+
+  testWidgets('必要な3 Providerの一部だけロード済みでも読み込み表示を維持する', (tester) async {
+    await _pumpRoom(
+      tester,
+      loadReadLetterProvider: false,
+      loadShizukuProvider: false,
+    );
+
+    expect(find.text('読み込み中です…'), findsOneWidget);
+    expect(find.text(roomHint), findsNothing);
+  });
+
+  testWidgets('必要な3 Providerがロード済みなら操作ヒントを表示する', (tester) async {
+    await _pumpRoom(tester);
+
+    expect(find.text(roomHint), findsOneWidget);
+    expect(find.text('読み込み中です…'), findsNothing);
+  });
+
+  testWidgets('Providerのload完了通知で読み込み表示から操作ヒントへ切り替わる', (tester) async {
+    final harness = await _pumpRoom(tester, loadProviders: false);
+
+    expect(find.text('読み込み中です…'), findsOneWidget);
+
+    await Future.wait([
+      harness.dateProvider.load(),
+      harness.readLetterProvider.load(),
+      harness.shizukuProvider.load(),
+    ]);
+    await tester.pump();
+
+    expect(find.text('読み込み中です…'), findsNothing);
+    expect(find.text(roomHint), findsOneWidget);
+  });
+
+  testWidgets('WeatherProviderが未ロードでも操作ヒントを表示する', (tester) async {
+    await _pumpRoom(tester);
+
+    expect(find.text(roomHint), findsOneWidget);
+  });
+
+  testWidgets('天候ロード失敗はRoomの操作ヒント表示を妨げない', (tester) async {
+    await _pumpRoom(tester, failNextWeatherLoad: true);
+    await tester.pumpAndSettle();
+
+    expect(find.text(roomHint), findsOneWidget);
+    expect(find.text('読み込み中です…'), findsNothing);
+  });
+
+  testWidgets('CatalogとPlacedFurnitureが未ロードでも操作ヒントを表示する', (tester) async {
+    await _pumpRoom(
+      tester,
+      loadCatalogProvider: false,
+      loadPlacedFurnitureProvider: false,
+    );
+
+    expect(find.text(roomHint), findsOneWidget);
+    expect(find.text('読み込み中です…'), findsNothing);
+  });
+
   for (final progress in const [0, 1, 15, 29]) {
     testWidgets('報酬済み$progress件の瓶水位を表示する', (tester) async {
       await _pumpRoom(tester, initialRewardedCount: progress);
@@ -374,6 +456,11 @@ Future<void> _openDesk(WidgetTester tester) async {
 Future<_RoomHarness> _pumpRoom(
   WidgetTester tester, {
   bool loadProviders = true,
+  bool loadAppDateProvider = true,
+  bool loadReadLetterProvider = true,
+  bool loadShizukuProvider = true,
+  bool loadCatalogProvider = true,
+  bool loadPlacedFurnitureProvider = true,
   bool blockRewardSave = false,
   WeatherType? weather = WeatherType.rain,
   bool failNextWeatherLoad = false,
@@ -404,11 +491,11 @@ Future<_RoomHarness> _pumpRoom(
 
   if (loadProviders) {
     await Future.wait([
-      shizukuProvider.load(),
-      readLetterProvider.load(),
-      catalogProvider.load(),
-      placedProvider.load(),
-      dateProvider.load(),
+      if (loadShizukuProvider) shizukuProvider.load(),
+      if (loadReadLetterProvider) readLetterProvider.load(),
+      if (loadCatalogProvider) catalogProvider.load(),
+      if (loadPlacedFurnitureProvider) placedProvider.load(),
+      if (loadAppDateProvider) dateProvider.load(),
     ]);
   }
 
