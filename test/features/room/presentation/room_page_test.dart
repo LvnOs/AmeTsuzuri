@@ -25,6 +25,63 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
+  for (final progress in const [0, 1, 15, 29]) {
+    testWidgets('報酬済み$progress件の瓶水位を表示する', (tester) async {
+      await _pumpRoom(tester, initialRewardedCount: progress);
+
+      expect(find.text('$progress/30'), findsOneWidget);
+    });
+  }
+
+  testWidgets('30件ロード済みでは満杯演出なしで空瓶を表示する', (tester) async {
+    await _pumpRoom(tester, initialRewardedCount: 30);
+
+    expect(find.text('0/30'), findsOneWidget);
+    expect(find.text('30/30'), findsNothing);
+  });
+
+  testWidgets('29件から30件になると満杯を短く表示して空瓶へ切り替える', (tester) async {
+    final harness = await _pumpRoom(tester, initialRewardedCount: 29);
+
+    await harness.shizukuProvider.rewardForLetter('letter29');
+    await tester.pump();
+    expect(find.text('30/30'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 700));
+    expect(find.text('0/30'), findsOneWidget);
+  });
+
+  testWidgets('30件から31件では通常の1/30を表示する', (tester) async {
+    final harness = await _pumpRoom(tester, initialRewardedCount: 30);
+
+    await harness.shizukuProvider.rewardForLetter('letter30');
+    await tester.pump();
+
+    expect(find.text('1/30'), findsOneWidget);
+    expect(find.text('30/30'), findsNothing);
+  });
+
+  testWidgets('59件から60件でも満杯演出を表示する', (tester) async {
+    final harness = await _pumpRoom(tester, initialRewardedCount: 59);
+
+    await harness.shizukuProvider.rewardForLetter('letter59');
+    await tester.pump();
+
+    expect(find.text('30/30'), findsOneWidget);
+  });
+
+  testWidgets('雫の消費と加算では瓶水位が変わらない', (tester) async {
+    final harness = await _pumpRoom(tester, initialRewardedCount: 15);
+
+    await harness.shizukuProvider.consumeShizuku(10);
+    await tester.pump();
+    expect(find.text('15/30'), findsOneWidget);
+
+    await harness.shizukuProvider.addShizuku(20);
+    await tester.pump();
+    expect(find.text('15/30'), findsOneWidget);
+  });
+
   testWidgets('同じ日は2通目を受け取らず配信処理を開始しない', (tester) async {
     final harness = await _pumpRoom(tester);
 
@@ -322,8 +379,12 @@ Future<_RoomHarness> _pumpRoom(
   bool failNextWeatherLoad = false,
   List<Letter>? letters,
   DateTime? date,
+  int initialRewardedCount = 0,
 }) async {
-  final shizukuRepository = _FakeShizukuRepository(blockSave: blockRewardSave);
+  final shizukuRepository = _FakeShizukuRepository(
+    blockSave: blockRewardSave,
+    initialRewardedCount: initialRewardedCount,
+  );
   final readLetterRepository = _FakeReadLetterRepository();
   final shizukuProvider = ShizukuProvider(shizukuRepository);
   final readLetterProvider = ReadLetterProvider(readLetterRepository);
@@ -445,14 +506,21 @@ Letter _letter(
 }
 
 class _FakeShizukuRepository extends ShizukuRepository {
-  _FakeShizukuRepository({required this.blockSave});
+  _FakeShizukuRepository({
+    required this.blockSave,
+    this.initialRewardedCount = 0,
+  }) : state = ShizukuState(
+         currentShizuku: 30,
+         rewardedLetterIds: {
+           for (var index = 0; index < initialRewardedCount; index++)
+             'letter$index',
+         },
+       );
 
   final bool blockSave;
+  final int initialRewardedCount;
   final Completer<void> _saveCompleter = Completer<void>();
-  ShizukuState state = const ShizukuState(
-    currentShizuku: 30,
-    rewardedLetterIds: {},
-  );
+  ShizukuState state;
   bool failNextSave = false;
   int saveCallCount = 0;
 

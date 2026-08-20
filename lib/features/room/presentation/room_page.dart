@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart';
@@ -14,6 +16,7 @@ import 'package:ame_tsuzuri/features/furniture/provider/catalog_provider.dart';
 import 'package:ame_tsuzuri/features/furniture/provider/placed_furniture_provider.dart';
 import 'package:ame_tsuzuri/features/furniture/repository/furniture_repository.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/rain_overlay.dart';
+import 'package:ame_tsuzuri/features/room/presentation/widgets/bottle_progress.dart';
 import 'package:ame_tsuzuri/shared/model/weather_type.dart';
 
 class RoomPage extends StatefulWidget {
@@ -55,6 +58,10 @@ class _RoomPageState extends State<RoomPage> {
   String _selectedArea = '部屋の中をタップしてみてください';
   bool _isOpeningLetter = false;
   DateTime? _requestedWeatherDate;
+  ShizukuProvider? _observedShizukuProvider;
+  int? _previousBottleRecordCount;
+  bool _showFullBottle = false;
+  Timer? _fullBottleTimer;
 
   @override
   void initState() {
@@ -67,6 +74,14 @@ class _RoomPageState extends State<RoomPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final shizukuProvider = context.read<ShizukuProvider>();
+    if (!identical(_observedShizukuProvider, shizukuProvider)) {
+      _observedShizukuProvider?.removeListener(_onShizukuChanged);
+      _observedShizukuProvider = shizukuProvider;
+      _previousBottleRecordCount = shizukuProvider.bottleRecordCount;
+      shizukuProvider.addListener(_onShizukuChanged);
+    }
+
     final appDateProvider = context.watch<AppDateProvider>();
     if (!appDateProvider.isLoaded) {
       return;
@@ -86,6 +101,40 @@ class _RoomPageState extends State<RoomPage> {
         // Weather is optional. A later date change or desk tap retries.
       });
     });
+  }
+
+  void _onShizukuChanged() {
+    final provider = _observedShizukuProvider;
+    if (provider == null) {
+      return;
+    }
+
+    final previousCount = _previousBottleRecordCount;
+    final currentCount = provider.bottleRecordCount;
+    _previousBottleRecordCount = currentCount;
+
+    if (previousCount == null ||
+        currentCount != previousCount + 1 ||
+        currentCount % 30 != 0) {
+      return;
+    }
+
+    _fullBottleTimer?.cancel();
+    if (mounted) {
+      setState(() => _showFullBottle = true);
+    }
+    _fullBottleTimer = Timer(const Duration(milliseconds: 700), () {
+      if (mounted) {
+        setState(() => _showFullBottle = false);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _fullBottleTimer?.cancel();
+    _observedShizukuProvider?.removeListener(_onShizukuChanged);
+    super.dispose();
   }
 
   void _onAreaTapped(String areaName) {
@@ -270,6 +319,7 @@ class _RoomPageState extends State<RoomPage> {
         .watch<PlacedFurnitureProvider>()
         .placedFurnitureIds;
     final weatherProvider = context.watch<WeatherProvider>();
+    final shizukuProvider = context.watch<ShizukuProvider>();
 
     return Scaffold(
       body: SafeArea(
@@ -286,6 +336,7 @@ class _RoomPageState extends State<RoomPage> {
                         placedFurnitureIds,
                         snapshot.data ?? [],
                         weatherProvider.currentWeather,
+                        shizukuProvider.currentBottleProgress,
                       );
                     },
                   ),
@@ -303,6 +354,7 @@ class _RoomPageState extends State<RoomPage> {
     Map<String, String> placedFurnitureIds,
     List<Furniture> furnitures,
     WeatherType? weather,
+    int bottleProgress,
   ) {
     final furnitureById = {
       for (final furniture in furnitures) furniture.id: furniture,
@@ -319,6 +371,17 @@ class _RoomPageState extends State<RoomPage> {
               placedFurnitureIds,
               furnitureById,
               constraints,
+            ),
+
+            Positioned(
+              left: constraints.maxWidth * 0.69,
+              top: constraints.maxHeight * 0.315,
+              width: constraints.maxWidth * 0.105,
+              height: constraints.maxHeight * 0.28,
+              child: BottleProgress(
+                progress: bottleProgress,
+                showFullState: _showFullBottle,
+              ),
             ),
 
             // 窓
