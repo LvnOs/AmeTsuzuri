@@ -7,9 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('新規状態を30滴でロードする', () async {
-    final provider = await _loadProvider(
-      _FakeShizukuRepository(_initialState),
-    );
+    final provider = await _loadProvider(_FakeShizukuRepository(_initialState));
 
     expect(provider.currentShizuku, 30);
     expect(provider.rewardedLetterIds, isEmpty);
@@ -82,7 +80,9 @@ void main() {
     60: (2, 0),
   }.entries) {
     test('瓶進行を報酬済み${entry.key}件から導出する', () async {
-      final ids = {for (var index = 0; index < entry.key; index++) 'letter$index'};
+      final ids = {
+        for (var index = 0; index < entry.key; index++) 'letter$index',
+      };
       final provider = await _loadProvider(
         _FakeShizukuRepository(
           ShizukuState(currentShizuku: 30, rewardedLetterIds: ids),
@@ -94,6 +94,108 @@ void main() {
       expect(provider.currentBottleProgress, entry.value.$2);
     });
   }
+
+  test('瓶テスト準備は実在IDと雫残高を維持して29件を保存する', () async {
+    final realIds = {for (var index = 0; index < 10; index++) 'letter_$index'};
+    final repository = _FakeShizukuRepository(
+      ShizukuState(currentShizuku: 75, rewardedLetterIds: realIds),
+    );
+    final provider = await _loadProvider(repository);
+
+    await provider.prepareNextBottleForPrototype();
+
+    expect(provider.currentShizuku, 75);
+    expect(provider.bottleRecordCount, 29);
+    expect(provider.currentBottleProgress, 29);
+    expect(provider.rewardedLetterIds, containsAll(realIds));
+    final addedIds = provider.rewardedLetterIds.difference(realIds);
+    expect(addedIds, hasLength(19));
+    expect(
+      addedIds.every((id) => id.startsWith('__prototype_bottle_test_')),
+      isTrue,
+    );
+    expect(repository.savedStates.single.currentShizuku, 75);
+    expect(repository.savedStates.single.rewardedLetterIds, hasLength(29));
+
+    await provider.prepareNextBottleForPrototype();
+
+    expect(provider.bottleRecordCount, 29);
+    expect(repository.saveCallCount, 1);
+  });
+
+  test('瓶テスト準備後の新規実在手紙は10滴と29から30件になる', () async {
+    final repository = _FakeShizukuRepository(
+      const ShizukuState(
+        currentShizuku: 40,
+        rewardedLetterIds: {'letter_already_rewarded'},
+      ),
+    );
+    final provider = await _loadProvider(repository);
+
+    await provider.prepareNextBottleForPrototype();
+    final duplicateResult = await provider.rewardForLetter(
+      'letter_already_rewarded',
+    );
+    final newResult = await provider.rewardForLetter('letter_new');
+
+    expect(duplicateResult.status, LetterRewardStatus.alreadyRewarded);
+    expect(duplicateResult.amount, 0);
+    expect(newResult.status, LetterRewardStatus.rewarded);
+    expect(newResult.amount, 10);
+    expect(provider.currentShizuku, 50);
+    expect(provider.bottleRecordCount, 30);
+    expect(provider.fullBottleCount, 1);
+    expect(provider.currentBottleProgress, 0);
+    expect(provider.rewardedLetterIds, contains('letter_new'));
+
+    await provider.reset();
+
+    expect(provider.currentShizuku, 30);
+    expect(provider.rewardedLetterIds, isEmpty);
+    expect(provider.bottleRecordCount, 0);
+  });
+
+  for (final entry in const {30: 59, 31: 59, 58: 59, 59: 59, 60: 89}.entries) {
+    test('瓶テスト準備は${entry.key}件を${entry.value}件にする', () async {
+      final repository = _FakeShizukuRepository(
+        ShizukuState(
+          currentShizuku: 30,
+          rewardedLetterIds: {
+            for (var index = 0; index < entry.key; index++) 'letter_$index',
+          },
+        ),
+      );
+      final provider = await _loadProvider(repository);
+
+      await provider.prepareNextBottleForPrototype();
+
+      expect(provider.bottleRecordCount, entry.value);
+      expect(provider.currentBottleProgress, 29);
+      expect(
+        provider.rewardedLetterIds,
+        containsAll({
+          for (var index = 0; index < entry.key; index++) 'letter_$index',
+        }),
+      );
+      expect(repository.saveCallCount, entry.key == 59 ? 0 : 1);
+    });
+  }
+
+  test('瓶テスト準備の保存失敗時はメモリ状態を変更しない', () async {
+    final repository = _FakeShizukuRepository(
+      const ShizukuState(currentShizuku: 40, rewardedLetterIds: {'letterA'}),
+    )..saveError = StateError('save failed');
+    final provider = await _loadProvider(repository);
+
+    await expectLater(
+      provider.prepareNextBottleForPrototype(),
+      throwsA(isA<StateError>()),
+    );
+
+    expect(provider.currentShizuku, 40);
+    expect(provider.rewardedLetterIds, {'letterA'});
+    expect(provider.bottleRecordCount, 1);
+  });
 
   test('報酬受取済みの手紙は保存も状態変更もしない', () async {
     final repository = _FakeShizukuRepository(

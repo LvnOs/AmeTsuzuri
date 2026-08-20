@@ -14,6 +14,8 @@ class LetterRewardResult {
 
 class ShizukuProvider extends ChangeNotifier {
   ShizukuProvider(this._repository);
+  static const String _prototypeBottleTestIdPrefix = '__prototype_bottle_test_';
+
   final ShizukuRepository _repository;
   int _currentShizuku = 0;
   Set<String> _rewardedLetterIds = {};
@@ -40,6 +42,32 @@ class ShizukuProvider extends ChangeNotifier {
     final nextState = ShizukuState(
       currentShizuku: _currentShizuku + amount,
       rewardedLetterIds: Set.of(_rewardedLetterIds),
+    );
+
+    await _repository.saveState(nextState);
+
+    _applyState(nextState);
+    notifyListeners();
+  }
+
+  Future<void> prepareNextBottleForPrototype() async {
+    if (currentBottleProgress == 29) {
+      return;
+    }
+
+    final nextRewardedLetterIds = Set<String>.of(_rewardedLetterIds);
+    final targetCount = (bottleRecordCount ~/ 30) * 30 + 29;
+    var index = 0;
+
+    while (nextRewardedLetterIds.length < targetCount) {
+      final suffix = index.toString().padLeft(3, '0');
+      nextRewardedLetterIds.add('$_prototypeBottleTestIdPrefix${suffix}__');
+      index++;
+    }
+
+    final nextState = ShizukuState(
+      currentShizuku: _currentShizuku,
+      rewardedLetterIds: nextRewardedLetterIds,
     );
 
     await _repository.saveState(nextState);

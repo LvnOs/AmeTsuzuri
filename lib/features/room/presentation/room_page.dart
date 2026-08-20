@@ -313,6 +313,32 @@ class _RoomPageState extends State<RoomPage> {
     ).showSnackBar(const SnackBar(content: Text('テストデータをリセットしました')));
   }
 
+  Future<void> _prepareNextBottleForPrototype() async {
+    final shizukuProvider = context.read<ShizukuProvider>();
+    if (!shizukuProvider.isLoaded) {
+      return;
+    }
+
+    try {
+      await shizukuProvider.prepareNextBottleForPrototype();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('瓶テストの準備に失敗しました')));
+      }
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('次の新しい手紙で瓶が満杯になります')));
+  }
+
   @override
   Widget build(BuildContext context) {
     final appDateProvider = context.watch<AppDateProvider>();
@@ -559,6 +585,7 @@ class _RoomPageState extends State<RoomPage> {
     const bool prototypeTestMode = true;
     if (prototypeTestMode) {
       final appDateProvider = context.watch<AppDateProvider>();
+      final shizukuProvider = context.watch<ShizukuProvider>();
       final isNarrow = MediaQuery.sizeOf(context).width < 600;
       final buttonStyle = isNarrow
           ? ElevatedButton.styleFrom(
@@ -581,6 +608,13 @@ class _RoomPageState extends State<RoomPage> {
         style: buttonStyle,
         child: const Text('リセット'),
       );
+      final bottleTestButton = ElevatedButton(
+        onPressed: shizukuProvider.isLoaded
+            ? _prepareNextBottleForPrototype
+            : null,
+        style: buttonStyle,
+        child: const Text('瓶テスト'),
+      );
 
       return Positioned(
         right: isNarrow ? 8 : 12,
@@ -592,6 +626,8 @@ class _RoomPageState extends State<RoomPage> {
                   nextDayButton,
                   const SizedBox(width: 6),
                   resetButton,
+                  const SizedBox(width: 6),
+                  bottleTestButton,
                 ],
               )
             : Column(
@@ -599,6 +635,8 @@ class _RoomPageState extends State<RoomPage> {
                   nextDayButton,
                   const SizedBox(height: 8),
                   resetButton,
+                  const SizedBox(height: 8),
+                  bottleTestButton,
                 ],
               ),
       );

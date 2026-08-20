@@ -107,26 +107,101 @@ void main() {
     expect(find.text('読み込み中です…'), findsNothing);
   });
 
-  testWidgets('スマホ幅で翌日とリセットを横並びで操作できる', (tester) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(390, 844);
-    addTearDown(() {
-      tester.view.resetDevicePixelRatio();
-      tester.view.resetPhysicalSize();
+  for (final size in const [Size(320, 700), Size(390, 844)]) {
+    testWidgets('スマホ${size.width.toInt()}px幅で3つのテストボタンを表示できる', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      addTearDown(() {
+        tester.view.resetDevicePixelRatio();
+        tester.view.resetPhysicalSize();
+      });
+
+      final harness = await _pumpRoom(tester);
+
+      expect(find.text('翌日'), findsOneWidget);
+      expect(find.text('リセット'), findsOneWidget);
+      expect(find.text('瓶テスト'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.text('翌日'));
+      await tester.pumpAndSettle();
+
+      expect(harness.dateProvider.today, DateTime(2026, 8, 8));
+      expect(tester.takeException(), isNull);
     });
+  }
 
-    final harness = await _pumpRoom(tester);
+  testWidgets('Shizuku未ロード中は瓶テストボタンを無効にする', (tester) async {
+    await _pumpRoom(tester, loadShizukuProvider: false);
 
-    expect(find.text('翌日'), findsOneWidget);
-    expect(find.text('リセット'), findsOneWidget);
-    expect(find.byType(Row), findsWidgets);
-    expect(tester.takeException(), isNull);
+    final button = tester.widget<ElevatedButton>(
+      find.widgetWithText(ElevatedButton, '瓶テスト'),
+    );
+    expect(button.onPressed, isNull);
+  });
 
-    await tester.tap(find.text('翌日'));
+  testWidgets('瓶テストは雫と既読を変えず29件に準備する', (tester) async {
+    final harness = await _pumpRoom(tester, initialRewardedCount: 10);
+    final beforeShizuku = harness.shizukuProvider.currentShizuku;
+
+    final button = tester.widget<ElevatedButton>(
+      find.widgetWithText(ElevatedButton, '瓶テスト'),
+    );
+    expect(button.onPressed, isNotNull);
+
+    await tester.tap(find.text('瓶テスト'));
     await tester.pumpAndSettle();
 
-    expect(harness.dateProvider.today, DateTime(2026, 8, 8));
-    expect(tester.takeException(), isNull);
+    expect(find.text('29/30'), findsOneWidget);
+    expect(harness.shizukuProvider.bottleRecordCount, 29);
+    expect(harness.shizukuProvider.currentShizuku, beforeShizuku);
+    expect(harness.readLetterProvider.readLetterIds, isEmpty);
+    expect(harness.readLetterProvider.receivedLetters, isEmpty);
+    expect(find.text('次の新しい手紙で瓶が満杯になります'), findsOneWidget);
+  });
+
+  testWidgets('瓶テスト後の新規手紙で29から30の満杯演出を表示する', (tester) async {
+    final harness = await _pumpRoom(tester, initialRewardedCount: 10);
+
+    await tester.tap(find.text('瓶テスト'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('deskTapArea')));
+    await tester.pump();
+
+    expect(find.text('30/30', skipOffstage: false), findsOneWidget);
+    expect(harness.shizukuProvider.currentShizuku, 40);
+    expect(harness.shizukuProvider.fullBottleCount, 1);
+    expect(harness.shizukuProvider.rewardedLetterIds, contains('letterA'));
+    expect(harness.readLetterProvider.readLetterIds, {'letterA'});
+    expect(
+      harness.readLetterProvider.receivedDateFor('letterA'),
+      DateTime(2026, 8, 7),
+    );
+    expect(
+      harness.readLetterProvider.readLetterIds.any(
+        (id) => id.startsWith('__prototype_bottle_test_'),
+      ),
+      isFalse,
+    );
+
+    await tester.pump(const Duration(milliseconds: 699));
+    expect(find.text('30/30', skipOffstage: false), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(find.text('0/30', skipOffstage: false), findsOneWidget);
+  });
+
+  testWidgets('瓶テスト状態は既存リセットで0件と30滴に戻る', (tester) async {
+    final harness = await _pumpRoom(tester, initialRewardedCount: 10);
+
+    await tester.tap(find.text('瓶テスト'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('リセット'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('0/30'), findsOneWidget);
+    expect(harness.shizukuProvider.currentShizuku, 30);
+    expect(harness.shizukuProvider.rewardedLetterIds, isEmpty);
   });
 
   for (final progress in const [0, 1, 15, 29]) {
@@ -647,6 +722,11 @@ class _FakeShizukuRepository extends ShizukuRepository {
       await _saveCompleter.future;
     }
     state = nextState;
+  }
+
+  @override
+  Future<void> resetState() async {
+    state = const ShizukuState(currentShizuku: 30, rewardedLetterIds: {});
   }
 
   void completeSave() {
