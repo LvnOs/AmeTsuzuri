@@ -559,27 +559,48 @@ class _RoomPageState extends State<RoomPage> {
     const bool prototypeTestMode = true;
     if (prototypeTestMode) {
       final appDateProvider = context.watch<AppDateProvider>();
+      final isNarrow = MediaQuery.sizeOf(context).width < 600;
+      final buttonStyle = isNarrow
+          ? ElevatedButton.styleFrom(
+              minimumSize: const Size(56, 40),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              textStyle: const TextStyle(fontSize: 12),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            )
+          : ElevatedButton.styleFrom(minimumSize: const Size(60, 30));
+
+      final nextDayButton = ElevatedButton(
+        onPressed: appDateProvider.isLoaded
+            ? () => appDateProvider.moveToNextDay()
+            : null,
+        style: buttonStyle,
+        child: const Text('翌日'),
+      );
+      final resetButton = ElevatedButton(
+        onPressed: _resetPrototypeData,
+        style: buttonStyle,
+        child: const Text('リセット'),
+      );
 
       return Positioned(
-        right: 12,
-        top: 12,
-        child: Column(
-          children: [
-            ElevatedButton(
-              onPressed: appDateProvider.isLoaded
-                  ? () => appDateProvider.moveToNextDay()
-                  : null,
-              style: ElevatedButton.styleFrom(minimumSize: Size(60, 30)),
-              child: const Text('翌日'),
-            ),
-            const SizedBox(height: 8),
-            ElevatedButton(
-              onPressed: _resetPrototypeData,
-              style: ElevatedButton.styleFrom(minimumSize: Size(60, 30)),
-              child: const Text('リセット'),
-            ),
-          ],
-        ),
+        right: isNarrow ? 8 : 12,
+        top: isNarrow ? 8 : 12,
+        child: isNarrow
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  nextDayButton,
+                  const SizedBox(width: 6),
+                  resetButton,
+                ],
+              )
+            : Column(
+                children: [
+                  nextDayButton,
+                  const SizedBox(height: 8),
+                  resetButton,
+                ],
+              ),
       );
     }
   }

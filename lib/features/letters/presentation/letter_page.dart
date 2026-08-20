@@ -14,22 +14,43 @@ class LetterPage extends StatelessWidget {
         backgroundColor: const Color(0xFFF3EDE1),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                letter.title,
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final horizontalPadding = constraints.maxWidth < 600 ? 20.0 : 32.0;
+
+            return SingleChildScrollView(
+              padding: EdgeInsets.symmetric(
+                horizontal: horizontalPadding,
+                vertical: 32,
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  key: const ValueKey('letterContent'),
+                  constraints: const BoxConstraints(maxWidth: 640),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          letter.title,
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        Text(
+                          letter.body,
+                          style: const TextStyle(fontSize: 18, height: 1.9),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-              SizedBox(height: 32),
-              Text(letter.body, style: TextStyle(fontSize: 18, height: 1.9)),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );

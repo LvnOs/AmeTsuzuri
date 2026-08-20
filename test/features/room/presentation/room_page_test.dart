@@ -107,6 +107,28 @@ void main() {
     expect(find.text('読み込み中です…'), findsNothing);
   });
 
+  testWidgets('スマホ幅で翌日とリセットを横並びで操作できる', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(() {
+      tester.view.resetDevicePixelRatio();
+      tester.view.resetPhysicalSize();
+    });
+
+    final harness = await _pumpRoom(tester);
+
+    expect(find.text('翌日'), findsOneWidget);
+    expect(find.text('リセット'), findsOneWidget);
+    expect(find.byType(Row), findsWidgets);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('翌日'));
+    await tester.pumpAndSettle();
+
+    expect(harness.dateProvider.today, DateTime(2026, 8, 8));
+    expect(tester.takeException(), isNull);
+  });
+
   for (final progress in const [0, 1, 15, 29]) {
     testWidgets('報酬済み$progress件の瓶水位を表示する', (tester) async {
       await _pumpRoom(tester, initialRewardedCount: progress);
