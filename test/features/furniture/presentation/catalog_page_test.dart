@@ -43,6 +43,15 @@ const _furnitureC = Furniture(
   imagePath: 'unused.png',
   initialAvailable: true,
 );
+const _longNameFurniture = Furniture(
+  id: 'long_name_furniture',
+  name: 'とても長い名前の木製アンティークチェア',
+  price: 30,
+  size: 'small',
+  slotIds: ['test_slot'],
+  imagePath: 'unused.png',
+  initialAvailable: true,
+);
 
 void main() {
   group('CatalogPageの初見UX表示', () {
@@ -51,6 +60,9 @@ void main() {
 
       expect(find.text('30滴で迎える'), findsNWidgets(2));
       expect(find.text('所持雫 100滴'), findsOneWidget);
+      expect(_purchasedCheckInTile('家具A'), findsNothing);
+      expect(_purchasedCheckInTile('家具B'), findsNothing);
+      expect(_purchasedCheckInTile('家具C'), findsOneWidget);
     });
 
     testWidgets('未購入家具から迎える確認へ進める', (tester) async {
@@ -74,6 +86,7 @@ void main() {
       expect(find.text('家具Aを迎えました'), findsOneWidget);
       expect(find.text('配置する'), findsNWidgets(2));
       expect(find.text('所持雫 70滴'), findsOneWidget);
+      expect(_purchasedCheckInTile('家具A'), findsOneWidget);
     });
 
     testWidgets('購入済み未配置家具から配置ダイアログへ進める', (tester) async {
@@ -90,6 +103,7 @@ void main() {
       await _pumpCatalog(tester, placedFurnitureIds: {'test_slot': 'furniture_c'});
 
       expect(find.text('配置を変える'), findsOneWidget);
+      expect(_purchasedCheckInTile('家具C'), findsOneWidget);
       await tester.tap(_furnitureTile('家具C'));
       await tester.pumpAndSettle();
 
@@ -114,6 +128,24 @@ void main() {
       expect(find.text('雫が足りません'), findsOneWidget);
       expect(find.text('30滴で迎える'), findsNWidgets(2));
       expect(find.text('所持雫 20滴'), findsOneWidget);
+    });
+
+    testWidgets('320px幅で長い家具名と状態表示がoverflowしない', (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await _pumpCatalog(
+        tester,
+        furnitures: const [_longNameFurniture],
+        purchasedFurnitureIds: const {'long_name_furniture'},
+      );
+
+      expect(find.text('所持雫 100滴'), findsOneWidget);
+      expect(find.text('配置する'), findsOneWidget);
+      expect(_purchasedCheckInTile(_longNameFurniture.name), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 
@@ -201,13 +233,17 @@ Future<_CatalogHarness> _pumpCatalog(
   bool loadShizukuProvider = true,
   int initialShizuku = 100,
   Map<String, String> placedFurnitureIds = const {},
+  Set<String> purchasedFurnitureIds = const {'furniture_c'},
+  List<Furniture> furnitures = const [_furnitureA, _furnitureB, _furnitureC],
 }) async {
   final shizukuRepository = _BlockingShizukuRepository(
     blockSave: blockPurchase,
     initialShizuku: initialShizuku,
   );
   addTearDown(shizukuRepository.completeSave);
-  final catalogRepository = _FakePurchasedFurnitureRepository();
+  final catalogRepository = _FakePurchasedFurnitureRepository(
+    purchasedFurnitureIds,
+  );
   final shizukuProvider = ShizukuProvider(shizukuRepository);
   final catalogProvider = CatalogProvider(catalogRepository);
   final placedFurnitureProvider = PlacedFurnitureProvider(
@@ -229,7 +265,7 @@ Future<_CatalogHarness> _pumpCatalog(
       ],
       child: MaterialApp(
         home: CatalogPage(
-          furnitureRepository: _FakeFurnitureRepository(),
+          furnitureRepository: _FakeFurnitureRepository(furnitures),
           placementSlotRepository: _FakePlacementSlotRepository(),
         ),
       ),
@@ -263,12 +299,12 @@ class _CatalogHarness {
 }
 
 class _FakeFurnitureRepository extends FurnitureRepository {
+  _FakeFurnitureRepository(this.furnitures);
+
+  final List<Furniture> furnitures;
+
   @override
-  Future<List<Furniture>> getAll() async => const [
-    _furnitureA,
-    _furnitureB,
-    _furnitureC,
-  ];
+  Future<List<Furniture>> getAll() async => furnitures;
 }
 
 class _FakePlacementSlotRepository extends PlacementSlotRepository {
@@ -282,10 +318,14 @@ class _FakePlacementSlotRepository extends PlacementSlotRepository {
 }
 
 class _FakePurchasedFurnitureRepository extends PurchasedFurnitureRepository {
+  _FakePurchasedFurnitureRepository(this.purchasedFurnitureIds);
+
+  final Set<String> purchasedFurnitureIds;
   int saveCallCount = 0;
 
   @override
-  Future<Set<String>> loadPurchasedFurnitureIds() async => {'furniture_c'};
+  Future<Set<String>> loadPurchasedFurnitureIds() async =>
+      Set.of(purchasedFurnitureIds);
 
   @override
   Future<void> savePurchasedFurnitureIds(Set<String> furnitureIds) async {
@@ -329,4 +369,11 @@ class _FakePlacedFurnitureRepository extends PlacedFurnitureRepository {
   @override
   Future<Map<String, String>> loadPlacedFurnitureIds() async =>
       placedFurnitureIds;
+}
+
+Finder _purchasedCheckInTile(String furnitureName) {
+  return find.descendant(
+    of: _furnitureTile(furnitureName),
+    matching: find.byIcon(Icons.check_circle_outline),
+  );
 }

@@ -52,89 +52,118 @@ class _CatalogPageState extends State<CatalogPage> {
         placedFurnitureProvider.isLoaded;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('家具目録'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Center(
-              child: Text(
-                shizukuProvider.isLoaded
-                    ? '所持雫 ${shizukuProvider.currentShizuku}滴'
-                    : '所持雫 --',
-              ),
+      appBar: AppBar(title: const Text('家具目録')),
+      body: Column(
+        children: [
+          _buildShizukuBalance(shizukuProvider),
+          const Divider(height: 1),
+          Expanded(
+            child: FutureBuilder<List<Furniture>>(
+              future: _furnituresFuture,
+              builder: (context, snapshot) {
+                if (!areProvidersLoaded ||
+                    snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      '家具の読み込みに失敗しました\n'
+                      '${snapshot.error}',
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                }
+
+                final furnitures = snapshot.data ?? [];
+                if (furnitures.isEmpty) {
+                  return const Center(child: Text('家具はまだありません'));
+                }
+
+                return ListView.builder(
+                  itemCount: furnitures.length,
+                  itemBuilder: (context, index) {
+                    final furniture = furnitures[index];
+                    final isPurchased = catalogProvider.isPurchased(
+                      furniture.id,
+                    );
+                    final isPurchasing =
+                        catalogProvider.purchasingFurnitureId == furniture.id;
+                    final isPlaced =
+                        placedFurnitureProvider.getSlotIdByFurnitureId(
+                          furniture.id,
+                        ) !=
+                        null;
+
+                    return ListTile(
+                      title: _buildFurnitureTitle(furniture, isPurchased),
+                      subtitle: Text(
+                        !isPurchased
+                            ? '${furniture.price}滴で迎える'
+                            : isPlaced
+                            ? '配置を変える'
+                            : '配置する',
+                      ),
+                      trailing: isPurchasing
+                          ? const SizedBox.square(
+                              dimension: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.chevron_right),
+                      onTap: !isPurchased && catalogProvider.isPurchasing
+                          ? null
+                          : () {
+                              if (isPurchased) {
+                                _showPlacementDialog(context, furniture);
+                              } else {
+                                _showPurchaseDialog(context, furniture);
+                              }
+                            },
+                    );
+                  },
+                );
+              },
             ),
           ),
         ],
       ),
-      body: FutureBuilder<List<Furniture>>(
-        future: _furnituresFuture,
-        builder: (context, snapshot) {
-          if (!areProvidersLoaded ||
-              snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+    );
+  }
 
-          if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                '家具の読み込みに失敗しました\n'
-                '${snapshot.error}',
-                textAlign: TextAlign.center,
-              ),
-            );
-          }
-
-          final furnitures = snapshot.data ?? [];
-
-          if (furnitures.isEmpty) {
-            return const Center(child: Text('家具はまだありません'));
-          }
-
-          return ListView.builder(
-            itemCount: furnitures.length,
-            itemBuilder: (context, index) {
-              final furniture = furnitures[index];
-
-              final isPurchased = catalogProvider.isPurchased(furniture.id);
-              final isPurchasing =
-                  catalogProvider.purchasingFurnitureId == furniture.id;
-              final isPlaced =
-                  placedFurnitureProvider.getSlotIdByFurnitureId(
-                    furniture.id,
-                  ) !=
-                  null;
-
-              return ListTile(
-                title: Text(furniture.name),
-                subtitle: Text(
-                  !isPurchased
-                      ? '${furniture.price}滴で迎える'
-                      : isPlaced
-                      ? '配置を変える'
-                      : '配置する',
-                ),
-                trailing: isPurchasing
-                    ? const SizedBox.square(
-                        dimension: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.chevron_right),
-                // enabled: !isPurchased,
-                onTap: !isPurchased && catalogProvider.isPurchasing
-                    ? null
-                    : () {
-                        if (isPurchased) {
-                          _showPlacementDialog(context, furniture);
-                        } else {
-                          _showPurchaseDialog(context, furniture);
-                        }
-                      },
-              );
-            },
-          );
-        },
+  Widget _buildShizukuBalance(ShizukuProvider shizukuProvider) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Row(
+        children: [
+          const Icon(Icons.water_drop_outlined, size: 20),
+          const SizedBox(width: 8),
+          Text(
+            shizukuProvider.isLoaded
+                ? '所持雫 ${shizukuProvider.currentShizuku}滴'
+                : '所持雫 --',
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildFurnitureTitle(Furniture furniture, bool isPurchased) {
+    final name = Text(
+      furniture.name,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+    if (!isPurchased) {
+      return name;
+    }
+
+    return Row(
+      children: [
+        const Icon(Icons.check_circle_outline, size: 20),
+        const SizedBox(width: 8),
+        Expanded(child: name),
+      ],
     );
   }
 
