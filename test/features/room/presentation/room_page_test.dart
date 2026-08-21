@@ -23,6 +23,7 @@ import 'package:ame_tsuzuri/shared/repository/weather_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   const roomHint = '机や本棚など、気になる場所をタップしてみてください';
@@ -129,6 +130,25 @@ void main() {
       expect(find.text('はじめる'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
+  });
+
+  testWidgets('完全新規日付から8月7日の初回案内と最初の手紙受取が成立する', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final harness = await _pumpRoom(
+      tester,
+      appDateRepository: AppDateRepository(),
+    );
+
+    expect(harness.dateProvider.today, DateTime(2026, 8, 7));
+    await _openDesk(tester);
+
+    expect(find.byType(LetterPage), findsOneWidget);
+    expect(harness.shizukuProvider.currentShizuku, 40);
+    expect(
+      harness.readLetterProvider.receivedDateFor('letterA'),
+      DateTime(2026, 8, 7),
+    );
+    expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
   });
 
   testWidgets('AppDateProvider未ロード中は読み込み表示にする', (tester) async {
@@ -787,6 +807,7 @@ Future<_RoomHarness> _pumpRoom(
   ReadLetterState? initialReadState,
   ShizukuState? initialShizukuState,
   bool dismissInitialGuide = true,
+  AppDateRepository? appDateRepository,
 }) async {
   final shizukuRepository = _FakeShizukuRepository(
     blockSave: blockRewardSave,
@@ -801,7 +822,7 @@ Future<_RoomHarness> _pumpRoom(
     _FakePlacedFurnitureRepository(),
   );
   final dateProvider = AppDateProvider(
-    _FakeAppDateRepository(date ?? DateTime(2026, 8, 7)),
+    appDateRepository ?? _FakeAppDateRepository(date ?? DateTime(2026, 8, 7)),
   );
   final weatherRepository = _FakeWeatherRepository(
     weather: weather,
