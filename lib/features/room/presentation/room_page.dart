@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart';
 import 'package:ame_tsuzuri/features/furniture/presentation/catalog_page.dart';
 import 'package:ame_tsuzuri/features/letters/presentation/letter_page.dart';
+import 'package:ame_tsuzuri/features/letters/model/letter.dart';
 import 'package:ame_tsuzuri/features/letters/repository/letter_repository.dart';
 import 'package:ame_tsuzuri/features/letters/service/letter_delivery_service.dart';
 import 'package:ame_tsuzuri/features/letters/provider/read_letter_provider.dart';
@@ -182,10 +183,9 @@ class _RoomPageState extends State<RoomPage> {
     try {
       final today = appDateProvider.today;
 
-      if (readLetterProvider.hasReceivedLetterOn(today)) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('今日の手紙はもう受け取りました')));
+      final receivedLetterId = readLetterProvider.receivedLetterIdOn(today);
+      if (receivedLetterId != null) {
+        await _openReceivedLetter(receivedLetterId);
         return;
       }
 
@@ -272,6 +272,42 @@ class _RoomPageState extends State<RoomPage> {
       );
     } finally {
       _isOpeningLetter = false;
+    }
+  }
+
+  Future<void> _openReceivedLetter(String letterId) async {
+    try {
+      final letters = await _letterRepository.getAll();
+      if (!mounted) {
+        return;
+      }
+
+      Letter? receivedLetter;
+      for (final letter in letters) {
+        if (letter.id == letterId) {
+          receivedLetter = letter;
+          break;
+        }
+      }
+
+      if (receivedLetter == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('今日の手紙を読み込めませんでした')),
+        );
+        return;
+      }
+
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (context) => LetterPage(letter: receivedLetter!),
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('今日の手紙を読み込めませんでした')),
+        );
+      }
     }
   }
 

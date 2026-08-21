@@ -261,7 +261,7 @@ void main() {
     expect(find.text('15/30'), findsOneWidget);
   });
 
-  testWidgets('同じ日は2通目を受け取らず配信処理を開始しない', (tester) async {
+  testWidgets('同じ日は2通目を配信せず今日の手紙を再読する', (tester) async {
     final harness = await _pumpRoom(tester);
 
     await _openDesk(tester);
@@ -272,19 +272,36 @@ void main() {
 
     await tester.pageBack();
     await tester.pumpAndSettle();
+    final receivedLettersBeforeReread = Map.of(
+      harness.readLetterProvider.receivedLetters,
+    );
+    final bottleRecordCountBeforeReread =
+        harness.shizukuProvider.bottleRecordCount;
     await _openDesk(tester);
     expect(harness.shizukuProvider.currentShizuku, 40);
     expect(harness.shizukuProvider.rewardedLetterIds, {'letterA'});
     expect(harness.readLetterProvider.readLetterIds, {'letterA'});
     expect(harness.shizukuRepository.saveCallCount, 1);
     expect(harness.readLetterRepository.saveCallCount, 1);
+    expect(
+      harness.readLetterProvider.receivedLetters,
+      receivedLettersBeforeReread,
+    );
+    expect(
+      harness.shizukuProvider.bottleRecordCount,
+      bottleRecordCountBeforeReread,
+    );
+    expect(
+      harness.readLetterProvider.receivedDateFor('letterA'),
+      DateTime(2026, 8, 7),
+    );
     expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
-    expect(harness.letterRepository.getAllCallCount, 1);
-    expect(find.byType(LetterPage), findsNothing);
-    expect(find.text('今日の手紙はもう受け取りました'), findsOneWidget);
+    expect(harness.letterRepository.getAllCallCount, 2);
+    expect(find.byType(LetterPage), findsOneWidget);
+    expect(find.text('letterA'), findsWidgets);
   });
 
-  testWidgets('再ロード後も同じ日の2通目を受け取らない', (tester) async {
+  testWidgets('受取履歴の再ロード後も同日の手紙を再読する', (tester) async {
     final harness = await _pumpRoom(tester);
 
     await _openDesk(tester);
@@ -295,9 +312,104 @@ void main() {
 
     expect(harness.readLetterProvider.readLetterIds, {'letterA'});
     expect(harness.shizukuProvider.currentShizuku, 40);
+    expect(harness.shizukuProvider.rewardedLetterIds, {'letterA'});
+    expect(harness.shizukuRepository.saveCallCount, 1);
+    expect(harness.readLetterRepository.saveCallCount, 1);
     expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
-    expect(harness.letterRepository.getAllCallCount, 1);
-    expect(find.text('今日の手紙はもう受け取りました'), findsOneWidget);
+    expect(harness.letterRepository.getAllCallCount, 2);
+    expect(find.byType(LetterPage), findsOneWidget);
+    expect(find.text('letterA'), findsWidgets);
+  });
+
+  testWidgets('保存済み受取履歴と日付のロード相当でも当日再読できる', (tester) async {
+    final harness = await _pumpRoom(
+      tester,
+      date: DateTime(2026, 8, 7),
+      initialReadState: ReadLetterState(
+        receivedLetters: {'letterA': DateTime(2026, 8, 7)},
+      ),
+      initialShizukuState: const ShizukuState(
+        currentShizuku: 40,
+        rewardedLetterIds: {'letterA'},
+      ),
+    );
+
+    await _openDesk(tester);
+
+    expect(find.text('letterA'), findsWidgets);
+    expect(harness.shizukuProvider.currentShizuku, 40);
+    expect(harness.shizukuRepository.saveCallCount, 0);
+    expect(harness.readLetterRepository.saveCallCount, 0);
+    expect(
+      harness.readLetterProvider.receivedDateFor('letterA'),
+      DateTime(2026, 8, 7),
+    );
+  });
+
+  testWidgets('当日再読は天候に依存せず次の未読手紙を配信しない', (tester) async {
+    final harness = await _pumpRoom(tester);
+
+    await _openDesk(tester);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    harness.weatherRepository.failNextLoad = true;
+    await _openDesk(tester);
+
+    expect(find.text('letterA'), findsWidgets);
+    expect(harness.readLetterProvider.readLetterIds, {'letterA'});
+    expect(harness.shizukuProvider.rewardedLetterIds, {'letterA'});
+    expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
+  });
+
+  testWidgets('当日受取IDがLetterマスタになければ副作用なしで終了する', (tester) async {
+    final harness = await _pumpRoom(tester);
+
+    await _openDesk(tester);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    harness.letterRepository.letters.clear();
+    await _openDesk(tester);
+
+    expect(find.text('今日の手紙を読み込めませんでした'), findsOneWidget);
+    expect(find.byType(LetterPage), findsNothing);
+    expect(harness.shizukuRepository.saveCallCount, 1);
+    expect(harness.readLetterRepository.saveCallCount, 1);
+    expect(harness.readLetterProvider.readLetterIds, {'letterA'});
+  });
+
+  testWidgets('当日再読のLetter読み込み失敗で新規配信へ進まない', (tester) async {
+    final harness = await _pumpRoom(tester);
+
+    await _openDesk(tester);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    harness.letterRepository.failNextLoad = true;
+    await _openDesk(tester);
+
+    expect(find.text('今日の手紙を読み込めませんでした'), findsOneWidget);
+    expect(find.byType(LetterPage), findsNothing);
+    expect(harness.shizukuRepository.saveCallCount, 1);
+    expect(harness.readLetterRepository.saveCallCount, 1);
+    expect(harness.readLetterProvider.readLetterIds, {'letterA'});
+  });
+
+  testWidgets('当日再読中の連打でLetterPageを多重pushしない', (tester) async {
+    final harness = await _pumpRoom(tester);
+
+    await _openDesk(tester);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    harness.letterRepository.blockNextLoad = true;
+
+    await tester.tap(find.byKey(const ValueKey('deskTapArea')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('deskTapArea')));
+    await tester.pump();
+    expect(harness.letterRepository.getAllCallCount, 2);
+
+    harness.letterRepository.completeLoad();
+    await tester.pumpAndSettle();
+    expect(find.byType(LetterPage), findsOneWidget);
   });
 
   testWidgets('履歴をresetすると同じ日でも再び1通受け取れる', (tester) async {
@@ -444,6 +556,10 @@ void main() {
     await _openDesk(tester);
     await tester.pageBack();
     await tester.pumpAndSettle();
+    await _openDesk(tester);
+    expect(find.text('letterA'), findsWidgets);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
     await harness.dateProvider.setDebugDate(DateTime(2026, 8, 8));
     await _openDesk(tester);
 
@@ -564,12 +680,15 @@ Future<_RoomHarness> _pumpRoom(
   List<Letter>? letters,
   DateTime? date,
   int initialRewardedCount = 0,
+  ReadLetterState? initialReadState,
+  ShizukuState? initialShizukuState,
 }) async {
   final shizukuRepository = _FakeShizukuRepository(
     blockSave: blockRewardSave,
     initialRewardedCount: initialRewardedCount,
+    initialState: initialShizukuState,
   );
-  final readLetterRepository = _FakeReadLetterRepository();
+  final readLetterRepository = _FakeReadLetterRepository(initialReadState);
   final shizukuProvider = ShizukuProvider(shizukuRepository);
   final readLetterProvider = ReadLetterProvider(readLetterRepository);
   final catalogProvider = CatalogProvider(_FakePurchasedFurnitureRepository());
@@ -661,15 +780,34 @@ class _FakeWeatherRepository extends WeatherRepository {
 }
 
 class _FakeLetterRepository extends LetterRepository {
-  _FakeLetterRepository(this.letters);
+  _FakeLetterRepository(List<Letter> letters) : letters = List.of(letters);
 
   final List<Letter> letters;
   int getAllCallCount = 0;
+  bool failNextLoad = false;
+  bool blockNextLoad = false;
+  Completer<void>? _loadCompleter;
 
   @override
   Future<List<Letter>> getAll() async {
     getAllCallCount++;
+    if (failNextLoad) {
+      failNextLoad = false;
+      throw StateError('letter load failed');
+    }
+    if (blockNextLoad) {
+      blockNextLoad = false;
+      _loadCompleter = Completer<void>();
+      await _loadCompleter!.future;
+    }
     return letters;
+  }
+
+  void completeLoad() {
+    final completer = _loadCompleter;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete();
+    }
   }
 }
 
@@ -693,7 +831,8 @@ class _FakeShizukuRepository extends ShizukuRepository {
   _FakeShizukuRepository({
     required this.blockSave,
     this.initialRewardedCount = 0,
-  }) : state = ShizukuState(
+    ShizukuState? initialState,
+  }) : state = initialState ?? ShizukuState(
          currentShizuku: 30,
          rewardedLetterIds: {
            for (var index = 0; index < initialRewardedCount; index++)
@@ -737,7 +876,10 @@ class _FakeShizukuRepository extends ShizukuRepository {
 }
 
 class _FakeReadLetterRepository extends ReadLetterRepository {
-  ReadLetterState state = ReadLetterState(receivedLetters: {});
+  _FakeReadLetterRepository([ReadLetterState? initialState])
+    : state = initialState ?? ReadLetterState(receivedLetters: {});
+
+  ReadLetterState state;
   bool failNextSave = false;
   int saveCallCount = 0;
 

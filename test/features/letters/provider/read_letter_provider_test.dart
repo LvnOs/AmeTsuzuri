@@ -167,6 +167,90 @@ void main() {
     expect(() => provider.readLetterIds.add('letterB'), throwsUnsupportedError);
   });
 
+  group('receivedLetterIdOn', () {
+    test('指定日に受け取ったLetter IDを返し時刻は無視する', () async {
+      final provider = await _loadProvider(
+        _FakeReadLetterRepository(
+          ReadLetterState(
+            receivedLetters: {'letterA': DateTime(2026, 8, 8)},
+          ),
+        ),
+      );
+
+      expect(
+        provider.receivedLetterIdOn(DateTime(2026, 8, 8, 23, 59)),
+        'letterA',
+      );
+    });
+
+    test('別日の履歴とnull受取日は該当しない', () async {
+      final provider = await _loadProvider(
+        _FakeReadLetterRepository(
+          ReadLetterState(
+            receivedLetters: {
+              'letterA': DateTime(2026, 8, 7),
+              'legacy': null,
+            },
+          ),
+        ),
+      );
+
+      expect(provider.receivedLetterIdOn(DateTime(2026, 8, 8)), isNull);
+    });
+
+    test('複数履歴から同日のIDを返す', () async {
+      final provider = await _loadProvider(
+        _FakeReadLetterRepository(
+          ReadLetterState(
+            receivedLetters: {
+              'letterA': DateTime(2026, 8, 7),
+              'letterB': DateTime(2026, 8, 8),
+              'legacy': null,
+            },
+          ),
+        ),
+      );
+
+      expect(
+        provider.receivedLetterIdOn(DateTime(2026, 8, 8)),
+        'letterB',
+      );
+    });
+
+    test('同日に複数履歴があればMap順の最初のIDを返す', () async {
+      final provider = await _loadProvider(
+        _FakeReadLetterRepository(
+          ReadLetterState(
+            receivedLetters: {
+              'first': DateTime(2026, 8, 8),
+              'second': DateTime(2026, 8, 8),
+            },
+          ),
+        ),
+      );
+
+      expect(provider.receivedLetterIdOn(DateTime(2026, 8, 8)), 'first');
+    });
+
+    test('問い合わせで状態変更・保存・通知をしない', () async {
+      final repository = _FakeReadLetterRepository(
+        ReadLetterState(
+          receivedLetters: {'letterA': DateTime(2026, 8, 8)},
+        ),
+      );
+      final provider = await _loadProvider(repository);
+      var notificationCount = 0;
+      provider.addListener(() => notificationCount++);
+
+      expect(provider.receivedLetterIdOn(DateTime(2026, 8, 8)), 'letterA');
+      expect(provider.receivedLetters, {
+        'letterA': DateTime(2026, 8, 8),
+      });
+      expect(repository.saveCallCount, 0);
+      expect(notificationCount, 0);
+    });
+  });
+
   group('hasReceivedLetterOn', () {
     test('同じ年月日の受取履歴があればtrueを返す', () async {
       final provider = await _loadProvider(
