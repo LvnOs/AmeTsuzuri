@@ -45,6 +45,78 @@ const _furnitureC = Furniture(
 );
 
 void main() {
+  group('CatalogPageの初見UX表示', () {
+    testWidgets('未購入家具に価格と迎える導線を表示する', (tester) async {
+      await _pumpCatalog(tester);
+
+      expect(find.text('30滴で迎える'), findsNWidgets(2));
+      expect(find.text('所持雫 100滴'), findsOneWidget);
+    });
+
+    testWidgets('未購入家具から迎える確認へ進める', (tester) async {
+      await _pumpCatalog(tester);
+
+      await tester.tap(_furnitureTile('家具A'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('30滴で迎えますか？'), findsOneWidget);
+      expect(find.text('迎える'), findsOneWidget);
+    });
+
+    testWidgets('迎えた家具は配置する表示へ切り替わる', (tester) async {
+      await _pumpCatalog(tester, blockPurchase: false);
+
+      await tester.tap(_furnitureTile('家具A'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('迎える'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('家具Aを迎えました'), findsOneWidget);
+      expect(find.text('配置する'), findsNWidgets(2));
+      expect(find.text('所持雫 70滴'), findsOneWidget);
+    });
+
+    testWidgets('購入済み未配置家具から配置ダイアログへ進める', (tester) async {
+      await _pumpCatalog(tester);
+
+      await tester.tap(_furnitureTile('家具C'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('配置する'), findsOneWidget);
+      expect(find.text('配置可能な場所'), findsOneWidget);
+    });
+
+    testWidgets('配置済み家具に配置を変えると表示し配置操作へ進める', (tester) async {
+      await _pumpCatalog(tester, placedFurnitureIds: {'test_slot': 'furniture_c'});
+
+      expect(find.text('配置を変える'), findsOneWidget);
+      await tester.tap(_furnitureTile('家具C'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('現在の配置場所：テスト配置場所'), findsOneWidget);
+      expect(find.text('取り外す'), findsOneWidget);
+    });
+
+    testWidgets('雫未ロード中は所持雫をダッシュ表示にする', (tester) async {
+      await _pumpCatalog(tester, loadShizukuProvider: false);
+
+      expect(find.text('所持雫 --'), findsOneWidget);
+    });
+
+    testWidgets('雫不足では家具を迎えずエラー表示を維持する', (tester) async {
+      await _pumpCatalog(tester, blockPurchase: false, initialShizuku: 20);
+
+      await tester.tap(_furnitureTile('家具A'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('迎える'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('雫が足りません'), findsOneWidget);
+      expect(find.text('30滴で迎える'), findsNWidgets(2));
+      expect(find.text('所持雫 20滴'), findsOneWidget);
+    });
+  });
+
   group('CatalogPageの購入排他制御', () {
     testWidgets('購入中は同じ未購入家具を再操作できない', (tester) async {
       final harness = await _pumpCatalog(tester);
@@ -53,7 +125,7 @@ void main() {
       await tester.tap(_furnitureTile('家具A'));
       await tester.pump();
 
-      expect(find.text('30滴で購入しますか？'), findsNothing);
+      expect(find.text('30滴で迎えますか？'), findsNothing);
       expect(harness.shizukuRepository.saveCallCount, 1);
       expect(harness.catalogRepository.saveCallCount, 0);
 
@@ -67,7 +139,7 @@ void main() {
       await tester.tap(_furnitureTile('家具B'));
       await tester.pump();
 
-      expect(find.text('30滴で購入しますか？'), findsNothing);
+      expect(find.text('30滴で迎えますか？'), findsNothing);
       expect(harness.shizukuRepository.saveCallCount, 1);
       expect(harness.catalogRepository.saveCallCount, 0);
 
@@ -118,23 +190,32 @@ Finder _furnitureTile(String furnitureName) {
 Future<void> _startPurchase(WidgetTester tester, String furnitureName) async {
   await tester.tap(_furnitureTile(furnitureName));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('購入'));
+  await tester.tap(find.text('迎える'));
   await tester.pump();
   await tester.pump(const Duration(seconds: 1));
 }
 
-Future<_CatalogHarness> _pumpCatalog(WidgetTester tester) async {
-  final shizukuRepository = _BlockingShizukuRepository();
+Future<_CatalogHarness> _pumpCatalog(
+  WidgetTester tester, {
+  bool blockPurchase = true,
+  bool loadShizukuProvider = true,
+  int initialShizuku = 100,
+  Map<String, String> placedFurnitureIds = const {},
+}) async {
+  final shizukuRepository = _BlockingShizukuRepository(
+    blockSave: blockPurchase,
+    initialShizuku: initialShizuku,
+  );
   addTearDown(shizukuRepository.completeSave);
   final catalogRepository = _FakePurchasedFurnitureRepository();
   final shizukuProvider = ShizukuProvider(shizukuRepository);
   final catalogProvider = CatalogProvider(catalogRepository);
   final placedFurnitureProvider = PlacedFurnitureProvider(
-    _FakePlacedFurnitureRepository(),
+    _FakePlacedFurnitureRepository(placedFurnitureIds),
   );
 
   await Future.wait([
-    shizukuProvider.load(),
+    if (loadShizukuProvider) shizukuProvider.load(),
     catalogProvider.load(),
     placedFurnitureProvider.load(),
   ]);
@@ -154,7 +235,11 @@ Future<_CatalogHarness> _pumpCatalog(WidgetTester tester) async {
       ),
     ),
   );
-  await tester.pumpAndSettle();
+  if (loadShizukuProvider) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+  }
 
   return _CatalogHarness(
     shizukuRepository: shizukuRepository,
@@ -209,17 +294,24 @@ class _FakePurchasedFurnitureRepository extends PurchasedFurnitureRepository {
 }
 
 class _BlockingShizukuRepository extends ShizukuRepository {
+  _BlockingShizukuRepository({
+    required this.blockSave,
+    required this.initialShizuku,
+  });
+
+  final bool blockSave;
+  final int initialShizuku;
   final Completer<void> _saveCompleter = Completer<void>();
   int saveCallCount = 0;
 
   @override
   Future<ShizukuState> loadState() async =>
-      const ShizukuState(currentShizuku: 100, rewardedLetterIds: {});
+      ShizukuState(currentShizuku: initialShizuku, rewardedLetterIds: {});
 
   @override
   Future<void> saveState(ShizukuState state) {
     saveCallCount++;
-    return _saveCompleter.future;
+    return blockSave ? _saveCompleter.future : Future.value();
   }
 
   void completeSave() {
@@ -230,6 +322,11 @@ class _BlockingShizukuRepository extends ShizukuRepository {
 }
 
 class _FakePlacedFurnitureRepository extends PlacedFurnitureRepository {
+  _FakePlacedFurnitureRepository(this.placedFurnitureIds);
+
+  final Map<String, String> placedFurnitureIds;
+
   @override
-  Future<Map<String, String>> loadPlacedFurnitureIds() async => {};
+  Future<Map<String, String>> loadPlacedFurnitureIds() async =>
+      placedFurnitureIds;
 }

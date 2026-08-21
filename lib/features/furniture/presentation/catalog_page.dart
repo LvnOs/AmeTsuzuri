@@ -60,8 +60,8 @@ class _CatalogPageState extends State<CatalogPage> {
             child: Center(
               child: Text(
                 shizukuProvider.isLoaded
-                    ? '雫 ${shizukuProvider.currentShizuku}'
-                    : '雫 --',
+                    ? '所持雫 ${shizukuProvider.currentShizuku}滴'
+                    : '所持雫 --',
               ),
             ),
           ),
@@ -109,18 +109,16 @@ class _CatalogPageState extends State<CatalogPage> {
                 title: Text(furniture.name),
                 subtitle: Text(
                   !isPurchased
-                      ? '${furniture.price}滴'
+                      ? '${furniture.price}滴で迎える'
                       : isPlaced
-                      ? '配置中'
-                      : '購入済み',
+                      ? '配置を変える'
+                      : '配置する',
                 ),
                 trailing: isPurchasing
                     ? const SizedBox.square(
                         dimension: 24,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : isPurchased
-                    ? const Icon(Icons.check)
                     : const Icon(Icons.chevron_right),
                 // enabled: !isPurchased,
                 onTap: !isPurchased && catalogProvider.isPurchasing
@@ -149,7 +147,7 @@ class _CatalogPageState extends State<CatalogPage> {
       builder: (dialogContext) {
         return AlertDialog(
           title: Text(furniture.name),
-          content: Text('${furniture.price}滴で購入しますか？'),
+          content: Text('${furniture.price}滴で迎えますか？'),
           actions: [
             TextButton(
               onPressed: () {
@@ -161,7 +159,7 @@ class _CatalogPageState extends State<CatalogPage> {
               onPressed: () {
                 Navigator.of(dialogContext).pop(true);
               },
-              child: const Text('購入'),
+              child: const Text('迎える'),
             ),
           ],
         );
@@ -186,7 +184,7 @@ class _CatalogPageState extends State<CatalogPage> {
     }
 
     final message = switch (result) {
-      FurniturePurchaseResult.success => '${furniture.name}を購入しました',
+      FurniturePurchaseResult.success => '${furniture.name}を迎えました',
       FurniturePurchaseResult.alreadyPurchased => 'この家具は購入済みです',
       FurniturePurchaseResult.notEnoughShizuku => '雫が足りません',
       FurniturePurchaseResult.purchaseInProgress => '購入処理中です',
