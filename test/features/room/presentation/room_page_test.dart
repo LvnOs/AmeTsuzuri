@@ -26,6 +26,110 @@ import 'package:provider/provider.dart';
 
 void main() {
   const roomHint = '机や本棚など、気になる場所をタップしてみてください';
+  const guideTitle = '雨つづり。へようこそ';
+  const guideContent =
+      '雨の日には、机に手紙が届きます。\n'
+      '手紙を開くと雫がたまり、家具を迎えられます。\n'
+      '瓶から家具目録を開き、迎えた家具を配置できます。\n'
+      '本棚では、届いた手紙をいつでも読み返せます。';
+
+  group('初回案内', () {
+    testWidgets('Providerロード前は案内を表示せず読み込み中にする', (tester) async {
+      await _pumpRoom(
+        tester,
+        loadProviders: false,
+        dismissInitialGuide: false,
+      );
+
+      expect(find.text('読み込み中です…'), findsOneWidget);
+      expect(find.text(guideTitle), findsNothing);
+    });
+
+    testWidgets('ロード完了後の受取履歴が空なら短い案内を表示する', (tester) async {
+      await _pumpRoom(tester, dismissInitialGuide: false);
+
+      expect(find.text(guideTitle), findsOneWidget);
+      expect(find.text(guideContent), findsOneWidget);
+      expect(find.text('はじめる'), findsOneWidget);
+    });
+
+    testWidgets('案内を閉じると下部ヒントへ移り再buildで再表示しない', (tester) async {
+      final harness = await _pumpRoom(tester, dismissInitialGuide: false);
+
+      await tester.tap(find.text('はじめる'));
+      await tester.pumpAndSettle();
+      expect(find.text(guideTitle), findsNothing);
+      expect(find.text(roomHint), findsOneWidget);
+
+      await harness.dateProvider.setDebugDate(DateTime(2026, 8, 8));
+      await tester.pump();
+      expect(find.text(guideTitle), findsNothing);
+    });
+
+    testWidgets('受取日ありの履歴があれば案内を表示しない', (tester) async {
+      await _pumpRoom(
+        tester,
+        dismissInitialGuide: false,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'letterA': DateTime(2026, 8, 7)},
+        ),
+      );
+
+      expect(find.text(guideTitle), findsNothing);
+      expect(find.text(roomHint), findsOneWidget);
+    });
+
+    testWidgets('null受取日の旧履歴でも非空なら案内を表示しない', (tester) async {
+      await _pumpRoom(
+        tester,
+        dismissInitialGuide: false,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'legacy': null},
+        ),
+      );
+
+      expect(find.text(guideTitle), findsNothing);
+    });
+
+    testWidgets('同じRoomPageで案内を閉じてリセットしても再表示しない', (tester) async {
+      await _pumpRoom(tester, dismissInitialGuide: false);
+      await tester.tap(find.text('はじめる'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('リセット'));
+      await tester.pumpAndSettle();
+
+      expect(find.text(guideTitle), findsNothing);
+    });
+
+    testWidgets('受取履歴が空の新しいRoomPageなら案内を再表示する', (tester) async {
+      await _pumpRoom(tester, dismissInitialGuide: false);
+      await tester.tap(find.text('はじめる'));
+      await tester.pumpAndSettle();
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      await _pumpRoom(tester, dismissInitialGuide: false);
+
+      expect(find.text(guideTitle), findsOneWidget);
+    });
+
+    testWidgets('320px幅で案内文とボタンがoverflowしない', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 640);
+      addTearDown(() {
+        tester.view.resetDevicePixelRatio();
+        tester.view.resetPhysicalSize();
+      });
+
+      await _pumpRoom(tester, dismissInitialGuide: false);
+
+      expect(find.text(guideTitle), findsOneWidget);
+      expect(find.text(guideContent), findsOneWidget);
+      expect(find.text('はじめる'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
 
   testWidgets('AppDateProvider未ロード中は読み込み表示にする', (tester) async {
     await _pumpRoom(tester, loadAppDateProvider: false);
@@ -682,6 +786,7 @@ Future<_RoomHarness> _pumpRoom(
   int initialRewardedCount = 0,
   ReadLetterState? initialReadState,
   ShizukuState? initialShizukuState,
+  bool dismissInitialGuide = true,
 }) async {
   final shizukuRepository = _FakeShizukuRepository(
     blockSave: blockRewardSave,
@@ -729,6 +834,12 @@ Future<_RoomHarness> _pumpRoom(
     ),
   );
   await tester.pump();
+  await tester.pump();
+
+  if (dismissInitialGuide && find.text('はじめる').evaluate().isNotEmpty) {
+    await tester.tap(find.text('はじめる'));
+    await tester.pumpAndSettle();
+  }
 
   return _RoomHarness(
     shizukuRepository: shizukuRepository,

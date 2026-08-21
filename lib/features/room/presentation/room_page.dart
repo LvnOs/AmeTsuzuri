@@ -63,6 +63,7 @@ class _RoomPageState extends State<RoomPage> {
   int? _previousBottleRecordCount;
   bool _showFullBottle = false;
   Timer? _fullBottleTimer;
+  bool _hasShownInitialGuide = false;
 
   @override
   void initState() {
@@ -388,6 +389,10 @@ class _RoomPageState extends State<RoomPage> {
         appDateProvider.isLoaded &&
         readLetterProvider.isLoaded &&
         shizukuProvider.isLoaded;
+    _scheduleInitialGuide(
+      isRoomReady: isRoomReady,
+      readLetterProvider: readLetterProvider,
+    );
 
     return Scaffold(
       body: SafeArea(
@@ -416,6 +421,45 @@ class _RoomPageState extends State<RoomPage> {
         ),
       ),
     );
+  }
+
+  void _scheduleInitialGuide({
+    required bool isRoomReady,
+    required ReadLetterProvider readLetterProvider,
+  }) {
+    if (_hasShownInitialGuide ||
+        !isRoomReady ||
+        readLetterProvider.receivedLetters.isNotEmpty) {
+      return;
+    }
+
+    _hasShownInitialGuide = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('雨つづり。へようこそ'),
+            content: const Text(
+              '雨の日には、机に手紙が届きます。\n'
+              '手紙を開くと雫がたまり、家具を迎えられます。\n'
+              '瓶から家具目録を開き、迎えた家具を配置できます。\n'
+              '本棚では、届いた手紙をいつでも読み返せます。',
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('はじめる'),
+              ),
+            ],
+          );
+        },
+      );
+    });
   }
 
   Widget _buildRoom(
