@@ -22,6 +22,10 @@ class RoomPage extends StatelessWidget {
   static const double _curtainWidthScale = 0.91;
   static const double _curtainHeightScale = 1.3;
 
+  // Shared placement values for the bottle and its future water layer.
+  static const Alignment _bottleAlignment = Alignment(0.58, -0.18);
+  static const double _bottleScale = 0.13;
+
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
@@ -83,6 +87,16 @@ class _RoomBackgroundLayers extends StatelessWidget {
                       'assets/images/room/curtain.png',
                       fit: BoxFit.contain,
                     ),
+                  ),
+                ),
+              ),
+              Align(
+                alignment: RoomPage._bottleAlignment,
+                child: SizedBox(
+                  width: constraints.maxWidth * RoomPage._bottleScale,
+                  child: Image.asset(
+                    'assets/images/room/bottle.png',
+                    fit: BoxFit.contain,
                   ),
                 ),
               ),
