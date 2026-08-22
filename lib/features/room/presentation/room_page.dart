@@ -34,6 +34,10 @@ class RoomPage extends StatelessWidget {
   static const Alignment _flowerAlignment = Alignment(0.34, -0.26);
   static const double _flowerScale = 0.13;
 
+  // Letter composition tuning. Scale is relative to the room canvas width.
+  static const Alignment _letterAlignment = Alignment(0, 0.07);
+  static const double _letterScale = 0.22;
+
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
@@ -124,6 +128,16 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   width: constraints.maxWidth * RoomPage._vaseScale,
                   child: Image.asset(
                     'assets/images/room/vase.png',
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+              Align(
+                alignment: RoomPage._letterAlignment,
+                child: SizedBox(
+                  width: constraints.maxWidth * RoomPage._letterScale,
+                  child: Image.asset(
+                    'assets/images/room/letter.png',
                     fit: BoxFit.contain,
                   ),
                 ),
