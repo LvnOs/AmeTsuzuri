@@ -323,6 +323,108 @@ void main() {
       expect(notificationCount, 0);
     });
   });
+  group('delivery state', () {
+    test('配達前は未配達で、deliver後は指定日のIDを返す', () async {
+      final repository = _FakeReadLetterRepository(_emptyState());
+      final provider = await _loadProvider(repository);
+
+      expect(provider.hasDeliveredLetterOn(DateTime(2026, 8, 8)), isFalse);
+      expect(provider.deliveredLetterIdOn(DateTime(2026, 8, 8)), isNull);
+
+      final delivered = await provider.deliver(
+        'letterA',
+        deliveredDate: DateTime(2026, 8, 8, 23, 59),
+      );
+
+      expect(delivered, isTrue);
+      expect(provider.hasDeliveredLetterOn(DateTime(2026, 8, 8)), isTrue);
+      expect(provider.deliveredLetterIdOn(DateTime(2026, 8, 8, 1)), 'letterA');
+      expect(provider.hasDeliveredLetterOn(DateTime(2026, 8, 9)), isFalse);
+      expect(repository.state.deliveredLetters, {
+        '2026-08-08': 'letterA',
+      });
+    });
+
+    test('同じ日への重複配達は同じIDでも別IDでも上書きしない', () async {
+      final repository = _FakeReadLetterRepository(_emptyState());
+      final provider = await _loadProvider(repository);
+
+      expect(
+        await provider.deliver(
+          'letterA',
+          deliveredDate: DateTime(2026, 8, 8),
+        ),
+        isTrue,
+      );
+      expect(
+        await provider.deliver(
+          'letterA',
+          deliveredDate: DateTime(2026, 8, 8, 12),
+        ),
+        isFalse,
+      );
+      expect(
+        await provider.deliver(
+          'letterB',
+          deliveredDate: DateTime(2026, 8, 8),
+        ),
+        isFalse,
+      );
+
+      expect(provider.deliveredLetterIdOn(DateTime(2026, 8, 8)), 'letterA');
+      expect(repository.saveCallCount, 1);
+    });
+
+    test('配達保存失敗時はProvider状態を変更しない', () async {
+      final repository = _FakeReadLetterRepository(_emptyState())
+        ..failSave = true;
+      final provider = await _loadProvider(repository);
+
+      await expectLater(
+        provider.deliver(
+          'letterA',
+          deliveredDate: DateTime(2026, 8, 8),
+        ),
+        throwsA(isA<StateError>()),
+      );
+
+      expect(provider.deliveredLetters, isEmpty);
+    });
+
+    test('配達後のmarkAsReadは配達状態を維持する', () async {
+      final repository = _FakeReadLetterRepository(_emptyState());
+      final provider = await _loadProvider(repository);
+
+      await provider.deliver(
+        'letterA',
+        deliveredDate: DateTime(2026, 8, 8),
+      );
+      expect(provider.readLetterIds, isNot(contains('letterA')));
+
+      await provider.markAsRead(
+        'letterA',
+        receivedDate: DateTime(2026, 8, 8),
+      );
+
+      expect(provider.deliveredLetterIdOn(DateTime(2026, 8, 8)), 'letterA');
+      expect(provider.readLetterIds, contains('letterA'));
+    });
+
+    test('resetで既読と配達の両方を消す', () async {
+      final repository = _FakeReadLetterRepository(
+        ReadLetterState(
+          receivedLetters: {'letterA': DateTime(2026, 8, 8)},
+          deliveredLetters: {'2026-08-08': 'letterA'},
+        ),
+      );
+      final provider = await _loadProvider(repository);
+
+      await provider.reset();
+
+      expect(provider.receivedLetters, isEmpty);
+      expect(provider.deliveredLetters, isEmpty);
+    });
+  });
 }
 
 Future<ReadLetterProvider> _loadProvider(

@@ -13,8 +13,17 @@ class ReadLetterProvider extends ChangeNotifier {
 
   Set<String> get readLetterIds => _state.readLetterIds;
   Map<String, DateTime?> get receivedLetters => _state.receivedLetters;
+  Map<String, String> get deliveredLetters => _state.deliveredLetters;
   DateTime? receivedDateFor(String letterId) => receivedLetters[letterId];
   bool get isLoaded => _isLoaded;
+
+  String? deliveredLetterIdOn(DateTime date) {
+    return _state.deliveredLetters[_formatDate(date)];
+  }
+
+  bool hasDeliveredLetterOn(DateTime date) {
+    return deliveredLetterIdOn(date) != null;
+  }
 
   String? receivedLetterIdOn(DateTime date) {
     for (final entry in _state.receivedLetters.entries) {
@@ -59,6 +68,29 @@ class ReadLetterProvider extends ChangeNotifier {
         ..._state.receivedLetters,
         letterId: normalizedDate,
       },
+      deliveredLetters: _state.deliveredLetters,
+    );
+
+    await _repository.saveState(nextState);
+
+    _state = nextState;
+    notifyListeners();
+
+    return true;
+  }
+
+  Future<bool> deliver(
+    String letterId, {
+    required DateTime deliveredDate,
+  }) async {
+    final dateKey = _formatDate(deliveredDate);
+    if (_state.deliveredLetters.containsKey(dateKey)) {
+      return false;
+    }
+
+    final nextState = ReadLetterState(
+      receivedLetters: _state.receivedLetters,
+      deliveredLetters: {..._state.deliveredLetters, dateKey: letterId},
     );
 
     await _repository.saveState(nextState);
@@ -71,7 +103,14 @@ class ReadLetterProvider extends ChangeNotifier {
 
   Future<void> reset() async {
     await _repository.resetState();
-    _state = ReadLetterState(receivedLetters: {});
+    _state = ReadLetterState(receivedLetters: {}, deliveredLetters: {});
     notifyListeners();
+  }
+
+  String _formatDate(DateTime date) {
+    final year = date.year.toString().padLeft(4, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '$year-$month-$day';
   }
 }

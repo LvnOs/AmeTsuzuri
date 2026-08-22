@@ -11,7 +11,7 @@ class ReadLetterRepository {
 
   static const String _stateKey = 'readLetterState';
   static const String _legacyIdsKey = 'readLetterIds';
-  static const int _currentVersion = 1;
+  static const int _currentVersion = 2;
 
   final SetStringOverride? setStringOverride;
 
@@ -40,6 +40,7 @@ class ReadLetterRepository {
           receivedDate == null ? null : _formatDate(receivedDate),
         ),
       ),
+      'deliveredLetters': state.deliveredLetters,
     });
 
     final didSave = setStringOverride != null
@@ -54,7 +55,9 @@ class ReadLetterRepository {
   }
 
   Future<void> resetState() async {
-    await saveState(ReadLetterState(receivedLetters: {}));
+    await saveState(
+      ReadLetterState(receivedLetters: {}, deliveredLetters: {}),
+    );
 
     final prefs = await SharedPreferences.getInstance();
     final didRemoveLegacyIds = await prefs.remove(_legacyIdsKey);
@@ -72,7 +75,12 @@ class ReadLetterRepository {
     final receivedLetters = <String, DateTime?>{
       for (final id in ids) id: currentState.receivedLetters[id],
     };
-    await saveState(ReadLetterState(receivedLetters: receivedLetters));
+    await saveState(
+      ReadLetterState(
+        receivedLetters: receivedLetters,
+        deliveredLetters: currentState.deliveredLetters,
+      ),
+    );
   }
 
   Future<void> clear() => resetState();
@@ -123,7 +131,37 @@ class ReadLetterRepository {
         }
       }
 
-      return ReadLetterState(receivedLetters: receivedLetters);
+      final deliveredLetters = <String, String>{};
+      final savedDeliveredLetters = decoded['deliveredLetters'];
+      if (savedDeliveredLetters is Map) {
+        for (final entry in savedDeliveredLetters.entries) {
+          final savedDate = entry.key;
+          final letterId = entry.value;
+          if (savedDate is! String || letterId is! String) {
+            continue;
+          }
+
+          final date = _tryParseDate(savedDate);
+          if (date != null) {
+            deliveredLetters[_formatDate(date)] = letterId;
+          }
+        }
+      } else if (!decoded.containsKey('deliveredLetters')) {
+        for (final entry in receivedLetters.entries) {
+          final receivedDate = entry.value;
+          if (receivedDate != null) {
+            deliveredLetters.putIfAbsent(
+              _formatDate(receivedDate),
+              () => entry.key,
+            );
+          }
+        }
+      }
+
+      return ReadLetterState(
+        receivedLetters: receivedLetters,
+        deliveredLetters: deliveredLetters,
+      );
     } on FormatException {
       return null;
     }

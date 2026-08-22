@@ -14,6 +14,76 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
+  test('配達IDを保存して再ロードできる', () async {
+    final repository = ReadLetterRepository();
+    await repository.saveState(
+      ReadLetterState(
+        receivedLetters: {},
+        deliveredLetters: {
+          '2026-08-08': 'letterA',
+          '2026-08-09': 'letterB',
+        },
+      ),
+    );
+
+    final prefs = await SharedPreferences.getInstance();
+    final saved = jsonDecode(prefs.getString(stateKey)!);
+    expect(saved['version'], 2);
+    expect(saved['deliveredLetters'], {
+      '2026-08-08': 'letterA',
+      '2026-08-09': 'letterB',
+    });
+
+    final reloaded = await repository.loadState();
+    expect(reloaded.deliveredLetters, {
+      '2026-08-08': 'letterA',
+      '2026-08-09': 'letterB',
+    });
+  });
+
+  test('旧version 1形式は受取日から日ごとの配達IDを復元する', () async {
+    SharedPreferences.setMockInitialValues({
+      stateKey: jsonEncode({
+        'version': 1,
+        'receivedLetters': {
+          'first': '2026-08-08',
+          'second': '2026-08-08',
+          'otherDay': '2026-08-09',
+          'legacy': null,
+        },
+      }),
+    });
+
+    final state = await ReadLetterRepository().loadState();
+
+    expect(state.receivedLetters.keys, {
+      'first',
+      'second',
+      'otherDay',
+      'legacy',
+    });
+    expect(state.deliveredLetters, {
+      '2026-08-08': 'first',
+      '2026-08-09': 'otherDay',
+    });
+  });
+
+  test('resetStateは既読と配達の両方を消す', () async {
+    final repository = ReadLetterRepository();
+    await repository.saveState(
+      ReadLetterState(
+        receivedLetters: {'letterA': DateTime(2026, 8, 8)},
+        deliveredLetters: {'2026-08-08': 'letterA'},
+      ),
+    );
+
+    await repository.resetState();
+
+    final state = await repository.loadState();
+    expect(state.receivedLetters, isEmpty);
+    expect(state.deliveredLetters, isEmpty);
+  });
+
   test('新旧データがなければ空Stateを保存して返す', () async {
     final state = await ReadLetterRepository().loadState();
 
@@ -32,8 +102,9 @@ void main() {
     expect(state.receivedLetters, {'letterA': null, 'letterB': null});
     final prefs = await SharedPreferences.getInstance();
     final saved = jsonDecode(prefs.getString(stateKey)!);
-    expect(saved['version'], 1);
+    expect(saved['version'], 2);
     expect(saved['receivedLetters'], {'letterA': null, 'letterB': null});
+    expect(saved['deliveredLetters'], isEmpty);
     expect(prefs.getStringList(legacyKey), ['letterA', 'letterB']);
   });
 
