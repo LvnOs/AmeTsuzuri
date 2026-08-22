@@ -26,6 +26,10 @@ class RoomPage extends StatelessWidget {
   static const Alignment _bottleAlignment = Alignment(0.58, -0.18);
   static const double _bottleScale = 0.13;
 
+  // Vase composition tuning. Scale is relative to the room canvas width.
+  static const Alignment _vaseAlignment = Alignment(0.33, -0.16);
+  static const double _vaseScale = 0.091;
+
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
@@ -96,6 +100,16 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   width: constraints.maxWidth * RoomPage._bottleScale,
                   child: Image.asset(
                     'assets/images/room/bottle.png',
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+              Align(
+                alignment: RoomPage._vaseAlignment,
+                child: SizedBox(
+                  width: constraints.maxWidth * RoomPage._vaseScale,
+                  child: Image.asset(
+                    'assets/images/room/vase.png',
                     fit: BoxFit.contain,
                   ),
                 ),
