@@ -1,7 +1,12 @@
 import 'package:ame_tsuzuri/features/letters/repository/letter_repository.dart';
+import 'package:ame_tsuzuri/features/letters/provider/read_letter_provider.dart';
+import 'package:ame_tsuzuri/features/letters/service/letter_delivery_service.dart';
+import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
+import 'package:ame_tsuzuri/shared/provider/weather_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-class RoomPage extends StatelessWidget {
+class RoomPage extends StatefulWidget {
   const RoomPage({super.key, this.letterRepository});
 
   final LetterRepository? letterRepository;
@@ -48,23 +53,123 @@ class RoomPage extends StatelessWidget {
   static const double _rugHeightScale = 0.80;
 
   @override
+  State<RoomPage> createState() => _RoomPageState();
+}
+
+class _RoomPageState extends State<RoomPage> {
+  late final LetterRepository _letterRepository;
+  final LetterDeliveryService _letterDeliveryService =
+      const LetterDeliveryService();
+  DateTime? _attemptedDeliveryDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _letterRepository = widget.letterRepository ?? LetterRepository();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    final appDateProvider = context.watch<AppDateProvider>();
+    final readLetterProvider = context.watch<ReadLetterProvider>();
+    context.watch<WeatherProvider>();
+
+    var showLetter = false;
+    if (appDateProvider.isLoaded && readLetterProvider.isLoaded) {
+      final today = _dateOnly(appDateProvider.today);
+      showLetter = readLetterProvider.hasDeliveredLetterOn(today);
+      if (!showLetter) {
+        _scheduleDelivery(today);
+      }
+    }
+
+    return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
         child: Center(
           child: AspectRatio(
-            aspectRatio: _designWidth / _designHeight,
-            child: _RoomBackgroundLayers(),
+            aspectRatio: RoomPage._designWidth / RoomPage._designHeight,
+            child: _RoomBackgroundLayers(showLetter: showLetter),
           ),
         ),
       ),
     );
   }
+
+  void _scheduleDelivery(DateTime date) {
+    if (_attemptedDeliveryDate == date) {
+      return;
+    }
+
+    _attemptedDeliveryDate = date;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _deliverLetterFor(date);
+    });
+  }
+
+  Future<void> _deliverLetterFor(DateTime date) async {
+    if (!mounted) {
+      return;
+    }
+
+    final appDateProvider = context.read<AppDateProvider>();
+    final readLetterProvider = context.read<ReadLetterProvider>();
+    final weatherProvider = context.read<WeatherProvider>();
+    if (!appDateProvider.isLoaded ||
+        !readLetterProvider.isLoaded ||
+        _dateOnly(appDateProvider.today) != date ||
+        readLetterProvider.hasDeliveredLetterOn(date)) {
+      return;
+    }
+
+    try {
+      if (weatherProvider.loadedDate != date) {
+        await weatherProvider.loadForDate(date);
+      }
+    } catch (_) {
+      return;
+    }
+
+    if (!mounted ||
+        _dateOnly(context.read<AppDateProvider>().today) != date ||
+        readLetterProvider.hasDeliveredLetterOn(date)) {
+      return;
+    }
+
+    final currentWeather = weatherProvider.currentWeather;
+    if (currentWeather == null) {
+      return;
+    }
+
+    try {
+      final letters = await _letterRepository.getAll();
+      if (!mounted ||
+          _dateOnly(context.read<AppDateProvider>().today) != date ||
+          readLetterProvider.hasDeliveredLetterOn(date)) {
+        return;
+      }
+
+      final letter = _letterDeliveryService.selectLetter(
+        letters: letters,
+        currentSeason: context.read<AppDateProvider>().currentSeason,
+        currentWeather: currentWeather,
+        readLetterIds: readLetterProvider.readLetterIds,
+      );
+      if (letter == null) {
+        return;
+      }
+
+      await readLetterProvider.deliver(letter.id, deliveredDate: date);
+    } catch (_) {
+      // Delivery is retried on a later Room rebuild or date change.
+    }
+  }
 }
 
 class _RoomBackgroundLayers extends StatelessWidget {
-  const _RoomBackgroundLayers();
+  const _RoomBackgroundLayers({required this.showLetter});
+
+  final bool showLetter;
 
   @override
   Widget build(BuildContext context) {
@@ -154,16 +259,18 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   ),
                 ),
               ),
-              Align(
-                alignment: RoomPage._letterAlignment,
-                child: SizedBox(
-                  width: constraints.maxWidth * RoomPage._letterScale,
-                  child: Image.asset(
-                    'assets/images/room/letter.png',
-                    fit: BoxFit.contain,
+              if (showLetter)
+                Align(
+                  key: const ValueKey('roomLetterLayer'),
+                  alignment: RoomPage._letterAlignment,
+                  child: SizedBox(
+                    width: constraints.maxWidth * RoomPage._letterScale,
+                    child: Image.asset(
+                      'assets/images/room/letter.png',
+                      fit: BoxFit.contain,
+                    ),
                   ),
                 ),
-              ),
               Align(
                 alignment: RoomPage._chairAlignment,
                 child: SizedBox(
@@ -181,3 +288,5 @@ class _RoomBackgroundLayers extends StatelessWidget {
     );
   }
 }
+
+DateTime _dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
