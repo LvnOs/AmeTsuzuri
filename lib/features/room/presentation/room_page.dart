@@ -1,5 +1,8 @@
 import 'package:ame_tsuzuri/features/letters/repository/letter_repository.dart';
+import 'package:ame_tsuzuri/features/letters/model/letter.dart';
+import 'package:ame_tsuzuri/features/letters/presentation/letter_page.dart';
 import 'package:ame_tsuzuri/features/letters/provider/read_letter_provider.dart';
+import 'package:ame_tsuzuri/features/letters/provider/shizuku_provider.dart';
 import 'package:ame_tsuzuri/features/letters/service/letter_delivery_service.dart';
 import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
 import 'package:ame_tsuzuri/shared/provider/weather_provider.dart';
@@ -42,6 +45,7 @@ class RoomPage extends StatefulWidget {
   // Letter composition tuning. Scale is relative to the room canvas width.
   static const Alignment _letterAlignment = Alignment(0, 0.07);
   static const double _letterScale = 0.22;
+  static const double _letterAspectRatio = 460 / 307;
 
   // Chair composition tuning. Scale is relative to the room canvas width.
   static const Alignment _chairAlignment = Alignment(0, 0.72);
@@ -61,6 +65,7 @@ class _RoomPageState extends State<RoomPage> {
   final LetterDeliveryService _letterDeliveryService =
       const LetterDeliveryService();
   DateTime? _attemptedDeliveryDate;
+  bool _isOpeningLetter = false;
 
   @override
   void initState() {
@@ -89,7 +94,10 @@ class _RoomPageState extends State<RoomPage> {
         child: Center(
           child: AspectRatio(
             aspectRatio: RoomPage._designWidth / RoomPage._designHeight,
-            child: _RoomBackgroundLayers(showLetter: showLetter),
+            child: _RoomBackgroundLayers(
+              showLetter: showLetter,
+              onTapLetter: _onTapLetter,
+            ),
           ),
         ),
       ),
@@ -164,12 +172,90 @@ class _RoomPageState extends State<RoomPage> {
       // Delivery is retried on a later Room rebuild or date change.
     }
   }
+
+  Future<void> _onTapLetter() async {
+    final appDateProvider = context.read<AppDateProvider>();
+    final readLetterProvider = context.read<ReadLetterProvider>();
+    final shizukuProvider = context.read<ShizukuProvider>();
+    if (!appDateProvider.isLoaded ||
+        !readLetterProvider.isLoaded ||
+        !shizukuProvider.isLoaded ||
+        _isOpeningLetter) {
+      return;
+    }
+
+    final today = _dateOnly(appDateProvider.today);
+    final deliveredLetterId = readLetterProvider.deliveredLetterIdOn(today);
+    if (deliveredLetterId == null) {
+      return;
+    }
+
+    _isOpeningLetter = true;
+    try {
+      final letters = await _letterRepository.getAll();
+      if (!mounted ||
+          _dateOnly(context.read<AppDateProvider>().today) != today ||
+          readLetterProvider.deliveredLetterIdOn(today) != deliveredLetterId) {
+        return;
+      }
+
+      Letter? deliveredLetter;
+      for (final letter in letters) {
+        if (letter.id == deliveredLetterId) {
+          deliveredLetter = letter;
+          break;
+        }
+      }
+      if (deliveredLetter == null) {
+        return;
+      }
+
+      if (!readLetterProvider.readLetterIds.contains(deliveredLetterId)) {
+        try {
+          await shizukuProvider.rewardForLetter(deliveredLetterId);
+        } catch (_) {
+          return;
+        }
+
+        try {
+          await readLetterProvider.markAsRead(
+            deliveredLetterId,
+            receivedDate: today,
+          );
+        } catch (_) {
+          try {
+            await readLetterProvider.load();
+          } catch (_) {
+            // A later app load can synchronize the persisted state again.
+          }
+          return;
+        }
+      }
+
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (context) => LetterPage(letter: deliveredLetter!),
+        ),
+      );
+    } catch (_) {
+      // Keep the delivered letter in the Room so the user can try again later.
+    } finally {
+      _isOpeningLetter = false;
+    }
+  }
 }
 
 class _RoomBackgroundLayers extends StatelessWidget {
-  const _RoomBackgroundLayers({required this.showLetter});
+  const _RoomBackgroundLayers({
+    required this.showLetter,
+    required this.onTapLetter,
+  });
 
   final bool showLetter;
+  final VoidCallback onTapLetter;
 
   @override
   Widget build(BuildContext context) {
@@ -265,6 +351,10 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   alignment: RoomPage._letterAlignment,
                   child: SizedBox(
                     width: constraints.maxWidth * RoomPage._letterScale,
+                    height:
+                        constraints.maxWidth *
+                        RoomPage._letterScale /
+                        RoomPage._letterAspectRatio,
                     child: Image.asset(
                       'assets/images/room/letter.png',
                       fit: BoxFit.contain,
@@ -281,6 +371,28 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   ),
                 ),
               ),
+              if (showLetter)
+                Align(
+                  alignment: RoomPage._letterAlignment,
+                  child: GestureDetector(
+                    key: const ValueKey('letterTapArea'),
+                    behavior: HitTestBehavior.opaque,
+                    onTap: onTapLetter,
+                    child: SizedBox(
+                      width: constraints.maxWidth * RoomPage._letterScale,
+                      height:
+                          constraints.maxWidth *
+                          RoomPage._letterScale /
+                          RoomPage._letterAspectRatio,
+                      child: Image.asset(
+                        'assets/images/room/letter.png',
+                        fit: BoxFit.contain,
+                        color: Colors.transparent,
+                        colorBlendMode: BlendMode.srcIn,
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         );

@@ -876,10 +876,161 @@ void main() {
       );
     });
   });
+
+  group('今日の手紙を開く', () {
+    testWidgets('未配達時はletterTapAreaが存在しない', (tester) async {
+      await _pumpRoom(tester, weather: WeatherType.sunny);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('letterTapArea')), findsNothing);
+    });
+
+    testWidgets('配達済み未読の確定IDを開いて初回だけ報酬と既読を保存する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: {},
+          deliveredLetters: {'2026-08-07': 'letterB'},
+        ),
+      );
+
+      expect(find.byKey(const ValueKey('letterTapArea')), findsOneWidget);
+      await _tapLetter(tester);
+
+      expect(find.byType(LetterPage), findsOneWidget);
+      expect(find.text('letterB'), findsWidgets);
+      expect(harness.shizukuProvider.currentShizuku, 40);
+      expect(harness.shizukuProvider.rewardedLetterIds, {'letterB'});
+      expect(harness.readLetterProvider.readLetterIds, {'letterB'});
+      expect(
+        harness.readLetterProvider.receivedDateFor('letterB'),
+        DateTime(2026, 8, 7),
+      );
+      expect(harness.letterRepository.getAllCallCount, 1);
+      expect(harness.weatherRepository.requestedDates, isEmpty);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('roomLetterLayer')), findsOneWidget);
+      expect(find.byKey(const ValueKey('letterTapArea')), findsOneWidget);
+    });
+
+    testWidgets('既読状態では報酬と既読保存なしで同じ手紙を再読できる', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'letterB': DateTime(2026, 8, 7)},
+          deliveredLetters: {'2026-08-07': 'letterB'},
+        ),
+        initialShizukuState: const ShizukuState(
+          currentShizuku: 40,
+          rewardedLetterIds: {'letterB'},
+        ),
+      );
+
+      await _tapLetter(tester);
+      expect(find.text('letterB'), findsWidgets);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await _tapLetter(tester);
+
+      expect(find.text('letterB'), findsWidgets);
+      expect(harness.shizukuProvider.currentShizuku, 40);
+      expect(harness.shizukuRepository.saveCallCount, 0);
+      expect(harness.readLetterRepository.saveCallCount, 0);
+      expect(harness.letterRepository.getAllCallCount, 2);
+    });
+
+    testWidgets('連続タップでも報酬・既読保存・画面pushを一度だけ行う', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: {},
+          deliveredLetters: {'2026-08-07': 'letterA'},
+        ),
+      );
+      harness.letterRepository.blockNextLoad = true;
+
+      await tester.tap(find.byKey(const ValueKey('letterTapArea')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('letterTapArea')));
+      await tester.pump();
+      expect(harness.letterRepository.getAllCallCount, 1);
+
+      harness.letterRepository.completeLoad();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LetterPage), findsOneWidget);
+      expect(harness.shizukuRepository.saveCallCount, 1);
+      expect(harness.readLetterRepository.saveCallCount, 1);
+    });
+
+    testWidgets('Providerロード前はletterTapAreaを表示せず副作用を起こさない', (tester) async {
+      final harness = await _pumpRoom(tester, loadProviders: false);
+
+      expect(find.byKey(const ValueKey('letterTapArea')), findsNothing);
+      expect(harness.letterRepository.getAllCallCount, 0);
+      expect(harness.shizukuRepository.saveCallCount, 0);
+      expect(harness.readLetterRepository.saveCallCount, 0);
+    });
+
+    testWidgets('既読保存失敗時は遷移せず配達済み表示を維持する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        failNextReadSave: true,
+        initialReadState: ReadLetterState(
+          receivedLetters: {},
+          deliveredLetters: {'2026-08-07': 'letterA'},
+        ),
+      );
+
+      await _tapLetter(tester);
+
+      expect(find.byType(LetterPage), findsNothing);
+      expect(harness.shizukuProvider.currentShizuku, 40);
+      expect(harness.readLetterProvider.readLetterIds, isEmpty);
+      expect(
+        harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
+        'letterA',
+      );
+      expect(find.byKey(const ValueKey('letterTapArea')), findsOneWidget);
+
+      await _tapLetter(tester);
+
+      expect(find.byType(LetterPage), findsOneWidget);
+      expect(harness.shizukuProvider.currentShizuku, 40);
+      expect(harness.shizukuRepository.saveCallCount, 1);
+      expect(harness.readLetterProvider.readLetterIds, {'letterA'});
+    });
+
+    testWidgets('報酬保存失敗時は既読保存と遷移を行わない', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: {},
+          deliveredLetters: {'2026-08-07': 'letterA'},
+        ),
+      );
+      harness.shizukuRepository.failNextSave = true;
+
+      await _tapLetter(tester);
+
+      expect(find.byType(LetterPage), findsNothing);
+      expect(harness.shizukuProvider.currentShizuku, 30);
+      expect(harness.readLetterProvider.readLetterIds, isEmpty);
+      expect(harness.readLetterRepository.saveCallCount, 0);
+      expect(find.byKey(const ValueKey('letterTapArea')), findsOneWidget);
+    });
+  });
 }
 
 Future<void> _openDesk(WidgetTester tester) async {
   await tester.tap(find.byKey(const ValueKey('deskTapArea')));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _tapLetter(WidgetTester tester) async {
+  await tester.tap(find.byKey(const ValueKey('letterTapArea')));
   await tester.pumpAndSettle();
 }
 
