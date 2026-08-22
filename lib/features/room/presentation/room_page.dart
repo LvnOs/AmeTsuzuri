@@ -38,6 +38,15 @@ class RoomPage extends StatelessWidget {
   static const Alignment _letterAlignment = Alignment(0, 0.07);
   static const double _letterScale = 0.22;
 
+  // Chair composition tuning. Scale is relative to the room canvas width.
+  static const Alignment _chairAlignment = Alignment(0, 0.72);
+  static const double _chairScale = 0.47;
+
+  // Rug composition tuning. Width and height are independently adjustable.
+  static const Alignment _rugAlignment = Alignment(0.53, 0.935);
+  static const double _rugWidthScale = 0.898;
+  static const double _rugHeightScale = 0.80;
+
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
@@ -89,6 +98,19 @@ class _RoomBackgroundLayers extends StatelessWidget {
                 fit: BoxFit.cover,
               ),
               Align(
+                alignment: RoomPage._rugAlignment,
+                child: Transform.scale(
+                  scaleY: RoomPage._rugHeightScale,
+                  child: SizedBox(
+                    width: constraints.maxWidth * RoomPage._rugWidthScale,
+                    child: Image.asset(
+                      'assets/images/room/rug.png',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ),
+              Align(
                 alignment: RoomPage._curtainAlignment,
                 child: Transform.scale(
                   scaleX: RoomPage._curtainWidthScale,
@@ -138,6 +160,16 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   width: constraints.maxWidth * RoomPage._letterScale,
                   child: Image.asset(
                     'assets/images/room/letter.png',
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+              Align(
+                alignment: RoomPage._chairAlignment,
+                child: SizedBox(
+                  width: constraints.maxWidth * RoomPage._chairScale,
+                  child: Image.asset(
+                    'assets/images/room/chair.png',
                     fit: BoxFit.contain,
                   ),
                 ),
