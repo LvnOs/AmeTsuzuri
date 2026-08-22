@@ -17,6 +17,11 @@ class RoomPage extends StatelessWidget {
   static const Alignment _postAlignment = Alignment(-0.50, -0.35);
   static const double _postScale = 0.19;
 
+  // Curtain composition tuning. Width is relative to the room canvas width.
+  static const Alignment _curtainAlignment = Alignment(0, -0.83);
+  static const double _curtainWidthScale = 0.91;
+  static const double _curtainHeightScale = 1.3;
+
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
@@ -66,6 +71,20 @@ class _RoomBackgroundLayers extends StatelessWidget {
               Image.asset(
                 'assets/images/room/room_base.png',
                 fit: BoxFit.cover,
+              ),
+              Align(
+                alignment: RoomPage._curtainAlignment,
+                child: Transform.scale(
+                  scaleX: RoomPage._curtainWidthScale,
+                  scaleY: RoomPage._curtainHeightScale,
+                  child: SizedBox(
+                    width: constraints.maxWidth,
+                    child: Image.asset(
+                      'assets/images/room/curtain.png',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
