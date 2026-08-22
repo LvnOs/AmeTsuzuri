@@ -30,6 +30,10 @@ class RoomPage extends StatelessWidget {
   static const Alignment _vaseAlignment = Alignment(0.33, -0.16);
   static const double _vaseScale = 0.091;
 
+  // Flower composition tuning. Scale is relative to the room canvas width.
+  static const Alignment _flowerAlignment = Alignment(0.34, -0.26);
+  static const double _flowerScale = 0.13;
+
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
@@ -100,6 +104,16 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   width: constraints.maxWidth * RoomPage._bottleScale,
                   child: Image.asset(
                     'assets/images/room/bottle.png',
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+              Align(
+                alignment: RoomPage._flowerAlignment,
+                child: SizedBox(
+                  width: constraints.maxWidth * RoomPage._flowerScale,
+                  child: Image.asset(
+                    'assets/images/room/flower_initial.png',
                     fit: BoxFit.contain,
                   ),
                 ),
