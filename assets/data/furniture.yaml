@@ -152,7 +152,7 @@ furniture:
       - living_room_bookshelf_top_right
       - living_room_bookshelf_bottom_left
       - living_room_bookshelf_bottom_right
-    image: furniture/decor/wooden_fox_figure.png
+    image: furniture/desk/wooden_fox_figure.png
     initial_available: true
 
   - id: small_clock

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:ame_tsuzuri/features/furniture/provider/catalog_provider.dart';
 import 'package:ame_tsuzuri/features/furniture/provider/placed_furniture_provider.dart';
 import 'package:ame_tsuzuri/features/furniture/presentation/catalog_page.dart';
+import 'package:ame_tsuzuri/features/furniture/model/furniture.dart';
+import 'package:ame_tsuzuri/features/furniture/repository/furniture_repository.dart';
 import 'package:ame_tsuzuri/features/furniture/repository/placed_furniture_repository.dart';
 import 'package:ame_tsuzuri/features/furniture/repository/purchased_furniture_repository.dart';
 import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart';
@@ -1391,7 +1393,160 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  group('机上Aの配置家具', () {
+    testWidgets('PlacedFurnitureProvider未ロードでは表示せずクラッシュしない', (tester) async {
+      await _pumpRoom(tester, loadPlacedFurnitureProvider: false);
+
+      expect(_placedFurnitureLayer, findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('机上Aが未配置なら家具を表示しない', (tester) async {
+      await _pumpRoom(tester);
+
+      expect(_placedFurnitureLayer, findsNothing);
+    });
+
+    for (final entry in {
+      'wooden_mug': 'furniture/desk/wooden_mug.png',
+      'ink_bottle': 'furniture/desk/ink_bottle.png',
+      'wooden_fox_figure': 'furniture/desk/wooden_fox_figure.png',
+    }.entries) {
+      testWidgets('机上Aの${entry.key}を対応するPNGで表示する', (tester) async {
+        await _pumpRoom(
+          tester,
+          initialPlacedFurnitureIds: {_deskSurfaceLeftSlotId: entry.key},
+        );
+
+        expect(_placedFurnitureLayer, findsOneWidget);
+        final image = tester.widget<Image>(
+          find.byKey(ValueKey('roomFurnitureImage-${entry.key}')),
+        );
+        expect(
+          (image.image as AssetImage).assetName,
+          'assets/images/${entry.value}',
+        );
+      });
+    }
+
+    testWidgets('Providerの配置交換をRoomへ反映する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: {_deskSurfaceLeftSlotId: 'wooden_mug'},
+      );
+
+      await harness.placedFurnitureProvider.place(
+        slotId: _deskSurfaceLeftSlotId,
+        furnitureId: 'ink_bottle',
+        isPurchased: true,
+        allowedSlotIds: const [_deskSurfaceLeftSlotId],
+      );
+      await tester.pump();
+
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-wooden_mug')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-ink_bottle')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('Providerで取り外すとRoomから家具が消える', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: {_deskSurfaceLeftSlotId: 'wooden_mug'},
+      );
+
+      await harness.placedFurnitureProvider.remove('wooden_mug');
+      await tester.pump();
+
+      expect(_placedFurnitureLayer, findsNothing);
+    });
+
+    testWidgets('未対応スロットの配置家具は描画しない', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {
+          'living_room_desk_surface_right': 'wooden_mug',
+        },
+      );
+
+      expect(_placedFurnitureLayer, findsNothing);
+    });
+
+    testWidgets('存在しないfurnitureIdでもクラッシュしない', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {
+          _deskSurfaceLeftSlotId: 'missing_furniture',
+        },
+      );
+
+      expect(_placedFurnitureLayer, findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('画像asset欠損時もRoomをクラッシュさせない', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {_deskSurfaceLeftSlotId: 'wooden_mug'},
+        furnitures: const [
+          Furniture(
+            id: 'wooden_mug',
+            name: 'missing image',
+            price: 30,
+            size: 'small',
+            slotIds: [_deskSurfaceLeftSlotId],
+            imagePath: 'furniture/desk/missing.png',
+            initialAvailable: true,
+          ),
+        ],
+      );
+      await tester.pump();
+
+      expect(_placedFurnitureLayer, findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('今日の手紙と机上A家具を同時に表示できる', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {_deskSurfaceLeftSlotId: 'wooden_mug'},
+        initialReadState: ReadLetterState(
+          receivedLetters: const {},
+          deliveredLetters: const {'2026-08-07': 'letterA'},
+        ),
+      );
+
+      expect(_placedFurnitureLayer, findsOneWidget);
+      expect(find.byKey(const ValueKey('roomLetterLayer')), findsOneWidget);
+    });
+
+    testWidgets('固定の瓶・花瓶・椅子・ラグを維持する', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {_deskSurfaceLeftSlotId: 'wooden_mug'},
+      );
+
+      for (final asset in [
+        'assets/images/room/bottle.png',
+        'assets/images/room/vase.png',
+        'assets/images/room/chair.png',
+        'assets/images/room/rug.png',
+      ]) {
+        expect(find.image(AssetImage(asset)), findsOneWidget);
+      }
+    });
+  });
 }
+
+const _deskSurfaceLeftSlotId = 'living_room_desk_surface_left';
+final _placedFurnitureLayer = find.byKey(
+  const ValueKey('deskSurfaceLeftFurnitureLayer'),
+);
 
 Future<void> _openDesk(WidgetTester tester) async {
   await tester.tap(find.byKey(const ValueKey('deskTapArea')));
@@ -1443,6 +1598,8 @@ Future<_RoomHarness> _pumpRoom(
   bool dismissInitialGuide = true,
   bool failNextReadSave = false,
   AppDateRepository? appDateRepository,
+  Map<String, String> initialPlacedFurnitureIds = const {},
+  List<Furniture> furnitures = _roomFurnitures,
 }) async {
   final shizukuRepository = _FakeShizukuRepository(
     blockSave: blockRewardSave,
@@ -1455,7 +1612,7 @@ Future<_RoomHarness> _pumpRoom(
   final readLetterProvider = ReadLetterProvider(readLetterRepository);
   final catalogProvider = CatalogProvider(_FakePurchasedFurnitureRepository());
   final placedProvider = PlacedFurnitureProvider(
-    _FakePlacedFurnitureRepository(),
+    _FakePlacedFurnitureRepository(initialPlacedFurnitureIds),
   );
   final dateProvider = AppDateProvider(
     appDateRepository ?? _FakeAppDateRepository(date ?? DateTime(2026, 8, 7)),
@@ -1487,7 +1644,12 @@ Future<_RoomHarness> _pumpRoom(
         ChangeNotifierProvider.value(value: dateProvider),
         ChangeNotifierProvider.value(value: weatherProvider),
       ],
-      child: MaterialApp(home: RoomPage(letterRepository: letterRepository)),
+      child: MaterialApp(
+        home: RoomPage(
+          letterRepository: letterRepository,
+          furnitureRepository: _FakeFurnitureRepository(furnitures),
+        ),
+      ),
     ),
   );
   await tester.pump();
@@ -1506,6 +1668,7 @@ Future<_RoomHarness> _pumpRoom(
     dateProvider: dateProvider,
     weatherRepository: weatherRepository,
     letterRepository: letterRepository,
+    placedFurnitureProvider: placedProvider,
   );
 }
 
@@ -1518,6 +1681,7 @@ class _RoomHarness {
     required this.dateProvider,
     required this.weatherRepository,
     required this.letterRepository,
+    required this.placedFurnitureProvider,
   });
 
   final _FakeShizukuRepository shizukuRepository;
@@ -1527,7 +1691,47 @@ class _RoomHarness {
   final AppDateProvider dateProvider;
   final _FakeWeatherRepository weatherRepository;
   final _FakeLetterRepository letterRepository;
+  final PlacedFurnitureProvider placedFurnitureProvider;
 }
+
+class _FakeFurnitureRepository extends FurnitureRepository {
+  _FakeFurnitureRepository(this.furnitures);
+
+  final List<Furniture> furnitures;
+
+  @override
+  Future<List<Furniture>> getAll() async => furnitures;
+}
+
+const List<Furniture> _roomFurnitures = [
+  Furniture(
+    id: 'wooden_mug',
+    name: 'wooden mug',
+    price: 30,
+    size: 'small',
+    slotIds: [_deskSurfaceLeftSlotId],
+    imagePath: 'furniture/desk/wooden_mug.png',
+    initialAvailable: true,
+  ),
+  Furniture(
+    id: 'ink_bottle',
+    name: 'ink bottle',
+    price: 30,
+    size: 'small',
+    slotIds: [_deskSurfaceLeftSlotId],
+    imagePath: 'furniture/desk/ink_bottle.png',
+    initialAvailable: true,
+  ),
+  Furniture(
+    id: 'wooden_fox_figure',
+    name: 'wooden fox figure',
+    price: 30,
+    size: 'small',
+    slotIds: [_deskSurfaceLeftSlotId],
+    imagePath: 'furniture/desk/wooden_fox_figure.png',
+    initialAvailable: true,
+  ),
+];
 
 class _FakeWeatherRepository extends WeatherRepository {
   _FakeWeatherRepository({required this.weather, required this.failNextLoad});
@@ -1680,8 +1884,20 @@ class _FakePurchasedFurnitureRepository extends PurchasedFurnitureRepository {
 }
 
 class _FakePlacedFurnitureRepository extends PlacedFurnitureRepository {
+  _FakePlacedFurnitureRepository([Map<String, String> initialState = const {}])
+    : state = Map.of(initialState);
+
+  Map<String, String> state;
+
   @override
-  Future<Map<String, String>> loadPlacedFurnitureIds() async => {};
+  Future<Map<String, String>> loadPlacedFurnitureIds() async => Map.of(state);
+
+  @override
+  Future<void> savePlacedFurnitureIds(
+    Map<String, String> placedFurnitureIds,
+  ) async {
+    state = Map.of(placedFurnitureIds);
+  }
 }
 
 class _FakeAppDateRepository extends AppDateRepository {

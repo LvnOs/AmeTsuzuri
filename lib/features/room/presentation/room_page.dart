@@ -10,15 +10,18 @@ import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart'
 import 'package:ame_tsuzuri/features/furniture/presentation/catalog_page.dart';
 import 'package:ame_tsuzuri/features/furniture/provider/catalog_provider.dart';
 import 'package:ame_tsuzuri/features/furniture/provider/placed_furniture_provider.dart';
+import 'package:ame_tsuzuri/features/furniture/model/furniture.dart';
+import 'package:ame_tsuzuri/features/furniture/repository/furniture_repository.dart';
 import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
 import 'package:ame_tsuzuri/shared/provider/weather_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 class RoomPage extends StatefulWidget {
-  const RoomPage({super.key, this.letterRepository});
+  const RoomPage({super.key, this.letterRepository, this.furnitureRepository});
 
   final LetterRepository? letterRepository;
+  final FurnitureRepository? furnitureRepository;
 
   static const String _tutorialLetterId = 'tutorial_001';
 
@@ -58,6 +61,14 @@ class RoomPage extends StatefulWidget {
   static const double _letterScale = 0.22;
   static const double _letterAspectRatio = 460 / 307;
 
+  // Desk-left furniture tuning for the 390 x 700 Room composition.
+  static const String _deskSurfaceLeftSlotId = 'living_room_desk_surface_left';
+  static const Alignment _deskSurfaceLeftFurnitureAlignment = Alignment(
+    -0.50,
+    0.02,
+  );
+  static const double _deskSurfaceLeftFurnitureScale = 0.20;
+
   // Arrival animation tuning. Defaults follow the existing post and letter.
   static const Duration _arrivalAnimationDuration = Duration(
     milliseconds: 4350,
@@ -96,6 +107,7 @@ class RoomPage extends StatefulWidget {
 class _RoomPageState extends State<RoomPage>
     with SingleTickerProviderStateMixin {
   late final LetterRepository _letterRepository;
+  late final Future<List<Furniture>> _furnituresFuture;
   final LetterDeliveryService _letterDeliveryService =
       const LetterDeliveryService();
   DateTime? _attemptedDeliveryDate;
@@ -108,6 +120,8 @@ class _RoomPageState extends State<RoomPage>
   void initState() {
     super.initState();
     _letterRepository = widget.letterRepository ?? LetterRepository();
+    _furnituresFuture = (widget.furnitureRepository ?? FurnitureRepository())
+        .getAll();
     _arrivalController = AnimationController(
       vsync: this,
       duration: RoomPage._arrivalAnimationDuration,
@@ -126,7 +140,13 @@ class _RoomPageState extends State<RoomPage>
   Widget build(BuildContext context) {
     final appDateProvider = context.watch<AppDateProvider>();
     final readLetterProvider = context.watch<ReadLetterProvider>();
+    final placedFurnitureProvider = context.watch<PlacedFurnitureProvider>();
     context.watch<WeatherProvider>();
+
+    final deskSurfaceLeftFurnitureId = placedFurnitureProvider.isLoaded
+        ? placedFurnitureProvider.placedFurnitureIds[RoomPage
+              ._deskSurfaceLeftSlotId]
+        : null;
 
     var showLetter = false;
     if (appDateProvider.isLoaded && readLetterProvider.isLoaded) {
@@ -147,6 +167,8 @@ class _RoomPageState extends State<RoomPage>
               hasDeliveredLetter: showLetter,
               isArrivalAnimating: _isArrivalAnimating,
               arrivalAnimation: _arrivalController,
+              furnituresFuture: _furnituresFuture,
+              deskSurfaceLeftFurnitureId: deskSurfaceLeftFurnitureId,
               onTapBottle: _onTapBottle,
               onTapBookshelf: _onTapBookshelf,
               onTapLetter: _onTapLetter,
@@ -378,6 +400,8 @@ class _RoomBackgroundLayers extends StatelessWidget {
     required this.hasDeliveredLetter,
     required this.isArrivalAnimating,
     required this.arrivalAnimation,
+    required this.furnituresFuture,
+    required this.deskSurfaceLeftFurnitureId,
     required this.onTapBottle,
     required this.onTapBookshelf,
     required this.onTapLetter,
@@ -386,6 +410,8 @@ class _RoomBackgroundLayers extends StatelessWidget {
   final bool hasDeliveredLetter;
   final bool isArrivalAnimating;
   final Animation<double> arrivalAnimation;
+  final Future<List<Furniture>> furnituresFuture;
+  final String? deskSurfaceLeftFurnitureId;
   final VoidCallback onTapBottle;
   final VoidCallback onTapBookshelf;
   final VoidCallback onTapLetter;
@@ -452,6 +478,11 @@ class _RoomBackgroundLayers extends StatelessWidget {
                     ),
                   ),
                 ),
+              ),
+              _DeskSurfaceLeftFurniture(
+                furnituresFuture: furnituresFuture,
+                furnitureId: deskSurfaceLeftFurnitureId,
+                roomWidth: constraints.maxWidth,
               ),
               Align(
                 alignment: RoomPage._bottleAlignment,
@@ -572,6 +603,77 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   ),
                 ),
             ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _DeskSurfaceLeftFurniture extends StatelessWidget {
+  const _DeskSurfaceLeftFurniture({
+    required this.furnituresFuture,
+    required this.furnitureId,
+    required this.roomWidth,
+  });
+
+  static const Set<String> _supportedFurnitureIds = {
+    'wooden_mug',
+    'ink_bottle',
+    'wooden_fox_figure',
+  };
+  static const Map<String, double> _scaleCorrections = {
+    'wooden_mug': 1,
+    'ink_bottle': 0.9,
+    'wooden_fox_figure': 1.05,
+  };
+
+  final Future<List<Furniture>> furnituresFuture;
+  final String? furnitureId;
+  final double roomWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedId = furnitureId;
+    if (selectedId == null || !_supportedFurnitureIds.contains(selectedId)) {
+      return const SizedBox.shrink();
+    }
+
+    return FutureBuilder<List<Furniture>>(
+      future: furnituresFuture,
+      builder: (context, snapshot) {
+        final furnitures = snapshot.data;
+        if (furnitures == null) {
+          return const SizedBox.shrink();
+        }
+
+        Furniture? selectedFurniture;
+        for (final furniture in furnitures) {
+          if (furniture.id == selectedId) {
+            selectedFurniture = furniture;
+            break;
+          }
+        }
+        if (selectedFurniture == null) {
+          return const SizedBox.shrink();
+        }
+
+        final scaleCorrection = _scaleCorrections[selectedId] ?? 1;
+        return Align(
+          key: const ValueKey('deskSurfaceLeftFurnitureLayer'),
+          alignment: RoomPage._deskSurfaceLeftFurnitureAlignment,
+          child: SizedBox(
+            width:
+                roomWidth *
+                RoomPage._deskSurfaceLeftFurnitureScale *
+                scaleCorrection,
+            child: Image.asset(
+              'assets/images/${selectedFurniture.imagePath}',
+              key: ValueKey('roomFurnitureImage-$selectedId'),
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) =>
+                  const SizedBox.shrink(),
+            ),
           ),
         );
       },
