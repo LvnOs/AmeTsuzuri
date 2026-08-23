@@ -9,14 +9,16 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('実データからtutorial_001と仮本文を読み込める', () async {
+  test('実データからtutorial_001と正式本文を読み込める', () async {
     final letters = await LetterRepository().getAll();
     final tutorial = letters.singleWhere(
       (letter) => letter.id == 'tutorial_001',
     );
 
     expect(tutorial.title, '雨つづり。へようこそ');
-    expect(tutorial.body, contains('最初のご案内'));
+    expect(tutorial.body, contains('この部屋には、雨の日になると手紙が届きます。'));
+    expect(tutorial.body, contains('まずは、この手紙といっしょに30雫をどうぞ。'));
+    expect(tutorial.body, contains('本棚からいつでも読み返せます。'));
   });
 
   test('dateなしYAMLから配信と表示に必要なフィールドを読み込む', () async {

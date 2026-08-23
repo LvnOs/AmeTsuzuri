@@ -90,6 +90,18 @@ const _missingImageFurniture = Furniture(
 );
 
 void main() {
+  testWidgets('Providerロード中は進捗表示しロード後に家具一覧へ切り替わる', (tester) async {
+    final harness = await _pumpCatalog(tester, loadCatalogProvider: false);
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    await harness.catalogProvider.load();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byType(ListTile), findsNWidgets(3));
+  });
+
   group('CatalogPageの家具画像プレビュー', () {
     for (final furniture in [
       _woodenMug,
@@ -359,6 +371,7 @@ Future<_CatalogHarness> _pumpCatalog(
   WidgetTester tester, {
   bool blockPurchase = true,
   bool loadShizukuProvider = true,
+  bool loadCatalogProvider = true,
   int initialShizuku = 100,
   Map<String, String> placedFurnitureIds = const {},
   Set<String> purchasedFurnitureIds = const {'furniture_c'},
@@ -380,7 +393,7 @@ Future<_CatalogHarness> _pumpCatalog(
 
   await Future.wait([
     if (loadShizukuProvider) shizukuProvider.load(),
-    catalogProvider.load(),
+    if (loadCatalogProvider) catalogProvider.load(),
     placedFurnitureProvider.load(),
   ]);
 
@@ -399,7 +412,7 @@ Future<_CatalogHarness> _pumpCatalog(
       ),
     ),
   );
-  if (loadShizukuProvider) {
+  if (loadShizukuProvider && loadCatalogProvider) {
     await tester.pumpAndSettle();
   } else {
     await tester.pump();
@@ -408,6 +421,7 @@ Future<_CatalogHarness> _pumpCatalog(
   return _CatalogHarness(
     shizukuRepository: shizukuRepository,
     catalogRepository: catalogRepository,
+    catalogProvider: catalogProvider,
   );
 }
 
@@ -415,10 +429,12 @@ class _CatalogHarness {
   const _CatalogHarness({
     required this.shizukuRepository,
     required this.catalogRepository,
+    required this.catalogProvider,
   });
 
   final _BlockingShizukuRepository shizukuRepository;
   final _FakePurchasedFurnitureRepository catalogRepository;
+  final CatalogProvider catalogProvider;
 
   Future<void> finishPurchase(WidgetTester tester) async {
     shizukuRepository.completeSave();

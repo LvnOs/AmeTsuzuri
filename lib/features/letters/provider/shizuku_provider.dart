@@ -23,6 +23,7 @@ class ShizukuProvider extends ChangeNotifier {
   int _currentShizuku = 0;
   Set<String> _rewardedLetterIds = {};
   bool _isLoaded = false;
+  Future<void>? _loadFuture;
   final Map<String, Future<LetterRewardResult>> _pendingLetterRewards = {};
 
   int get currentShizuku => _currentShizuku;
@@ -32,7 +33,27 @@ class ShizukuProvider extends ChangeNotifier {
   int get fullBottleCount => bottleRecordCount ~/ 30;
   int get currentBottleProgress => bottleRecordCount % 30;
 
-  Future<void> load() async {
+  Future<void> load() {
+    if (_isLoaded) {
+      return Future.value();
+    }
+
+    final pendingLoad = _loadFuture;
+    if (pendingLoad != null) {
+      return pendingLoad;
+    }
+
+    late final Future<void> operation;
+    operation = _loadInternal().whenComplete(() {
+      if (identical(_loadFuture, operation)) {
+        _loadFuture = null;
+      }
+    });
+    _loadFuture = operation;
+    return operation;
+  }
+
+  Future<void> _loadInternal() async {
     final state = await _repository.loadState();
     _currentShizuku = state.currentShizuku;
     _rewardedLetterIds = Set.of(state.rewardedLetterIds);

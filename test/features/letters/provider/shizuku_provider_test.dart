@@ -6,6 +6,55 @@ import 'package:ame_tsuzuri/features/letters/repository/shizuku_repository.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('進行中のloadは同じFutureを共有してRepositoryを一度だけ読む', () async {
+    final repository = _BlockingLoadShizukuRepository();
+    final provider = ShizukuProvider(repository);
+
+    final first = provider.load();
+    final second = provider.load();
+
+    expect(identical(first, second), isTrue);
+    expect(repository.loadCallCount, 1);
+
+    repository.completeLoad(_initialState);
+    await Future.wait([first, second]);
+
+    expect(provider.isLoaded, isTrue);
+  });
+
+  test('load失敗後は再度Repositoryを読み込める', () async {
+    final repository = _BlockingLoadShizukuRepository();
+    final provider = ShizukuProvider(repository);
+
+    final failedLoad = provider.load();
+    repository.failLoad(StateError('load failed'));
+    await expectLater(failedLoad, throwsA(isA<StateError>()));
+
+    expect(provider.isLoaded, isFalse);
+
+    final retry = provider.load();
+    expect(repository.loadCallCount, 2);
+    repository.completeLoad(
+      const ShizukuState(currentShizuku: 40, rewardedLetterIds: {'letterA'}),
+    );
+    await retry;
+
+    expect(provider.isLoaded, isTrue);
+    expect(provider.currentShizuku, 40);
+    expect(provider.rewardedLetterIds, {'letterA'});
+  });
+
+  test('load成功後の再呼び出しではRepositoryを再読込しない', () async {
+    final repository = _FakeShizukuRepository(_initialState);
+    final provider = ShizukuProvider(repository);
+
+    await provider.load();
+    await provider.load();
+
+    expect(repository.loadCallCount, 1);
+    expect(provider.isLoaded, isTrue);
+  });
+
   test('新規状態を0滴でロードする', () async {
     final provider = await _loadProvider(_FakeShizukuRepository(_initialState));
 
@@ -389,10 +438,14 @@ class _FakeShizukuRepository extends ShizukuRepository {
   Object? saveError;
   int saveCallCount = 0;
   int resetCallCount = 0;
+  int loadCallCount = 0;
   final List<ShizukuState> savedStates = [];
 
   @override
-  Future<ShizukuState> loadState() async => state;
+  Future<ShizukuState> loadState() async {
+    loadCallCount++;
+    return state;
+  }
 
   @override
   Future<void> saveState(ShizukuState nextState) async {
@@ -408,6 +461,26 @@ class _FakeShizukuRepository extends ShizukuRepository {
   Future<void> resetState() async {
     resetCallCount++;
     state = _initialState;
+  }
+}
+
+class _BlockingLoadShizukuRepository extends ShizukuRepository {
+  Completer<ShizukuState>? _loadCompleter;
+  int loadCallCount = 0;
+
+  @override
+  Future<ShizukuState> loadState() {
+    loadCallCount++;
+    _loadCompleter = Completer<ShizukuState>();
+    return _loadCompleter!.future;
+  }
+
+  void completeLoad(ShizukuState state) {
+    _loadCompleter!.complete(state);
+  }
+
+  void failLoad(Object error) {
+    _loadCompleter!.completeError(error);
   }
 }
 

@@ -978,6 +978,132 @@ void main() {
       expect(harness.readLetterRepository.saveCallCount, 0);
     });
 
+    testWidgets('Shizuku未ロードでも最初のタップを保持してロード後に手紙を開く', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        loadShizukuProvider: false,
+        blockNextShizukuLoad: true,
+        initialReadState: ReadLetterState(
+          receivedLetters: {},
+          deliveredLetters: {'2026-08-07': 'letterA'},
+        ),
+      );
+
+      expect(find.byKey(const ValueKey('letterTapArea')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('letterTapArea')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('letterTapArea')));
+      await tester.pump();
+
+      expect(harness.shizukuRepository.loadCallCount, 1);
+      expect(harness.letterRepository.getAllCallCount, 0);
+
+      harness.shizukuRepository.completeLoad();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LetterPage), findsOneWidget);
+      expect(harness.shizukuRepository.saveCallCount, 1);
+      expect(harness.readLetterRepository.saveCallCount, 1);
+      expect(harness.letterRepository.getAllCallCount, 1);
+    });
+
+    testWidgets('Shizukuロード失敗後は状態を変えず再タップで再試行できる', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        loadShizukuProvider: false,
+        failNextShizukuLoad: true,
+        initialReadState: ReadLetterState(
+          receivedLetters: {},
+          deliveredLetters: {'2026-08-07': 'letterA'},
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('letterTapArea')));
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(LetterPage), findsNothing);
+      expect(harness.shizukuRepository.saveCallCount, 0);
+      expect(harness.readLetterRepository.saveCallCount, 0);
+
+      await tester.tap(find.byKey(const ValueKey('letterTapArea')));
+      await tester.pumpAndSettle();
+
+      expect(harness.shizukuRepository.loadCallCount, 2);
+      expect(find.byType(LetterPage), findsOneWidget);
+    });
+
+    testWidgets('Shizukuロード待機中に日付が変わったら古い手紙を開かない', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        loadShizukuProvider: false,
+        blockNextShizukuLoad: true,
+        weather: null,
+        initialReadState: ReadLetterState(
+          receivedLetters: {},
+          deliveredLetters: {'2026-08-07': 'letterA'},
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('letterTapArea')));
+      await tester.pump();
+      await harness.dateProvider.setDebugDate(DateTime(2026, 8, 8));
+      await tester.pump();
+      harness.shizukuRepository.completeLoad();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LetterPage), findsNothing);
+      expect(harness.shizukuRepository.saveCallCount, 0);
+      expect(harness.readLetterRepository.saveCallCount, 0);
+    });
+
+    testWidgets('Shizukuロード待機中に配達IDが変わったら古い手紙を開かない', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        loadShizukuProvider: false,
+        blockNextShizukuLoad: true,
+        initialReadState: ReadLetterState(
+          receivedLetters: {},
+          deliveredLetters: {'2026-08-07': 'letterA'},
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('letterTapArea')));
+      await tester.pump();
+      harness.readLetterRepository.state = ReadLetterState(
+        receivedLetters: {},
+        deliveredLetters: {'2026-08-07': 'letterB'},
+      );
+      await harness.readLetterProvider.load();
+      harness.shizukuRepository.completeLoad();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LetterPage), findsNothing);
+      expect(harness.shizukuRepository.saveCallCount, 0);
+      expect(harness.readLetterRepository.saveCallCount, 0);
+    });
+
+    testWidgets('既読手紙もShizuku未ロード時の最初のタップで再読できる', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        loadShizukuProvider: false,
+        blockNextShizukuLoad: true,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'letterA': DateTime(2026, 8, 7)},
+          deliveredLetters: {'2026-08-07': 'letterA'},
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('letterTapArea')));
+      await tester.pump();
+      harness.shizukuRepository.completeLoad();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LetterPage), findsOneWidget);
+      expect(harness.shizukuRepository.saveCallCount, 0);
+      expect(harness.readLetterRepository.saveCallCount, 0);
+    });
+
     testWidgets('既読保存失敗時は遷移せず配達済み表示を維持する', (tester) async {
       final harness = await _pumpRoom(
         tester,
@@ -1119,13 +1245,14 @@ void main() {
       expect(find.byType(CatalogPage), findsNothing);
     });
 
-    testWidgets('Catalog側Providerロード前は瓶タップで遷移しない', (tester) async {
+    testWidgets('Catalog側Providerロード前でも最初の瓶タップで遷移してロードを待つ', (tester) async {
       await _pumpRoom(tester, loadCatalogProvider: false);
 
       await tester.tap(find.byKey(const ValueKey('bottleTapArea')));
-      await tester.pumpAndSettle();
+      await _pumpRouteTransition(tester);
 
-      expect(find.byType(CatalogPage), findsNothing);
+      expect(find.byType(CatalogPage), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
 
     testWidgets('Bookshelf側Providerロード前は本棚タップで遷移しない', (tester) async {
@@ -1588,6 +1715,8 @@ Future<_RoomHarness> _pumpRoom(
   bool loadCatalogProvider = true,
   bool loadPlacedFurnitureProvider = true,
   bool blockRewardSave = false,
+  bool blockNextShizukuLoad = false,
+  bool failNextShizukuLoad = false,
   WeatherType? weather = WeatherType.rain,
   bool failNextWeatherLoad = false,
   List<Letter>? letters,
@@ -1606,6 +1735,9 @@ Future<_RoomHarness> _pumpRoom(
     initialRewardedCount: initialRewardedCount,
     initialState: initialShizukuState,
   );
+  shizukuRepository
+    ..blockNextLoad = blockNextShizukuLoad
+    ..failNextLoad = failNextShizukuLoad;
   final readLetterRepository = _FakeReadLetterRepository(initialReadState);
   readLetterRepository.failNextSave = failNextReadSave;
   final shizukuProvider = ShizukuProvider(shizukuRepository);
@@ -1819,10 +1951,26 @@ class _FakeShizukuRepository extends ShizukuRepository {
   final Completer<void> _saveCompleter = Completer<void>();
   ShizukuState state;
   bool failNextSave = false;
+  bool blockNextLoad = false;
+  bool failNextLoad = false;
   int saveCallCount = 0;
+  int loadCallCount = 0;
+  Completer<ShizukuState>? _loadCompleter;
 
   @override
-  Future<ShizukuState> loadState() async => state;
+  Future<ShizukuState> loadState() async {
+    loadCallCount++;
+    if (failNextLoad) {
+      failNextLoad = false;
+      throw StateError('load failed');
+    }
+    if (blockNextLoad) {
+      blockNextLoad = false;
+      _loadCompleter = Completer<ShizukuState>();
+      return _loadCompleter!.future;
+    }
+    return state;
+  }
 
   @override
   Future<void> saveState(ShizukuState nextState) async {
@@ -1845,6 +1993,13 @@ class _FakeShizukuRepository extends ShizukuRepository {
   void completeSave() {
     if (!_saveCompleter.isCompleted) {
       _saveCompleter.complete();
+    }
+  }
+
+  void completeLoad() {
+    final completer = _loadCompleter;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete(state);
     }
   }
 }

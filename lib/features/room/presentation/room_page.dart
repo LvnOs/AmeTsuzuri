@@ -8,7 +8,6 @@ import 'package:ame_tsuzuri/features/letters/provider/shizuku_provider.dart';
 import 'package:ame_tsuzuri/features/letters/service/letter_delivery_service.dart';
 import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart';
 import 'package:ame_tsuzuri/features/furniture/presentation/catalog_page.dart';
-import 'package:ame_tsuzuri/features/furniture/provider/catalog_provider.dart';
 import 'package:ame_tsuzuri/features/furniture/provider/placed_furniture_provider.dart';
 import 'package:ame_tsuzuri/features/furniture/model/furniture.dart';
 import 'package:ame_tsuzuri/features/furniture/repository/furniture_repository.dart';
@@ -286,24 +285,46 @@ class _RoomPageState extends State<RoomPage>
   }
 
   Future<void> _onTapLetter() async {
-    final appDateProvider = context.read<AppDateProvider>();
-    final readLetterProvider = context.read<ReadLetterProvider>();
-    final shizukuProvider = context.read<ShizukuProvider>();
-    if (!appDateProvider.isLoaded ||
-        !readLetterProvider.isLoaded ||
-        !shizukuProvider.isLoaded ||
-        _isOpeningLetter) {
-      return;
-    }
-
-    final today = _dateOnly(appDateProvider.today);
-    final deliveredLetterId = readLetterProvider.deliveredLetterIdOn(today);
-    if (deliveredLetterId == null) {
+    if (_isOpeningLetter) {
       return;
     }
 
     _isOpeningLetter = true;
     try {
+      final appDateProvider = context.read<AppDateProvider>();
+      final readLetterProvider = context.read<ReadLetterProvider>();
+      if (!appDateProvider.isLoaded || !readLetterProvider.isLoaded) {
+        return;
+      }
+
+      final initialToday = _dateOnly(appDateProvider.today);
+      final initialDeliveredLetterId = readLetterProvider.deliveredLetterIdOn(
+        initialToday,
+      );
+      if (initialDeliveredLetterId == null) {
+        return;
+      }
+
+      final shizukuProvider = context.read<ShizukuProvider>();
+      if (!shizukuProvider.isLoaded) {
+        await shizukuProvider.load();
+      }
+      if (!mounted || !shizukuProvider.isLoaded) {
+        return;
+      }
+
+      final today = _dateOnly(context.read<AppDateProvider>().today);
+      if (today != initialToday) {
+        return;
+      }
+      final currentDeliveredLetterId = readLetterProvider.deliveredLetterIdOn(
+        today,
+      );
+      if (currentDeliveredLetterId != initialDeliveredLetterId) {
+        return;
+      }
+      final deliveredLetterId = initialDeliveredLetterId;
+
       final letters = await _letterRepository.getAll();
       if (!mounted ||
           _dateOnly(context.read<AppDateProvider>().today) != today ||
@@ -360,10 +381,7 @@ class _RoomPageState extends State<RoomPage>
   }
 
   Future<void> _onTapBottle() async {
-    if (_isNavigatingFromRoom ||
-        !context.read<ShizukuProvider>().isLoaded ||
-        !context.read<CatalogProvider>().isLoaded ||
-        !context.read<PlacedFurnitureProvider>().isLoaded) {
+    if (_isNavigatingFromRoom) {
       return;
     }
 
