@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:ame_tsuzuri/features/furniture/provider/catalog_provider.dart';
 import 'package:ame_tsuzuri/features/furniture/provider/placed_furniture_provider.dart';
+import 'package:ame_tsuzuri/features/furniture/presentation/catalog_page.dart';
 import 'package:ame_tsuzuri/features/furniture/repository/placed_furniture_repository.dart';
 import 'package:ame_tsuzuri/features/furniture/repository/purchased_furniture_repository.dart';
+import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart';
 import 'package:ame_tsuzuri/features/letters/model/letter.dart';
 import 'package:ame_tsuzuri/features/letters/model/read_letter_state.dart';
 import 'package:ame_tsuzuri/features/letters/model/shizuku_state.dart';
@@ -1023,6 +1025,154 @@ void main() {
     });
   });
 
+  group('Roomオブジェクトからの画面遷移', () {
+    testWidgets('瓶と本棚の透明タップ領域が存在する', (tester) async {
+      await _pumpRoom(tester);
+
+      expect(find.byKey(const ValueKey('bottleTapArea')), findsOneWidget);
+      expect(find.byKey(const ValueKey('bookshelfTapArea')), findsOneWidget);
+
+      final bottleSize = tester.getSize(
+        find.byKey(const ValueKey('bottleTapArea')),
+      );
+      expect(bottleSize.width, greaterThan(50));
+      expect(bottleSize.height, greaterThan(bottleSize.width));
+    });
+
+    testWidgets('瓶タップでCatalogPageを開く', (tester) async {
+      await _pumpRoom(tester);
+
+      await tester.tap(find.byKey(const ValueKey('bottleTapArea')));
+      await _pumpRouteTransition(tester);
+
+      expect(find.byType(CatalogPage), findsOneWidget);
+    });
+
+    testWidgets('本棚タップでBookshelfPageを開く', (tester) async {
+      await _pumpRoom(tester);
+
+      await tester.tap(find.byKey(const ValueKey('bookshelfTapArea')));
+      await _pumpRouteTransition(tester);
+
+      expect(find.byType(BookshelfPage), findsOneWidget);
+    });
+
+    testWidgets('瓶の連続タップでCatalogPageを複数pushしない', (tester) async {
+      await _pumpRoom(tester);
+
+      final detector = tester.widget<GestureDetector>(
+        find.byKey(const ValueKey('bottleTapArea')),
+      );
+      detector.onTap!();
+      detector.onTap!();
+      await _pumpRouteTransition(tester);
+
+      expect(find.byType(CatalogPage), findsOneWidget);
+    });
+
+    testWidgets('本棚の連続タップでBookshelfPageを複数pushしない', (tester) async {
+      await _pumpRoom(tester);
+
+      final detector = tester.widget<GestureDetector>(
+        find.byKey(const ValueKey('bookshelfTapArea')),
+      );
+      detector.onTap!();
+      detector.onTap!();
+      await _pumpRouteTransition(tester);
+
+      expect(find.byType(BookshelfPage), findsOneWidget);
+    });
+
+    testWidgets('瓶遷移開始後の本棚タップで別画面を重ねない', (tester) async {
+      await _pumpRoom(tester);
+
+      final bottleDetector = tester.widget<GestureDetector>(
+        find.byKey(const ValueKey('bottleTapArea')),
+      );
+      final bookshelfDetector = tester.widget<GestureDetector>(
+        find.byKey(const ValueKey('bookshelfTapArea')),
+      );
+      bottleDetector.onTap!();
+      bookshelfDetector.onTap!();
+      await _pumpRouteTransition(tester);
+
+      expect(find.byType(CatalogPage), findsOneWidget);
+      expect(find.byType(BookshelfPage), findsNothing);
+    });
+
+    testWidgets('本棚遷移開始後の瓶タップで別画面を重ねない', (tester) async {
+      await _pumpRoom(tester);
+
+      final bookshelfDetector = tester.widget<GestureDetector>(
+        find.byKey(const ValueKey('bookshelfTapArea')),
+      );
+      final bottleDetector = tester.widget<GestureDetector>(
+        find.byKey(const ValueKey('bottleTapArea')),
+      );
+      bookshelfDetector.onTap!();
+      bottleDetector.onTap!();
+      await _pumpRouteTransition(tester);
+
+      expect(find.byType(BookshelfPage), findsOneWidget);
+      expect(find.byType(CatalogPage), findsNothing);
+    });
+
+    testWidgets('Catalog側Providerロード前は瓶タップで遷移しない', (tester) async {
+      await _pumpRoom(tester, loadCatalogProvider: false);
+
+      await tester.tap(find.byKey(const ValueKey('bottleTapArea')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CatalogPage), findsNothing);
+    });
+
+    testWidgets('Bookshelf側Providerロード前は本棚タップで遷移しない', (tester) async {
+      await _pumpRoom(tester, loadReadLetterProvider: false);
+
+      await tester.tap(find.byKey(const ValueKey('bookshelfTapArea')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(BookshelfPage), findsNothing);
+    });
+
+    testWidgets('遷移先から戻ると再度Roomオブジェクトから遷移できる', (tester) async {
+      await _pumpRoom(tester);
+
+      await tester.tap(find.byKey(const ValueKey('bottleTapArea')));
+      await _pumpRouteTransition(tester);
+      await tester.pageBack();
+      await _pumpRouteTransition(tester);
+      await tester.tap(find.byKey(const ValueKey('bookshelfTapArea')));
+      await _pumpRouteTransition(tester);
+
+      expect(find.byType(BookshelfPage), findsOneWidget);
+    });
+
+    testWidgets('瓶・本棚・手紙のタップ領域が重ならない', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: {},
+          deliveredLetters: {'2026-08-07': 'letterA'},
+        ),
+      );
+
+      final bottleRect = tester.getRect(
+        find.byKey(const ValueKey('bottleTapArea')),
+      );
+      final bookshelfRect = tester.getRect(
+        find.byKey(const ValueKey('bookshelfTapArea')),
+      );
+      final letterRect = tester.getRect(
+        find.byKey(const ValueKey('letterTapArea')),
+      );
+
+      expect(bottleRect.overlaps(bookshelfRect), isFalse);
+      expect(bottleRect.overlaps(letterRect), isFalse);
+      expect(bookshelfRect.overlaps(letterRect), isFalse);
+    });
+  });
+
   group('初回チュートリアル手紙の配達', () {
     testWidgets('未読なら通常候補よりtutorial_001を優先する', (tester) async {
       final harness = await _pumpRoom(
@@ -1246,6 +1396,11 @@ void main() {
 Future<void> _openDesk(WidgetTester tester) async {
   await tester.tap(find.byKey(const ValueKey('deskTapArea')));
   await tester.pumpAndSettle();
+}
+
+Future<void> _pumpRouteTransition(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(seconds: 1));
 }
 
 Future<void> _tapLetter(WidgetTester tester) async {

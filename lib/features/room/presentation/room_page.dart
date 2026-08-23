@@ -6,6 +6,10 @@ import 'package:ame_tsuzuri/features/letters/presentation/letter_page.dart';
 import 'package:ame_tsuzuri/features/letters/provider/read_letter_provider.dart';
 import 'package:ame_tsuzuri/features/letters/provider/shizuku_provider.dart';
 import 'package:ame_tsuzuri/features/letters/service/letter_delivery_service.dart';
+import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart';
+import 'package:ame_tsuzuri/features/furniture/presentation/catalog_page.dart';
+import 'package:ame_tsuzuri/features/furniture/provider/catalog_provider.dart';
+import 'package:ame_tsuzuri/features/furniture/provider/placed_furniture_provider.dart';
 import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
 import 'package:ame_tsuzuri/shared/provider/weather_provider.dart';
 import 'package:flutter/material.dart';
@@ -96,6 +100,7 @@ class _RoomPageState extends State<RoomPage>
       const LetterDeliveryService();
   DateTime? _attemptedDeliveryDate;
   bool _isOpeningLetter = false;
+  bool _isNavigatingFromRoom = false;
   bool _isArrivalAnimating = false;
   late final AnimationController _arrivalController;
 
@@ -142,6 +147,8 @@ class _RoomPageState extends State<RoomPage>
               hasDeliveredLetter: showLetter,
               isArrivalAnimating: _isArrivalAnimating,
               arrivalAnimation: _arrivalController,
+              onTapBottle: _onTapBottle,
+              onTapBookshelf: _onTapBookshelf,
               onTapLetter: _onTapLetter,
             ),
           ),
@@ -329,6 +336,41 @@ class _RoomPageState extends State<RoomPage>
       _isOpeningLetter = false;
     }
   }
+
+  Future<void> _onTapBottle() async {
+    if (_isNavigatingFromRoom ||
+        !context.read<ShizukuProvider>().isLoaded ||
+        !context.read<CatalogProvider>().isLoaded ||
+        !context.read<PlacedFurnitureProvider>().isLoaded) {
+      return;
+    }
+
+    _isNavigatingFromRoom = true;
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (context) => const CatalogPage()),
+      );
+    } finally {
+      _isNavigatingFromRoom = false;
+    }
+  }
+
+  Future<void> _onTapBookshelf() async {
+    if (_isNavigatingFromRoom ||
+        !context.read<ReadLetterProvider>().isLoaded ||
+        !context.read<ShizukuProvider>().isLoaded) {
+      return;
+    }
+
+    _isNavigatingFromRoom = true;
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (context) => const BookshelfPage()),
+      );
+    } finally {
+      _isNavigatingFromRoom = false;
+    }
+  }
 }
 
 class _RoomBackgroundLayers extends StatelessWidget {
@@ -336,12 +378,16 @@ class _RoomBackgroundLayers extends StatelessWidget {
     required this.hasDeliveredLetter,
     required this.isArrivalAnimating,
     required this.arrivalAnimation,
+    required this.onTapBottle,
+    required this.onTapBookshelf,
     required this.onTapLetter,
   });
 
   final bool hasDeliveredLetter;
   final bool isArrivalAnimating;
   final Animation<double> arrivalAnimation;
+  final VoidCallback onTapBottle;
+  final VoidCallback onTapBookshelf;
   final VoidCallback onTapLetter;
 
   @override
@@ -476,6 +522,30 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   child: Image.asset(
                     'assets/images/room/chair.png',
                     fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 0,
+                top: constraints.maxHeight * 0.46,
+                width: constraints.maxWidth * 0.17,
+                height: constraints.maxHeight * 0.33,
+                child: GestureDetector(
+                  key: const ValueKey('bookshelfTapArea'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onTapBookshelf,
+                  child: const SizedBox.expand(),
+                ),
+              ),
+              Align(
+                alignment: RoomPage._bottleAlignment,
+                child: GestureDetector(
+                  key: const ValueKey('bottleTapArea'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onTapBottle,
+                  child: SizedBox(
+                    width: constraints.maxWidth * 0.17,
+                    height: constraints.maxWidth * 0.24,
                   ),
                 ),
               ),
