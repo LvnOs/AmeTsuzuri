@@ -1022,6 +1022,79 @@ void main() {
       expect(find.byKey(const ValueKey('letterTapArea')), findsOneWidget);
     });
   });
+
+  group('手紙の到着演出', () {
+    testWidgets('既存の当日配達は演出なしで手紙とtapAreaを即表示する', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: {},
+          deliveredLetters: {'2026-08-07': 'letterA'},
+        ),
+      );
+
+      expect(find.byKey(const ValueKey('postArrivalGlow')), findsNothing);
+      expect(find.byKey(const ValueKey('arrivalMovingLight')), findsNothing);
+      expect(find.byKey(const ValueKey('roomLetterLayer')), findsOneWidget);
+      expect(find.byKey(const ValueKey('letterTapArea')), findsOneWidget);
+    });
+
+    testWidgets('新規配達時はpost発光から光移動を経て手紙を表示する', (tester) async {
+      await _pumpRoom(tester);
+
+      expect(find.byKey(const ValueKey('postArrivalGlow')), findsNothing);
+      expect(find.byKey(const ValueKey('arrivalMovingLight')), findsNothing);
+      expect(_opacityForKey(tester, 'roomLetterLayer'), 0);
+      expect(find.byKey(const ValueKey('letterTapArea')), findsNothing);
+
+      await tester.pump(const Duration(milliseconds: 700));
+      expect(find.byKey(const ValueKey('postArrivalGlow')), findsNothing);
+      expect(find.byKey(const ValueKey('arrivalMovingLight')), findsNothing);
+      expect(_opacityForKey(tester, 'roomLetterLayer'), 0);
+      expect(find.byKey(const ValueKey('letterTapArea')), findsNothing);
+
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(_opacityForKey(tester, 'postArrivalGlow'), greaterThan(0.1));
+      expect(find.byKey(const ValueKey('arrivalMovingLight')), findsNothing);
+      expect(_opacityForKey(tester, 'roomLetterLayer'), 0);
+
+      await tester.pump(const Duration(milliseconds: 1500));
+      expect(find.byKey(const ValueKey('postArrivalGlow')), findsNothing);
+      expect(_opacityForKey(tester, 'arrivalMovingLight'), greaterThan(0));
+      expect(_opacityForKey(tester, 'roomLetterLayer'), 0);
+      expect(find.byKey(const ValueKey('letterTapArea')), findsNothing);
+
+      await tester.pump(const Duration(milliseconds: 1750));
+      expect(find.byKey(const ValueKey('postArrivalGlow')), findsNothing);
+      expect(find.byKey(const ValueKey('arrivalMovingLight')), findsNothing);
+      expect(_opacityForKey(tester, 'roomLetterLayer'), 1);
+      expect(find.byKey(const ValueKey('letterTapArea')), findsOneWidget);
+    });
+
+    testWidgets('演出中のProvider通知やrebuildで最初から再生し直さない', (tester) async {
+      final harness = await _pumpRoom(tester);
+      await tester.pump(const Duration(seconds: 1));
+
+      await harness.readLetterProvider.load();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 3450));
+
+      expect(find.byKey(const ValueKey('postArrivalGlow')), findsNothing);
+      expect(find.byKey(const ValueKey('arrivalMovingLight')), findsNothing);
+      expect(find.byKey(const ValueKey('letterTapArea')), findsOneWidget);
+    });
+
+    testWidgets('演出中にRoomPageを破棄してもTicker leakや例外がない', (tester) async {
+      await _pumpRoom(tester);
+      await tester.pump(const Duration(milliseconds: 1000));
+      expect(find.byKey(const ValueKey('postArrivalGlow')), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+    });
+  });
 }
 
 Future<void> _openDesk(WidgetTester tester) async {
@@ -1032,6 +1105,22 @@ Future<void> _openDesk(WidgetTester tester) async {
 Future<void> _tapLetter(WidgetTester tester) async {
   await tester.tap(find.byKey(const ValueKey('letterTapArea')));
   await tester.pumpAndSettle();
+}
+
+double _opacityForKey(WidgetTester tester, String key) {
+  final keyedWidget = find.byKey(ValueKey(key));
+  final descendantOpacity = find.descendant(
+    of: keyedWidget,
+    matching: find.byType(Opacity),
+  );
+  if (descendantOpacity.evaluate().isNotEmpty) {
+    return tester.widget<Opacity>(descendantOpacity.first).opacity;
+  }
+  final ancestorOpacity = find.ancestor(
+    of: keyedWidget,
+    matching: find.byType(Opacity),
+  );
+  return tester.widget<Opacity>(ancestorOpacity.first).opacity;
 }
 
 Future<_RoomHarness> _pumpRoom(

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:ame_tsuzuri/features/letters/repository/letter_repository.dart';
 import 'package:ame_tsuzuri/features/letters/model/letter.dart';
 import 'package:ame_tsuzuri/features/letters/presentation/letter_page.dart';
@@ -22,7 +24,10 @@ class RoomPage extends StatefulWidget {
   static const double _outdoorScale = 0.66;
 
   // Post composition tuning. Scale is relative to the room canvas width.
-  static const Alignment _postAlignment = Alignment(-0.50, -0.35);
+  static const double _postX = -0.50;
+  static const double _postY = -0.35;
+
+  static const Alignment _postAlignment = Alignment(_postX, _postY);
   static const double _postScale = 0.19;
 
   // Curtain composition tuning. Width is relative to the room canvas width.
@@ -47,6 +52,28 @@ class RoomPage extends StatefulWidget {
   static const double _letterScale = 0.22;
   static const double _letterAspectRatio = 460 / 307;
 
+  // Arrival animation tuning. Defaults follow the existing post and letter.
+  static const Duration _arrivalAnimationDuration = Duration(
+    milliseconds: 4350,
+  );
+  static const double _arrivalDelayEnd = 800 / 4350;
+  static const double _arrivalGlowEnd = 2600 / 4350;
+  static const double _arrivalMoveEnd = 4000 / 4350;
+  static const double _postArrivalGlowXOffset = -0.13;
+  static const double _postArrivalGlowYOffset = -0.13;
+  static const Alignment _postArrivalGlowAlignment = Alignment(
+    _postX + _postArrivalGlowXOffset,
+    _postY + _postArrivalGlowYOffset,
+  );
+  static const double _postArrivalGlowScale = 0.32;
+  static const double _postArrivalGlowMinimumOpacity = 0.06;
+  static const double _postArrivalGlowMaximumOpacity = 0.32;
+  static const Alignment _arrivalLightStartAlignment = Alignment(
+    _postX + _postArrivalGlowXOffset + 0.25,
+    _postY + _postArrivalGlowYOffset + 0.07,
+  );
+  static const Alignment _arrivalLightEndAlignment = _letterAlignment;
+
   // Chair composition tuning. Scale is relative to the room canvas width.
   static const Alignment _chairAlignment = Alignment(0, 0.72);
   static const double _chairScale = 0.47;
@@ -60,17 +87,32 @@ class RoomPage extends StatefulWidget {
   State<RoomPage> createState() => _RoomPageState();
 }
 
-class _RoomPageState extends State<RoomPage> {
+class _RoomPageState extends State<RoomPage>
+    with SingleTickerProviderStateMixin {
   late final LetterRepository _letterRepository;
   final LetterDeliveryService _letterDeliveryService =
       const LetterDeliveryService();
   DateTime? _attemptedDeliveryDate;
   bool _isOpeningLetter = false;
+  bool _isArrivalAnimating = false;
+  late final AnimationController _arrivalController;
 
   @override
   void initState() {
     super.initState();
     _letterRepository = widget.letterRepository ?? LetterRepository();
+    _arrivalController = AnimationController(
+      vsync: this,
+      duration: RoomPage._arrivalAnimationDuration,
+    )..addStatusListener(_onArrivalAnimationStatusChanged);
+  }
+
+  @override
+  void dispose() {
+    _arrivalController
+      ..removeStatusListener(_onArrivalAnimationStatusChanged)
+      ..dispose();
+    super.dispose();
   }
 
   @override
@@ -95,7 +137,9 @@ class _RoomPageState extends State<RoomPage> {
           child: AspectRatio(
             aspectRatio: RoomPage._designWidth / RoomPage._designHeight,
             child: _RoomBackgroundLayers(
-              showLetter: showLetter,
+              hasDeliveredLetter: showLetter,
+              isArrivalAnimating: _isArrivalAnimating,
+              arrivalAnimation: _arrivalController,
               onTapLetter: _onTapLetter,
             ),
           ),
@@ -167,9 +211,26 @@ class _RoomPageState extends State<RoomPage> {
         return;
       }
 
-      await readLetterProvider.deliver(letter.id, deliveredDate: date);
+      final didDeliver = await readLetterProvider.deliver(
+        letter.id,
+        deliveredDate: date,
+      );
+      if (didDeliver && mounted) {
+        _startArrivalAnimation();
+      }
     } catch (_) {
       // Delivery is retried on a later Room rebuild or date change.
+    }
+  }
+
+  void _startArrivalAnimation() {
+    setState(() => _isArrivalAnimating = true);
+    _arrivalController.forward(from: 0);
+  }
+
+  void _onArrivalAnimationStatusChanged(AnimationStatus status) {
+    if (status == AnimationStatus.completed && mounted) {
+      setState(() => _isArrivalAnimating = false);
     }
   }
 
@@ -250,11 +311,15 @@ class _RoomPageState extends State<RoomPage> {
 
 class _RoomBackgroundLayers extends StatelessWidget {
   const _RoomBackgroundLayers({
-    required this.showLetter,
+    required this.hasDeliveredLetter,
+    required this.isArrivalAnimating,
+    required this.arrivalAnimation,
     required this.onTapLetter,
   });
 
-  final bool showLetter;
+  final bool hasDeliveredLetter;
+  final bool isArrivalAnimating;
+  final Animation<double> arrivalAnimation;
   final VoidCallback onTapLetter;
 
   @override
@@ -284,6 +349,11 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   ),
                 ),
               ),
+              if (isArrivalAnimating)
+                _PostArrivalGlow(
+                  animation: arrivalAnimation,
+                  roomWidth: constraints.maxWidth,
+                ),
               Image.asset(
                 'assets/images/room/room_base.png',
                 fit: BoxFit.cover,
@@ -345,19 +415,35 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   ),
                 ),
               ),
-              if (showLetter)
+              if (isArrivalAnimating)
+                _ArrivalMovingLight(
+                  animation: arrivalAnimation,
+                  roomWidth: constraints.maxWidth,
+                ),
+              if (hasDeliveredLetter)
                 Align(
                   key: const ValueKey('roomLetterLayer'),
                   alignment: RoomPage._letterAlignment,
-                  child: SizedBox(
-                    width: constraints.maxWidth * RoomPage._letterScale,
-                    height:
-                        constraints.maxWidth *
-                        RoomPage._letterScale /
-                        RoomPage._letterAspectRatio,
-                    child: Image.asset(
-                      'assets/images/room/letter.png',
-                      fit: BoxFit.contain,
+                  child: AnimatedBuilder(
+                    animation: arrivalAnimation,
+                    builder: (context, child) {
+                      return Opacity(
+                        opacity: isArrivalAnimating
+                            ? _letterArrivalOpacity(arrivalAnimation.value)
+                            : 1,
+                        child: child,
+                      );
+                    },
+                    child: SizedBox(
+                      width: constraints.maxWidth * RoomPage._letterScale,
+                      height:
+                          constraints.maxWidth *
+                          RoomPage._letterScale /
+                          RoomPage._letterAspectRatio,
+                      child: Image.asset(
+                        'assets/images/room/letter.png',
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                 ),
@@ -371,7 +457,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   ),
                 ),
               ),
-              if (showLetter)
+              if (hasDeliveredLetter && !isArrivalAnimating)
                 Align(
                   alignment: RoomPage._letterAlignment,
                   child: GestureDetector(
@@ -399,6 +485,111 @@ class _RoomBackgroundLayers extends StatelessWidget {
       },
     );
   }
+}
+
+class _PostArrivalGlow extends StatelessWidget {
+  const _PostArrivalGlow({required this.animation, required this.roomWidth});
+
+  final Animation<double> animation;
+  final double roomWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: RoomPage._postArrivalGlowAlignment,
+      child: AnimatedBuilder(
+        animation: animation,
+        builder: (context, child) {
+          final value = animation.value;
+          if (value < RoomPage._arrivalDelayEnd ||
+              value >= RoomPage._arrivalGlowEnd) {
+            return const SizedBox.shrink();
+          }
+          final phaseProgress =
+              ((value - RoomPage._arrivalDelayEnd) /
+                      (RoomPage._arrivalGlowEnd - RoomPage._arrivalDelayEnd))
+                  .clamp(0.0, 1.0);
+          final pulse = math.pow(math.sin(phaseProgress * math.pi), 2);
+          final opacity =
+              RoomPage._postArrivalGlowMinimumOpacity +
+              pulse *
+                  (RoomPage._postArrivalGlowMaximumOpacity -
+                      RoomPage._postArrivalGlowMinimumOpacity);
+          return Opacity(opacity: opacity, child: child);
+        },
+        child: Container(
+          key: const ValueKey('postArrivalGlow'),
+          width: roomWidth * RoomPage._postArrivalGlowScale,
+          height: roomWidth * RoomPage._postArrivalGlowScale,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: RadialGradient(
+              colors: [Color(0xFFFFF4D6), Color(0x00FFF4D6)],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ArrivalMovingLight extends StatelessWidget {
+  const _ArrivalMovingLight({required this.animation, required this.roomWidth});
+
+  final Animation<double> animation;
+  final double roomWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        final value = animation.value;
+        if (value < RoomPage._arrivalGlowEnd ||
+            value >= RoomPage._arrivalMoveEnd) {
+          return const SizedBox.shrink();
+        }
+        final moveProgress =
+            ((value - RoomPage._arrivalGlowEnd) /
+                    (RoomPage._arrivalMoveEnd - RoomPage._arrivalGlowEnd))
+                .clamp(0.0, 1.0);
+        final curvedProgress = Curves.easeInOut.transform(moveProgress);
+        final alignment = Alignment.lerp(
+          RoomPage._arrivalLightStartAlignment,
+          RoomPage._arrivalLightEndAlignment,
+          curvedProgress,
+        )!;
+        final opacity = math.sin(moveProgress * math.pi).clamp(0.0, 1.0) * 0.62;
+
+        return Align(
+          alignment: alignment,
+          child: Opacity(opacity: opacity, child: child),
+        );
+      },
+      child: Container(
+        key: const ValueKey('arrivalMovingLight'),
+        width: roomWidth * 0.037,
+        height: roomWidth * 0.037,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            colors: [Color(0xFFFFF6DD), Color(0x00FFF6DD)],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+double _letterArrivalOpacity(double animationValue) {
+  if (animationValue < RoomPage._arrivalMoveEnd) {
+    return 0;
+  }
+  return Curves.easeIn.transform(
+    ((animationValue - RoomPage._arrivalMoveEnd) /
+            (1 - RoomPage._arrivalMoveEnd))
+        .clamp(0.0, 1.0),
+  );
 }
 
 DateTime _dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
