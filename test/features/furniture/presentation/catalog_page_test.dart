@@ -52,8 +52,130 @@ const _longNameFurniture = Furniture(
   imagePath: 'unused.png',
   initialAvailable: true,
 );
+const _woodenMug = Furniture(
+  id: 'wooden_mug',
+  name: '木のマグ',
+  price: 30,
+  size: 'small',
+  slotIds: ['test_slot'],
+  imagePath: 'furniture/desk/wooden_mug.png',
+  initialAvailable: true,
+);
+const _inkBottle = Furniture(
+  id: 'ink_bottle',
+  name: 'インク瓶',
+  price: 30,
+  size: 'small',
+  slotIds: ['test_slot'],
+  imagePath: 'furniture/desk/ink_bottle.png',
+  initialAvailable: true,
+);
+const _woodenFoxFigure = Furniture(
+  id: 'wooden_fox_figure',
+  name: '木彫りのキツネ',
+  price: 30,
+  size: 'small',
+  slotIds: ['test_slot'],
+  imagePath: 'furniture/desk/wooden_fox_figure.png',
+  initialAvailable: true,
+);
+const _missingImageFurniture = Furniture(
+  id: 'missing_image',
+  name: '画像のない家具',
+  price: 30,
+  size: 'small',
+  slotIds: ['test_slot'],
+  imagePath: 'furniture/desk/missing.png',
+  initialAvailable: true,
+);
 
 void main() {
+  group('CatalogPageの家具画像プレビュー', () {
+    for (final furniture in [
+      _woodenMug,
+      _inkBottle,
+      _woodenFoxFigure,
+    ]) {
+      testWidgets('${furniture.id}はFurniture.imagePathの画像を表示する', (
+        tester,
+      ) async {
+        await _pumpCatalog(
+          tester,
+          furnitures: [furniture],
+          purchasedFurnitureIds: const {},
+        );
+
+        final preview = tester.widget<SizedBox>(
+          find.byKey(ValueKey('catalogFurniturePreview-${furniture.id}')),
+        );
+        final image = tester.widget<Image>(
+          find.byKey(ValueKey('catalogFurnitureImage-${furniture.id}')),
+        );
+        expect(preview.width, 64);
+        expect(preview.height, 64);
+        expect(image.fit, BoxFit.contain);
+        expect(
+          (image.image as AssetImage).assetName,
+          'assets/images/${furniture.imagePath}',
+        );
+      });
+    }
+
+    testWidgets('画像欠落でも家具名と購入操作を維持する', (tester) async {
+      await _pumpCatalog(
+        tester,
+        blockPurchase: false,
+        furnitures: const [_missingImageFurniture],
+        purchasedFurnitureIds: const {},
+      );
+      await tester.pump();
+
+      expect(find.text(_missingImageFurniture.name), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(_furnitureTile(_missingImageFurniture.name));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.byType(FilledButton), findsOneWidget);
+    });
+
+    testWidgets('画像欠落でも購入済み家具の配置場所を選択できる', (tester) async {
+      await _pumpCatalog(
+        tester,
+        furnitures: const [_missingImageFurniture],
+        purchasedFurnitureIds: const {'missing_image'},
+      );
+      await tester.pump();
+
+      expect(find.text(_missingImageFurniture.name), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(_furnitureTile(_missingImageFurniture.name));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.byType(ListTile),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('プレビュー追加後も所持雫と購入状態を維持する', (tester) async {
+      await _pumpCatalog(
+        tester,
+        furnitures: const [_woodenMug, _inkBottle],
+        purchasedFurnitureIds: const {'ink_bottle'},
+      );
+
+      expect(_textContainingAscii('100'), findsOneWidget);
+      expect(_textContainingAscii('30'), findsOneWidget);
+      expect(_purchasedCheckInTile(_inkBottle.name), findsOneWidget);
+      expect(_purchasedCheckInTile(_woodenMug.name), findsNothing);
+    });
+  });
+
   group('CatalogPageの初見UX表示', () {
     testWidgets('未購入家具に価格と迎える導線を表示する', (tester) async {
       await _pumpCatalog(tester);
@@ -212,6 +334,12 @@ Finder _progressInTile(String furnitureName) {
   return find.descendant(
     of: _furnitureTile(furnitureName),
     matching: find.byType(CircularProgressIndicator),
+  );
+}
+
+Finder _textContainingAscii(String value) {
+  return find.byWidgetPredicate(
+    (widget) => widget is Text && (widget.data?.contains(value) ?? false),
   );
 }
 

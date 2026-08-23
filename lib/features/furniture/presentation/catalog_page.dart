@@ -97,6 +97,7 @@ class _CatalogPageState extends State<CatalogPage> {
                         null;
 
                     return ListTile(
+                      leading: _FurniturePreview(furniture: furniture),
                       title: _buildFurnitureTitle(furniture, isPurchased),
                       subtitle: Text(
                         !isPurchased
@@ -371,6 +372,32 @@ class _CatalogPageState extends State<CatalogPage> {
           ],
         );
       },
+    );
+  }
+}
+
+class _FurniturePreview extends StatelessWidget {
+  const _FurniturePreview({required this.furniture});
+
+  static const double _previewSize = 64;
+
+  final Furniture furniture;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.square(
+      key: ValueKey('catalogFurniturePreview-${furniture.id}'),
+      dimension: _previewSize,
+      child: ColoredBox(
+        color: const Color(0xFFF2EFE8),
+        child: Image.asset(
+          'assets/images/${furniture.imagePath}',
+          key: ValueKey('catalogFurnitureImage-${furniture.id}'),
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) =>
+              const SizedBox.expand(),
+        ),
+      ),
     );
   }
 }
