@@ -1151,6 +1151,10 @@ void main() {
           receivedLetters: {},
           deliveredLetters: {'2026-08-07': 'tutorial_001'},
         ),
+        initialShizukuState: const ShizukuState(
+          currentShizuku: 0,
+          rewardedLetterIds: {},
+        ),
       );
 
       await _tapLetter(tester);
@@ -1161,7 +1165,7 @@ void main() {
         harness.readLetterProvider.readLetterIds,
         contains('tutorial_001'),
       );
-      expect(harness.shizukuProvider.currentShizuku, 40);
+      expect(harness.shizukuProvider.currentShizuku, 30);
     });
   });
 

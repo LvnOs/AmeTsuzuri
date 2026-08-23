@@ -14,6 +14,9 @@ class LetterRewardResult {
 
 class ShizukuProvider extends ChangeNotifier {
   ShizukuProvider(this._repository);
+  static const String _tutorialLetterId = 'tutorial_001';
+  static const int _tutorialLetterReward = 30;
+  static const int _normalLetterReward = 10;
   static const String _prototypeBottleTestIdPrefix = '__prototype_bottle_test_';
 
   final ShizukuRepository _repository;
@@ -107,7 +110,9 @@ class ShizukuProvider extends ChangeNotifier {
   }
 
   Future<LetterRewardResult> _saveLetterReward(String letterId) async {
-    const amount = 10;
+    final amount = letterId == _tutorialLetterId
+        ? _tutorialLetterReward
+        : _normalLetterReward;
     final nextRewardedLetterIds = Set<String>.of(_rewardedLetterIds)
       ..add(letterId);
     final nextState = ShizukuState(

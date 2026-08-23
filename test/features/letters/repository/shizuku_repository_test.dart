@@ -17,7 +17,7 @@ void main() {
 
     final state = await repository.loadState();
 
-    expect(state.currentShizuku, 30);
+    expect(state.currentShizuku, 0);
     expect(state.rewardedLetterIds, isEmpty);
 
     final prefs = await SharedPreferences.getInstance();
@@ -122,7 +122,7 @@ void main() {
     await repository.resetState();
     final state = await repository.loadState();
 
-    expect(state.currentShizuku, 30);
+    expect(state.currentShizuku, 0);
     expect(state.rewardedLetterIds, isEmpty);
 
     final prefs = await SharedPreferences.getInstance();

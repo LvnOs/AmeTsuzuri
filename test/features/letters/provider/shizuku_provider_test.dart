@@ -6,10 +6,10 @@ import 'package:ame_tsuzuri/features/letters/repository/shizuku_repository.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('新規状態を30滴でロードする', () async {
+  test('新規状態を0滴でロードする', () async {
     final provider = await _loadProvider(_FakeShizukuRepository(_initialState));
 
-    expect(provider.currentShizuku, 30);
+    expect(provider.currentShizuku, 0);
     expect(provider.rewardedLetterIds, isEmpty);
   });
 
@@ -34,8 +34,86 @@ void main() {
 
     expect(result.status, LetterRewardStatus.rewarded);
     expect(result.amount, 10);
-    expect(provider.currentShizuku, 40);
+    expect(provider.currentShizuku, 10);
     expect(provider.rewardedLetterIds, {'letterA'});
+    expect(repository.saveCallCount, 1);
+  });
+
+  test('tutorial_001の初回報酬は30滴で瓶進捗は1通分になる', () async {
+    final repository = _FakeShizukuRepository(_initialState);
+    final provider = await _loadProvider(repository);
+
+    final result = await provider.rewardForLetter('tutorial_001');
+
+    expect(result.status, LetterRewardStatus.rewarded);
+    expect(result.amount, 30);
+    expect(provider.currentShizuku, 30);
+    expect(provider.rewardedLetterIds, {'tutorial_001'});
+    expect(provider.bottleRecordCount, 1);
+    expect(provider.currentBottleProgress, 1);
+    expect(repository.saveCallCount, 1);
+  });
+
+  test('tutorial_001の再報酬は0滴で状態を変更しない', () async {
+    final repository = _FakeShizukuRepository(
+      const ShizukuState(
+        currentShizuku: 30,
+        rewardedLetterIds: {'tutorial_001'},
+      ),
+    );
+    final provider = await _loadProvider(repository);
+
+    final result = await provider.rewardForLetter('tutorial_001');
+
+    expect(result.status, LetterRewardStatus.alreadyRewarded);
+    expect(result.amount, 0);
+    expect(provider.currentShizuku, 30);
+    expect(provider.rewardedLetterIds, {'tutorial_001'});
+    expect(repository.saveCallCount, 0);
+  });
+
+  test('tutorial_001と通常手紙の初回報酬は合計40滴になる', () async {
+    final repository = _FakeShizukuRepository(_initialState);
+    final provider = await _loadProvider(repository);
+
+    await provider.rewardForLetter('tutorial_001');
+    await provider.rewardForLetter('letterA');
+
+    expect(provider.currentShizuku, 40);
+    expect(provider.rewardedLetterIds, {'tutorial_001', 'letterA'});
+    expect(provider.bottleRecordCount, 2);
+    expect(repository.saveCallCount, 2);
+  });
+
+  test('tutorial_001の報酬保存失敗時は状態を変更しない', () async {
+    final repository = _FakeShizukuRepository(_initialState)
+      ..saveError = StateError('save failed');
+    final provider = await _loadProvider(repository);
+
+    await expectLater(
+      provider.rewardForLetter('tutorial_001'),
+      throwsA(isA<StateError>()),
+    );
+
+    expect(provider.currentShizuku, 0);
+    expect(provider.rewardedLetterIds, isEmpty);
+    expect(provider.bottleRecordCount, 0);
+  });
+
+  test('tutorial_001の並行報酬は30滴を二重付与しない', () async {
+    final repository = _BlockingShizukuRepository();
+    final provider = await _loadProvider(repository);
+
+    final first = provider.rewardForLetter('tutorial_001');
+    final second = provider.rewardForLetter('tutorial_001');
+
+    expect(repository.saveCallCount, 1);
+    repository.completeSave();
+
+    final results = await Future.wait([first, second]);
+    expect(results.every((result) => result.amount == 30), isTrue);
+    expect(provider.currentShizuku, 30);
+    expect(provider.rewardedLetterIds, {'tutorial_001'});
     expect(repository.saveCallCount, 1);
   });
 
@@ -150,7 +228,7 @@ void main() {
 
     await provider.reset();
 
-    expect(provider.currentShizuku, 30);
+    expect(provider.currentShizuku, 0);
     expect(provider.rewardedLetterIds, isEmpty);
     expect(provider.bottleRecordCount, 0);
   });
@@ -225,7 +303,7 @@ void main() {
       throwsA(isA<StateError>()),
     );
 
-    expect(provider.currentShizuku, 30);
+    expect(provider.currentShizuku, 0);
     expect(provider.rewardedLetterIds, isEmpty);
     expect(provider.bottleRecordCount, 0);
   });
@@ -269,7 +347,7 @@ void main() {
 
     await provider.reset();
 
-    expect(provider.currentShizuku, 30);
+    expect(provider.currentShizuku, 0);
     expect(provider.rewardedLetterIds, isEmpty);
     expect(provider.bottleRecordCount, 0);
     expect(provider.fullBottleCount, 0);
@@ -290,13 +368,13 @@ void main() {
 
     final results = await Future.wait([first, second]);
     expect(results.every((result) => result.amount == 10), isTrue);
-    expect(provider.currentShizuku, 40);
+    expect(provider.currentShizuku, 10);
     expect(provider.rewardedLetterIds, {'letterA'});
     expect(repository.saveCallCount, 1);
   });
 }
 
-const _initialState = ShizukuState(currentShizuku: 30, rewardedLetterIds: {});
+const _initialState = ShizukuState(currentShizuku: 0, rewardedLetterIds: {});
 
 Future<ShizukuProvider> _loadProvider(ShizukuRepository repository) async {
   final provider = ShizukuProvider(repository);

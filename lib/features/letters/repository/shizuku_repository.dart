@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../model/shizuku_state.dart';
 
 class ShizukuRepository {
-  static const int initialShizuku = 30;
+  static const int initialShizuku = 0;
   static const String _stateKey = 'shizukuState';
   static const String _legacyShizukuKey = 'currentShizuku';
   static const String _readLetterIdsKey = 'readLetterIds';
