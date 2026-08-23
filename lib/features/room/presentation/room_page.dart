@@ -396,17 +396,29 @@ class _RoomPageState extends State<RoomPage>
   }
 
   Future<void> _onTapBookshelf() async {
-    if (_isNavigatingFromRoom ||
-        !context.read<ReadLetterProvider>().isLoaded ||
-        !context.read<ShizukuProvider>().isLoaded) {
+    if (_isNavigatingFromRoom) {
       return;
     }
 
     _isNavigatingFromRoom = true;
     try {
+      final readLetterProvider = context.read<ReadLetterProvider>();
+      final shizukuProvider = context.read<ShizukuProvider>();
+      await Future.wait([
+        if (!readLetterProvider.isLoaded) readLetterProvider.load(),
+        if (!shizukuProvider.isLoaded) shizukuProvider.load(),
+      ]);
+      if (!mounted ||
+          !readLetterProvider.isLoaded ||
+          !shizukuProvider.isLoaded) {
+        return;
+      }
+
       await Navigator.of(context).push(
         MaterialPageRoute<void>(builder: (context) => const BookshelfPage()),
       );
+    } catch (_) {
+      // Keep the Room available so the user can retry after a load failure.
     } finally {
       _isNavigatingFromRoom = false;
     }

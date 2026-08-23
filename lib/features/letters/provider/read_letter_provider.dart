@@ -10,6 +10,7 @@ class ReadLetterProvider extends ChangeNotifier {
 
   ReadLetterState _state = ReadLetterState(receivedLetters: {});
   bool _isLoaded = false;
+  Future<void>? _loadFuture;
 
   Set<String> get readLetterIds => _state.readLetterIds;
   Map<String, DateTime?> get receivedLetters => _state.receivedLetters;
@@ -42,7 +43,23 @@ class ReadLetterProvider extends ChangeNotifier {
     return receivedLetterIdOn(date) != null;
   }
 
-  Future<void> load() async {
+  Future<void> load() {
+    final pendingLoad = _loadFuture;
+    if (pendingLoad != null) {
+      return pendingLoad;
+    }
+
+    late final Future<void> operation;
+    operation = _loadInternal().whenComplete(() {
+      if (identical(_loadFuture, operation)) {
+        _loadFuture = null;
+      }
+    });
+    _loadFuture = operation;
+    return operation;
+  }
+
+  Future<void> _loadInternal() async {
     final state = await _repository.loadState();
     _state = state;
     _isLoaded = true;

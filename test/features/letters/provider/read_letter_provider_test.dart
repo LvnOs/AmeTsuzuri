@@ -1,9 +1,50 @@
+import 'dart:async';
+
 import 'package:ame_tsuzuri/features/letters/model/read_letter_state.dart';
 import 'package:ame_tsuzuri/features/letters/provider/read_letter_provider.dart';
 import 'package:ame_tsuzuri/features/letters/repository/read_letter_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('進行中のloadは同じFutureを共有してRepositoryを一度だけ読む', () async {
+    final repository = _BlockingLoadReadLetterRepository();
+    final provider = ReadLetterProvider(repository);
+
+    final first = provider.load();
+    final second = provider.load();
+
+    expect(identical(first, second), isTrue);
+    expect(repository.loadCallCount, 1);
+
+    repository.completeLoad(_emptyState());
+    await Future.wait([first, second]);
+
+    expect(provider.isLoaded, isTrue);
+  });
+
+  test('load失敗後は再度Repositoryを読み込める', () async {
+    final repository = _BlockingLoadReadLetterRepository();
+    final provider = ReadLetterProvider(repository);
+
+    final failedLoad = provider.load();
+    repository.failLoad(StateError('load failed'));
+    await expectLater(failedLoad, throwsA(isA<StateError>()));
+
+    expect(provider.isLoaded, isFalse);
+
+    final retry = provider.load();
+    expect(repository.loadCallCount, 2);
+    repository.completeLoad(
+      ReadLetterState(
+        receivedLetters: {'letterA': DateTime(2026, 8, 8)},
+      ),
+    );
+    await retry;
+
+    expect(provider.isLoaded, isTrue);
+    expect(provider.readLetterIds, {'letterA'});
+  });
+
   test('受取日ありと不明のStateをロードする', () async {
     final repository = _FakeReadLetterRepository(
       ReadLetterState(
@@ -467,5 +508,25 @@ class _FakeReadLetterRepository extends ReadLetterRepository {
   Future<void> resetState() async {
     resetCallCount++;
     state = _emptyState();
+  }
+}
+
+class _BlockingLoadReadLetterRepository extends ReadLetterRepository {
+  Completer<ReadLetterState>? _loadCompleter;
+  int loadCallCount = 0;
+
+  @override
+  Future<ReadLetterState> loadState() {
+    loadCallCount++;
+    _loadCompleter = Completer<ReadLetterState>();
+    return _loadCompleter!.future;
+  }
+
+  void completeLoad(ReadLetterState state) {
+    _loadCompleter!.complete(state);
+  }
+
+  void failLoad(Object error) {
+    _loadCompleter!.completeError(error);
   }
 }

@@ -1255,13 +1255,131 @@ void main() {
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
 
-    testWidgets('Bookshelf側Providerロード前は本棚タップで遷移しない', (tester) async {
-      await _pumpRoom(tester, loadReadLetterProvider: false);
+    testWidgets('ReadLetter未ロードでも最初の本棚タップを保持してロード後に遷移する', (
+      tester,
+    ) async {
+      final harness = await _pumpRoom(
+        tester,
+        loadReadLetterProvider: false,
+        blockNextReadLoad: true,
+      );
 
       await tester.tap(find.byKey(const ValueKey('bookshelfTapArea')));
-      await tester.pumpAndSettle();
+      await tester.pump();
 
       expect(find.byType(BookshelfPage), findsNothing);
+      expect(harness.readLetterRepository.loadCallCount, 1);
+
+      harness.readLetterRepository.completeLoad();
+      await tester.pump();
+      await _pumpRouteTransition(tester);
+
+      expect(find.byType(BookshelfPage), findsOneWidget);
+    });
+
+    testWidgets('Shizuku未ロードでも最初の本棚タップを保持してロード後に遷移する', (
+      tester,
+    ) async {
+      final harness = await _pumpRoom(
+        tester,
+        loadShizukuProvider: false,
+        blockNextShizukuLoad: true,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('bookshelfTapArea')));
+      await tester.pump();
+
+      expect(find.byType(BookshelfPage), findsNothing);
+      expect(harness.shizukuRepository.loadCallCount, 1);
+
+      harness.shizukuRepository.completeLoad();
+      await _pumpRouteTransition(tester);
+
+      expect(find.byType(BookshelfPage), findsOneWidget);
+    });
+
+    testWidgets('両Provider未ロードなら両方の完了を待って本棚へ遷移する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        loadReadLetterProvider: false,
+        loadShizukuProvider: false,
+        blockNextReadLoad: true,
+        blockNextShizukuLoad: true,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('bookshelfTapArea')));
+      await tester.pump();
+      harness.readLetterRepository.completeLoad();
+      await tester.pump();
+
+      expect(find.byType(BookshelfPage), findsNothing);
+
+      harness.shizukuRepository.completeLoad();
+      await _pumpRouteTransition(tester);
+
+      expect(find.byType(BookshelfPage), findsOneWidget);
+    });
+
+    testWidgets('本棚ロード待機中の連打と瓶タップで画面を重ねない', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        loadReadLetterProvider: false,
+        blockNextReadLoad: true,
+      );
+      final bookshelfDetector = tester.widget<GestureDetector>(
+        find.byKey(const ValueKey('bookshelfTapArea')),
+      );
+      final bottleDetector = tester.widget<GestureDetector>(
+        find.byKey(const ValueKey('bottleTapArea')),
+      );
+
+      bookshelfDetector.onTap!();
+      bookshelfDetector.onTap!();
+      bottleDetector.onTap!();
+      await tester.pump();
+
+      expect(harness.readLetterRepository.loadCallCount, 1);
+      expect(find.byType(CatalogPage), findsNothing);
+
+      harness.readLetterRepository.completeLoad();
+      await tester.pump();
+      await _pumpRouteTransition(tester);
+
+      expect(find.byType(BookshelfPage), findsOneWidget);
+      expect(find.byType(CatalogPage), findsNothing);
+    });
+
+    testWidgets('本棚Providerロード失敗後は再タップで再試行できる', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        loadReadLetterProvider: false,
+        failNextReadLoad: true,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('bookshelfTapArea')));
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(BookshelfPage), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('bookshelfTapArea')));
+      await _pumpRouteTransition(tester);
+
+      expect(harness.readLetterRepository.loadCallCount, 2);
+      expect(find.byType(BookshelfPage), findsOneWidget);
+    });
+
+    testWidgets('BookshelfPageから戻ると再び1タップで開ける', (tester) async {
+      await _pumpRoom(tester);
+
+      await tester.tap(find.byKey(const ValueKey('bookshelfTapArea')));
+      await _pumpRouteTransition(tester);
+      await tester.pageBack();
+      await _pumpRouteTransition(tester);
+      await tester.tap(find.byKey(const ValueKey('bookshelfTapArea')));
+      await _pumpRouteTransition(tester);
+
+      expect(find.byType(BookshelfPage), findsOneWidget);
     });
 
     testWidgets('遷移先から戻ると再度Roomオブジェクトから遷移できる', (tester) async {
@@ -1726,6 +1844,8 @@ Future<_RoomHarness> _pumpRoom(
   ShizukuState? initialShizukuState,
   bool dismissInitialGuide = true,
   bool failNextReadSave = false,
+  bool blockNextReadLoad = false,
+  bool failNextReadLoad = false,
   AppDateRepository? appDateRepository,
   Map<String, String> initialPlacedFurnitureIds = const {},
   List<Furniture> furnitures = _roomFurnitures,
@@ -1739,7 +1859,10 @@ Future<_RoomHarness> _pumpRoom(
     ..blockNextLoad = blockNextShizukuLoad
     ..failNextLoad = failNextShizukuLoad;
   final readLetterRepository = _FakeReadLetterRepository(initialReadState);
-  readLetterRepository.failNextSave = failNextReadSave;
+  readLetterRepository
+    ..failNextSave = failNextReadSave
+    ..blockNextLoad = blockNextReadLoad
+    ..failNextLoad = failNextReadLoad;
   final shizukuProvider = ShizukuProvider(shizukuRepository);
   final readLetterProvider = ReadLetterProvider(readLetterRepository);
   final catalogProvider = CatalogProvider(_FakePurchasedFurnitureRepository());
@@ -2010,12 +2133,28 @@ class _FakeReadLetterRepository extends ReadLetterRepository {
 
   ReadLetterState state;
   bool failNextSave = false;
+  bool blockNextLoad = false;
+  bool failNextLoad = false;
   int saveCallCount = 0;
+  int loadCallCount = 0;
+  Completer<ReadLetterState>? _loadCompleter;
 
   Set<String> get persistedIds => state.readLetterIds;
 
   @override
-  Future<ReadLetterState> loadState() async => state;
+  Future<ReadLetterState> loadState() async {
+    loadCallCount++;
+    if (failNextLoad) {
+      failNextLoad = false;
+      throw StateError('load failed');
+    }
+    if (blockNextLoad) {
+      blockNextLoad = false;
+      _loadCompleter = Completer<ReadLetterState>();
+      return _loadCompleter!.future;
+    }
+    return state;
+  }
 
   @override
   Future<void> saveState(ReadLetterState nextState) async {
@@ -2030,6 +2169,13 @@ class _FakeReadLetterRepository extends ReadLetterRepository {
   @override
   Future<void> resetState() async {
     state = ReadLetterState(receivedLetters: {});
+  }
+
+  void completeLoad() {
+    final completer = _loadCompleter;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete(state);
+    }
   }
 }
 
