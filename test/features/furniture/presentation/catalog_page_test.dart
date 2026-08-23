@@ -16,6 +16,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
+const _deskSurfaceLeftSlotId = 'living_room_desk_surface_left';
+
 const _furnitureA = Furniture(
   id: 'furniture_a',
   name: '家具A',
@@ -57,7 +59,7 @@ const _woodenMug = Furniture(
   name: '木のマグ',
   price: 30,
   size: 'small',
-  slotIds: ['test_slot'],
+  slotIds: [_deskSurfaceLeftSlotId],
   imagePath: 'furniture/desk/wooden_mug.png',
   initialAvailable: true,
 );
@@ -66,7 +68,7 @@ const _inkBottle = Furniture(
   name: 'インク瓶',
   price: 30,
   size: 'small',
-  slotIds: ['test_slot'],
+  slotIds: [_deskSurfaceLeftSlotId],
   imagePath: 'furniture/desk/ink_bottle.png',
   initialAvailable: true,
 );
@@ -75,7 +77,7 @@ const _woodenFoxFigure = Furniture(
   name: '木彫りのキツネ',
   price: 30,
   size: 'small',
-  slotIds: ['test_slot'],
+  slotIds: [_deskSurfaceLeftSlotId],
   imagePath: 'furniture/desk/wooden_fox_figure.png',
   initialAvailable: true,
 );
@@ -88,6 +90,15 @@ const _missingImageFurniture = Furniture(
   imagePath: 'furniture/desk/missing.png',
   initialAvailable: true,
 );
+const _hiddenFurniture = Furniture(
+  id: 'hidden_furniture',
+  name: '非公開家具',
+  price: 30,
+  size: 'small',
+  slotIds: ['legacy_slot'],
+  imagePath: 'unused.png',
+  initialAvailable: false,
+);
 
 void main() {
   testWidgets('Providerロード中は進捗表示しロード後に家具一覧へ切り替わる', (tester) async {
@@ -99,7 +110,164 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(CircularProgressIndicator), findsNothing);
-    expect(find.byType(ListTile), findsNWidgets(3));
+    expect(_catalogFurnitureRows, findsNWidgets(3));
+  });
+
+  group('CatalogPageの公開家具フィルタ', () {
+    testWidgets('initialAvailableがtrueの家具だけを表示する', (tester) async {
+      await _pumpCatalog(
+        tester,
+        furnitures: const [_furnitureA, _hiddenFurniture],
+        purchasedFurnitureIds: const {},
+      );
+
+      expect(find.text(_furnitureA.name), findsOneWidget);
+      expect(find.text(_hiddenFurniture.name), findsNothing);
+      expect(_catalogFurnitureRows, findsOneWidget);
+    });
+
+    testWidgets('非公開家具の旧購入・旧配置データがあっても公開家具を操作できる', (
+      tester,
+    ) async {
+      await _pumpCatalog(
+        tester,
+        furnitures: const [_furnitureA, _hiddenFurniture],
+        purchasedFurnitureIds: const {'hidden_furniture'},
+        placedFurnitureIds: const {'legacy_slot': 'hidden_furniture'},
+      );
+
+      expect(find.text(_hiddenFurniture.name), findsNothing);
+      expect(find.text(_furnitureA.name), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(_furnitureTile(_furnitureA.name));
+      await tester.pumpAndSettle();
+      expect(find.text('30滴で迎えますか？'), findsOneWidget);
+    });
+  });
+
+  group('CatalogPageの家具目録ビジュアル', () {
+    testWidgets('背景と紙面と目録ヘッダーを表示する', (tester) async {
+      await _pumpCatalog(tester);
+
+      final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
+      final appBar = tester.widget<AppBar>(find.byType(AppBar));
+      final paper = tester.widget<Container>(
+        find.byKey(const ValueKey('catalogPaper')),
+      );
+      final decoration = paper.decoration! as BoxDecoration;
+
+      expect(scaffold.backgroundColor, const Color(0xFFE5DDD0));
+      expect(appBar.backgroundColor, const Color(0xFFE5DDD0));
+      expect(appBar.elevation, 0);
+      expect(appBar.scrolledUnderElevation, 0);
+      expect(appBar.surfaceTintColor, Colors.transparent);
+      expect(decoration.color, const Color(0xFFFFFAEC));
+      expect(decoration.borderRadius, BorderRadius.circular(4));
+      expect(decoration.boxShadow, isNotEmpty);
+      expect(find.byKey(const ValueKey('catalogPaperTitle')), findsOneWidget);
+      expect(find.text('家具目録'), findsNWidgets(2));
+      expect(
+        find.byKey(const ValueKey('catalogShizukuBalance')),
+        findsOneWidget,
+      );
+      expect(find.text('所持雫 100滴'), findsOneWidget);
+    });
+
+    testWidgets('正式3家具を目録番号と安定した行Keyで表示する', (tester) async {
+      await _pumpCatalog(
+        tester,
+        furnitures: const [_woodenMug, _inkBottle, _woodenFoxFigure],
+        purchasedFurnitureIds: const {},
+      );
+
+      for (var index = 0; index < 3; index++) {
+        final furniture = [_woodenMug, _inkBottle, _woodenFoxFigure][index];
+        expect(
+          find.byKey(ValueKey('catalogFurnitureRow-${furniture.id}')),
+          findsOneWidget,
+        );
+        expect(find.text('No.0${index + 1}'), findsOneWidget);
+      }
+    });
+
+    testWidgets('未購入・購入済み未配置・配置済みを文字で判別できる', (tester) async {
+      await _pumpCatalog(
+        tester,
+        furnitures: const [_furnitureA, _furnitureB, _furnitureC],
+        purchasedFurnitureIds: const {'furniture_b', 'furniture_c'},
+        placedFurnitureIds: const {'test_slot': 'furniture_c'},
+      );
+
+      expect(find.text('30滴で迎える'), findsOneWidget);
+      expect(find.text('配置する'), findsOneWidget);
+      expect(find.text('配置を変える'), findsOneWidget);
+    });
+
+    testWidgets('390x700で紙面と家具行が横overflowしない', (tester) async {
+      tester.view.physicalSize = const Size(390, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await _pumpCatalog(
+        tester,
+        furnitures: const [_woodenMug, _inkBottle, _woodenFoxFigure],
+        purchasedFurnitureIds: const {'ink_bottle'},
+      );
+
+      expect(find.byKey(const ValueKey('catalogPaper')), findsOneWidget);
+      expect(_catalogFurnitureRows, findsNWidgets(3));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('PC幅でも紙面は640pxを超えない', (tester) async {
+      tester.view.physicalSize = const Size(1200, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await _pumpCatalog(tester);
+
+      expect(
+        tester.getSize(find.byKey(const ValueKey('catalogPaper'))).width,
+        lessThanOrEqualTo(640),
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('公開家具が増えても目録内を縦スクロールできる', (tester) async {
+      final furnitures = List.generate(
+        10,
+        (index) => Furniture(
+          id: 'scroll_furniture_$index',
+          name: '家具$index',
+          price: 30,
+          size: 'small',
+          slotIds: const ['test_slot'],
+          imagePath: 'unused.png',
+          initialAvailable: true,
+        ),
+      );
+      await _pumpCatalog(
+        tester,
+        furnitures: furnitures,
+        purchasedFurnitureIds: const {},
+      );
+
+      final list = find.byKey(const ValueKey('catalogFurnitureList'));
+      expect(list, findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('家具9'),
+        250,
+        scrollable: find.descendant(
+          of: list,
+          matching: find.byType(Scrollable),
+        ),
+      );
+      expect(find.text('家具9'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
   });
 
   group('CatalogPageの家具画像プレビュー', () {
@@ -185,6 +353,85 @@ void main() {
       expect(_textContainingAscii('30'), findsOneWidget);
       expect(_purchasedCheckInTile(_inkBottle.name), findsOneWidget);
       expect(_purchasedCheckInTile(_woodenMug.name), findsNothing);
+    });
+  });
+
+  group('正式3家具のMVP操作', () {
+    for (final furniture in [
+      _woodenMug,
+      _inkBottle,
+      _woodenFoxFigure,
+    ]) {
+      testWidgets('${furniture.id}を30雫で購入できる', (tester) async {
+        await _pumpCatalog(
+          tester,
+          blockPurchase: false,
+          initialShizuku: 30,
+          furnitures: [furniture],
+          purchasedFurnitureIds: const {},
+        );
+
+        await tester.tap(_furnitureTile(furniture.name));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('迎える'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('${furniture.name}を迎えました'), findsOneWidget);
+        expect(find.text('所持雫 0滴'), findsOneWidget);
+        expect(_purchasedCheckInTile(furniture.name), findsOneWidget);
+      });
+    }
+
+    testWidgets('机上Aで正式家具を交換して旧家具の購入済み状態を維持する', (tester) async {
+      final harness = await _pumpCatalog(
+        tester,
+        furnitures: const [_woodenMug, _inkBottle],
+        purchasedFurnitureIds: const {'wooden_mug', 'ink_bottle'},
+        placedFurnitureIds: const {
+          _deskSurfaceLeftSlotId: 'wooden_mug',
+        },
+      );
+
+      await tester.tap(_furnitureTile(_inkBottle.name));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('机上A'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('置き換える'));
+      await tester.pumpAndSettle();
+
+      expect(
+        harness.placedFurnitureProvider.placedFurnitureIds,
+        const {_deskSurfaceLeftSlotId: 'ink_bottle'},
+      );
+      expect(_purchasedCheckInTile(_woodenMug.name), findsOneWidget);
+      expect(_purchasedCheckInTile(_inkBottle.name), findsOneWidget);
+    });
+
+    testWidgets('机上Aから取り外した購入済み家具を再配置できる', (tester) async {
+      final harness = await _pumpCatalog(
+        tester,
+        furnitures: const [_woodenMug],
+        purchasedFurnitureIds: const {'wooden_mug'},
+        placedFurnitureIds: const {
+          _deskSurfaceLeftSlotId: 'wooden_mug',
+        },
+      );
+
+      await tester.tap(_furnitureTile(_woodenMug.name));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('取り外す'));
+      await tester.pumpAndSettle();
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, isEmpty);
+      expect(_purchasedCheckInTile(_woodenMug.name), findsOneWidget);
+
+      await tester.tap(_furnitureTile(_woodenMug.name));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('机上A'));
+      await tester.pumpAndSettle();
+      expect(
+        harness.placedFurnitureProvider.placedFurnitureIds,
+        const {_deskSurfaceLeftSlotId: 'wooden_mug'},
+      );
     });
   });
 
@@ -356,8 +603,19 @@ Finder _textContainingAscii(String value) {
 }
 
 Finder _furnitureTile(String furnitureName) {
-  return find.widgetWithText(ListTile, furnitureName);
+  return find.ancestor(
+    of: find.text(furnitureName),
+    matching: _catalogFurnitureRows,
+  );
 }
+
+final _catalogFurnitureRows = find.byWidgetPredicate(
+  (widget) =>
+      widget.key is ValueKey<String> &&
+      (widget.key! as ValueKey<String>).value.startsWith(
+        'catalogFurnitureRow-',
+      ),
+);
 
 Future<void> _startPurchase(WidgetTester tester, String furnitureName) async {
   await tester.tap(_furnitureTile(furnitureName));
@@ -422,6 +680,7 @@ Future<_CatalogHarness> _pumpCatalog(
     shizukuRepository: shizukuRepository,
     catalogRepository: catalogRepository,
     catalogProvider: catalogProvider,
+    placedFurnitureProvider: placedFurnitureProvider,
   );
 }
 
@@ -430,11 +689,13 @@ class _CatalogHarness {
     required this.shizukuRepository,
     required this.catalogRepository,
     required this.catalogProvider,
+    required this.placedFurnitureProvider,
   });
 
   final _BlockingShizukuRepository shizukuRepository;
   final _FakePurchasedFurnitureRepository catalogRepository;
   final CatalogProvider catalogProvider;
+  final PlacedFurnitureProvider placedFurnitureProvider;
 
   Future<void> finishPurchase(WidgetTester tester) async {
     shizukuRepository.completeSave();
@@ -453,9 +714,9 @@ class _FakeFurnitureRepository extends FurnitureRepository {
 
 class _FakePlacementSlotRepository extends PlacementSlotRepository {
   @override
-  Future<PlacementSlot?> getById(String slotId) async => const PlacementSlot(
-    id: 'test_slot',
-    name: 'テスト配置場所',
+  Future<PlacementSlot?> getById(String slotId) async => PlacementSlot(
+    id: slotId,
+    name: slotId == _deskSurfaceLeftSlotId ? '机上A' : 'テスト配置場所',
     type: 'surface',
     maxItems: 1,
   );
@@ -513,6 +774,11 @@ class _FakePlacedFurnitureRepository extends PlacedFurnitureRepository {
   @override
   Future<Map<String, String>> loadPlacedFurnitureIds() async =>
       placedFurnitureIds;
+
+  @override
+  Future<void> savePlacedFurnitureIds(
+    Map<String, String> placedFurnitureIds,
+  ) async {}
 }
 
 Finder _purchasedCheckInTile(String furnitureName) {

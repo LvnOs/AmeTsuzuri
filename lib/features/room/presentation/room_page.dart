@@ -8,6 +8,8 @@ import 'package:ame_tsuzuri/features/letters/provider/shizuku_provider.dart';
 import 'package:ame_tsuzuri/features/letters/service/letter_delivery_service.dart';
 import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart';
 import 'package:ame_tsuzuri/features/furniture/presentation/catalog_page.dart';
+import 'package:ame_tsuzuri/features/room/presentation/prototype_controls.dart';
+import 'package:ame_tsuzuri/features/room/presentation/prototype_reset_page.dart';
 import 'package:ame_tsuzuri/features/furniture/provider/placed_furniture_provider.dart';
 import 'package:ame_tsuzuri/features/furniture/model/furniture.dart';
 import 'package:ame_tsuzuri/features/furniture/repository/furniture_repository.dart';
@@ -115,6 +117,7 @@ class _RoomPageState extends State<RoomPage>
   bool _isOpeningLetter = false;
   bool _isNavigatingFromRoom = false;
   bool _isArrivalAnimating = false;
+  bool _isPrototypeOperationRunning = false;
   late final AnimationController _arrivalController;
 
   @override
@@ -173,6 +176,9 @@ class _RoomPageState extends State<RoomPage>
               onTapBottle: _onTapBottle,
               onTapBookshelf: _onTapBookshelf,
               onTapLetter: _onTapLetter,
+              isPrototypeOperationRunning: _isPrototypeOperationRunning,
+              onMoveToNextDay: _moveToNextDay,
+              onResetPrototype: _confirmPrototypeReset,
             ),
           ),
         ),
@@ -463,6 +469,75 @@ class _RoomPageState extends State<RoomPage>
       _isNavigatingFromRoom = false;
     }
   }
+
+  Future<void> _moveToNextDay() async {
+    if (_isPrototypeOperationRunning) {
+      return;
+    }
+
+    setState(() => _isPrototypeOperationRunning = true);
+    try {
+      await context.read<AppDateProvider>().moveToNextDay();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('日付を進められませんでした')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isPrototypeOperationRunning = false);
+      }
+    }
+  }
+
+  Future<void> _confirmPrototypeReset() async {
+    if (_isPrototypeOperationRunning) {
+      return;
+    }
+
+    setState(() => _isPrototypeOperationRunning = true);
+    final shouldReset = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('最初からやり直しますか？'),
+        content: const Text('手紙、雫、購入した家具、家具の配置が初期状態に戻ります。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('最初から'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+    if (shouldReset != true) {
+      setState(() => _isPrototypeOperationRunning = false);
+      return;
+    }
+
+    try {
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (context) => PrototypeResetPage(
+            letterRepository: _letterRepository,
+            furnitureRepository: widget.furnitureRepository,
+          ),
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isPrototypeOperationRunning = false);
+      }
+    }
+  }
 }
 
 class _RoomBackgroundLayers extends StatelessWidget {
@@ -475,6 +550,9 @@ class _RoomBackgroundLayers extends StatelessWidget {
     required this.onTapBottle,
     required this.onTapBookshelf,
     required this.onTapLetter,
+    required this.isPrototypeOperationRunning,
+    required this.onMoveToNextDay,
+    required this.onResetPrototype,
   });
 
   final bool hasDeliveredLetter;
@@ -485,6 +563,9 @@ class _RoomBackgroundLayers extends StatelessWidget {
   final VoidCallback onTapBottle;
   final VoidCallback onTapBookshelf;
   final VoidCallback onTapLetter;
+  final bool isPrototypeOperationRunning;
+  final VoidCallback onMoveToNextDay;
+  final VoidCallback onResetPrototype;
 
   @override
   Widget build(BuildContext context) {
@@ -672,6 +753,15 @@ class _RoomBackgroundLayers extends StatelessWidget {
                     ),
                   ),
                 ),
+              Positioned(
+                right: 10,
+                top: 10,
+                child: PrototypeControls(
+                  isRunning: isPrototypeOperationRunning,
+                  onNextDay: onMoveToNextDay,
+                  onReset: onResetPrototype,
+                ),
+              ),
             ],
           ),
         );

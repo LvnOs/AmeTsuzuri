@@ -18,6 +18,7 @@ class CatalogProvider extends ChangeNotifier {
 
   Set<String> _purchasedFurnitureIds = {};
   bool _isLoaded = false;
+  Future<void>? _loadFuture;
   bool _isPurchasing = false;
   String? _purchasingFurnitureId;
 
@@ -31,7 +32,26 @@ class CatalogProvider extends ChangeNotifier {
     return _purchasedFurnitureIds.contains(furnitureId);
   }
 
-  Future<void> load() async {
+  Future<void> load() {
+    if (_isLoaded) {
+      return Future.value();
+    }
+    final pendingLoad = _loadFuture;
+    if (pendingLoad != null) {
+      return pendingLoad;
+    }
+
+    late final Future<void> operation;
+    operation = _loadInternal().whenComplete(() {
+      if (identical(_loadFuture, operation)) {
+        _loadFuture = null;
+      }
+    });
+    _loadFuture = operation;
+    return operation;
+  }
+
+  Future<void> _loadInternal() async {
     _purchasedFurnitureIds = await _repository.loadPurchasedFurnitureIds();
     _isLoaded = true;
 

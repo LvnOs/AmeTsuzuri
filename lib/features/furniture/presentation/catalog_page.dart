@@ -25,6 +25,11 @@ class CatalogPage extends StatefulWidget {
 
 class _CatalogPageState extends State<CatalogPage> {
   static const String _removeAction = '__remove__';
+  static const Color _pageBackgroundColor = Color(0xFFE5DDD0);
+  static const Color _paperColor = Color(0xFFFFFAEC);
+  static const Color _inkColor = Color(0xFF3F382F);
+  static const Color _secondaryInkColor = Color(0xFF71685D);
+  static const Color _ruleColor = Color(0x268A8175);
 
   late final FurnitureRepository _furnitureRepository;
   late final PlacementSlotRepository _placementSlotRepository;
@@ -52,119 +57,161 @@ class _CatalogPageState extends State<CatalogPage> {
         placedFurnitureProvider.isLoaded;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('家具目録')),
-      body: Column(
-        children: [
-          _buildShizukuBalance(shizukuProvider),
-          const Divider(height: 1),
-          Expanded(
-            child: FutureBuilder<List<Furniture>>(
-              future: _furnituresFuture,
-              builder: (context, snapshot) {
-                if (!areProvidersLoaded ||
-                    snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text(
-                      '家具の読み込みに失敗しました\n'
-                      '${snapshot.error}',
-                      textAlign: TextAlign.center,
+      backgroundColor: _pageBackgroundColor,
+      appBar: AppBar(
+        title: const Text('家具目録'),
+        backgroundColor: _pageBackgroundColor,
+        foregroundColor: _inkColor,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: Container(
+                key: const ValueKey('catalogPaper'),
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(18, 24, 18, 20),
+                decoration: BoxDecoration(
+                  color: _paperColor,
+                  borderRadius: BorderRadius.circular(4),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x263D342B),
+                      blurRadius: 24,
+                      offset: Offset(0, 6),
                     ),
-                  );
-                }
-
-                final furnitures = snapshot.data ?? [];
-                if (furnitures.isEmpty) {
-                  return const Center(child: Text('家具はまだありません'));
-                }
-
-                return ListView.builder(
-                  itemCount: furnitures.length,
-                  itemBuilder: (context, index) {
-                    final furniture = furnitures[index];
-                    final isPurchased = catalogProvider.isPurchased(
-                      furniture.id,
-                    );
-                    final isPurchasing =
-                        catalogProvider.purchasingFurnitureId == furniture.id;
-                    final isPlaced =
-                        placedFurnitureProvider.getSlotIdByFurnitureId(
-                          furniture.id,
-                        ) !=
-                        null;
-
-                    return ListTile(
-                      leading: _FurniturePreview(furniture: furniture),
-                      title: _buildFurnitureTitle(furniture, isPurchased),
-                      subtitle: Text(
-                        !isPurchased
-                            ? '${furniture.price}滴で迎える'
-                            : isPlaced
-                            ? '配置を変える'
-                            : '配置する',
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '家具目録',
+                      key: ValueKey('catalogPaperTitle'),
+                      style: TextStyle(
+                        color: _inkColor,
+                        fontSize: 21,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.2,
                       ),
-                      trailing: isPurchasing
-                          ? const SizedBox.square(
-                              dimension: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.chevron_right),
-                      onTap: !isPurchased && catalogProvider.isPurchasing
-                          ? null
-                          : () {
-                              if (isPurchased) {
-                                _showPlacementDialog(context, furniture);
-                              } else {
-                                _showPurchaseDialog(context, furniture);
-                              }
+                    ),
+                    const SizedBox(height: 10),
+                    _buildShizukuBalance(shizukuProvider),
+                    const SizedBox(height: 18),
+                    const Divider(height: 1, thickness: 0.8, color: _ruleColor),
+                    Expanded(
+                      child: FutureBuilder<List<Furniture>>(
+                        future: _furnituresFuture,
+                        builder: (context, snapshot) {
+                          if (!areProvidersLoaded ||
+                              snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+
+                          if (snapshot.hasError) {
+                            return Center(
+                              child: Text(
+                                '家具の読み込みに失敗しました\n'
+                                '${snapshot.error}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: _inkColor),
+                              ),
+                            );
+                          }
+
+                          final furnitures = snapshot.data ?? [];
+                          final availableFurnitures = furnitures
+                              .where(
+                                (furniture) => furniture.initialAvailable,
+                              )
+                              .toList();
+                          if (availableFurnitures.isEmpty) {
+                            return const Center(
+                              child: Text(
+                                '家具はまだありません',
+                                style: TextStyle(color: _secondaryInkColor),
+                              ),
+                            );
+                          }
+
+                          return ListView.separated(
+                            key: const ValueKey('catalogFurnitureList'),
+                            padding: EdgeInsets.zero,
+                            itemCount: availableFurnitures.length,
+                            separatorBuilder: (context, index) => const Divider(
+                              height: 1,
+                              thickness: 0.8,
+                              color: _ruleColor,
+                            ),
+                            itemBuilder: (context, index) {
+                              final furniture = availableFurnitures[index];
+                              final isPurchased = catalogProvider.isPurchased(
+                                furniture.id,
+                              );
+                              final isPurchasing =
+                                  catalogProvider.purchasingFurnitureId ==
+                                  furniture.id;
+                              final isPlaced = placedFurnitureProvider
+                                      .getSlotIdByFurnitureId(furniture.id) !=
+                                  null;
+
+                              return _CatalogFurnitureRow(
+                                index: index,
+                                furniture: furniture,
+                                isPurchased: isPurchased,
+                                isPlaced: isPlaced,
+                                isPurchasing: isPurchasing,
+                                onTap:
+                                    !isPurchased && catalogProvider.isPurchasing
+                                    ? null
+                                    : () {
+                                        if (isPurchased) {
+                                          _showPlacementDialog(
+                                            context,
+                                            furniture,
+                                          );
+                                        } else {
+                                          _showPurchaseDialog(
+                                            context,
+                                            furniture,
+                                          );
+                                        }
+                                      },
+                              );
                             },
-                    );
-                  },
-                );
-              },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildShizukuBalance(ShizukuProvider shizukuProvider) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Row(
-        children: [
-          const Icon(Icons.water_drop_outlined, size: 20),
-          const SizedBox(width: 8),
-          Text(
-            shizukuProvider.isLoaded
-                ? '所持雫 ${shizukuProvider.currentShizuku}滴'
-                : '所持雫 --',
-          ),
-        ],
+    return Text(
+      shizukuProvider.isLoaded
+          ? '所持雫 ${shizukuProvider.currentShizuku}滴'
+          : '所持雫 --',
+      key: const ValueKey('catalogShizukuBalance'),
+      style: const TextStyle(
+        color: _secondaryInkColor,
+        fontSize: 14,
+        letterSpacing: 0.3,
       ),
-    );
-  }
-
-  Widget _buildFurnitureTitle(Furniture furniture, bool isPurchased) {
-    final name = Text(
-      furniture.name,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-    );
-    if (!isPurchased) {
-      return name;
-    }
-
-    return Row(
-      children: [
-        const Icon(Icons.check_circle_outline, size: 20),
-        const SizedBox(width: 8),
-        Expanded(child: name),
-      ],
     );
   }
 
@@ -376,6 +423,110 @@ class _CatalogPageState extends State<CatalogPage> {
   }
 }
 
+class _CatalogFurnitureRow extends StatelessWidget {
+  const _CatalogFurnitureRow({
+    required this.index,
+    required this.furniture,
+    required this.isPurchased,
+    required this.isPlaced,
+    required this.isPurchasing,
+    required this.onTap,
+  });
+
+  final int index;
+  final Furniture furniture;
+  final bool isPurchased;
+  final bool isPlaced;
+  final bool isPurchasing;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final stateText = !isPurchased
+        ? '${furniture.price}滴で迎える'
+        : isPlaced
+        ? '配置を変える'
+        : '配置する';
+
+    return InkWell(
+      key: ValueKey('catalogFurnitureRow-${furniture.id}'),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 42,
+              child: Text(
+                'No.${(index + 1).toString().padLeft(2, '0')}',
+                style: const TextStyle(
+                  color: _CatalogPageState._secondaryInkColor,
+                  fontSize: 11,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ),
+            _FurniturePreview(furniture: furniture),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    furniture.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _CatalogPageState._inkColor,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Row(
+                    children: [
+                      if (isPurchased) ...[
+                        const Icon(
+                          Icons.check_circle_outline,
+                          size: 16,
+                          color: _CatalogPageState._secondaryInkColor,
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      Expanded(
+                        child: Text(
+                          stateText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: _CatalogPageState._secondaryInkColor,
+                            fontSize: 13.5,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                      if (isPurchasing)
+                        const Padding(
+                          padding: EdgeInsets.only(left: 8),
+                          child: SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 1.8),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _FurniturePreview extends StatelessWidget {
   const _FurniturePreview({required this.furniture});
 
@@ -389,7 +540,7 @@ class _FurniturePreview extends StatelessWidget {
       key: ValueKey('catalogFurniturePreview-${furniture.id}'),
       dimension: _previewSize,
       child: ColoredBox(
-        color: const Color(0xFFF2EFE8),
+        color: const Color(0xFFF5F0E4),
         child: Image.asset(
           'assets/images/${furniture.imagePath}',
           key: ValueKey('catalogFurnitureImage-${furniture.id}'),

@@ -2,11 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../repository/placed_furniture_repository.dart';
 
-enum PlaceFurnitureResult {
-  success,
-  notPurchased,
-  invalidSlot,
-}
+enum PlaceFurnitureResult { success, notPurchased, invalidSlot }
 
 class PlacedFurnitureProvider extends ChangeNotifier {
   PlacedFurnitureProvider(this._repository);
@@ -15,12 +11,32 @@ class PlacedFurnitureProvider extends ChangeNotifier {
 
   Map<String, String> _placedFurnitureIds = {};
   bool _isLoaded = false;
+  Future<void>? _loadFuture;
 
   Map<String, String> get placedFurnitureIds =>
       Map.unmodifiable(_placedFurnitureIds);
   bool get isLoaded => _isLoaded;
 
-  Future<void> load() async {
+  Future<void> load() {
+    if (_isLoaded) {
+      return Future.value();
+    }
+    final pendingLoad = _loadFuture;
+    if (pendingLoad != null) {
+      return pendingLoad;
+    }
+
+    late final Future<void> operation;
+    operation = _loadInternal().whenComplete(() {
+      if (identical(_loadFuture, operation)) {
+        _loadFuture = null;
+      }
+    });
+    _loadFuture = operation;
+    return operation;
+  }
+
+  Future<void> _loadInternal() async {
     _placedFurnitureIds = await _repository.loadPlacedFurnitureIds();
     _isLoaded = true;
 
