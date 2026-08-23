@@ -16,6 +16,8 @@ class RoomPage extends StatefulWidget {
 
   final LetterRepository? letterRepository;
 
+  static const String _tutorialLetterId = 'tutorial_001';
+
   static const double _designWidth = 390;
   static const double _designHeight = 700;
 
@@ -67,7 +69,7 @@ class RoomPage extends StatefulWidget {
   );
   static const double _postArrivalGlowScale = 0.32;
   static const double _postArrivalGlowMinimumOpacity = 0.06;
-  static const double _postArrivalGlowMaximumOpacity = 0.32;
+  static const double _postArrivalGlowMaximumOpacity = 0.45;
   static const Alignment _arrivalLightStartAlignment = Alignment(
     _postX + _postArrivalGlowXOffset + 0.25,
     _postY + _postArrivalGlowYOffset + 0.07,
@@ -175,25 +177,6 @@ class _RoomPageState extends State<RoomPage>
     }
 
     try {
-      if (weatherProvider.loadedDate != date) {
-        await weatherProvider.loadForDate(date);
-      }
-    } catch (_) {
-      return;
-    }
-
-    if (!mounted ||
-        _dateOnly(context.read<AppDateProvider>().today) != date ||
-        readLetterProvider.hasDeliveredLetterOn(date)) {
-      return;
-    }
-
-    final currentWeather = weatherProvider.currentWeather;
-    if (currentWeather == null) {
-      return;
-    }
-
-    try {
       final letters = await _letterRepository.getAll();
       if (!mounted ||
           _dateOnly(context.read<AppDateProvider>().today) != date ||
@@ -201,8 +184,43 @@ class _RoomPageState extends State<RoomPage>
         return;
       }
 
+      if (!readLetterProvider.readLetterIds.contains(
+        RoomPage._tutorialLetterId,
+      )) {
+        final tutorialLetter = _findLetterById(
+          letters,
+          RoomPage._tutorialLetterId,
+        );
+        if (tutorialLetter != null) {
+          await _deliverAndAnimate(tutorialLetter.id, date);
+          return;
+        }
+      }
+
+      try {
+        if (weatherProvider.loadedDate != date) {
+          await weatherProvider.loadForDate(date);
+        }
+      } catch (_) {
+        return;
+      }
+
+      if (!mounted ||
+          _dateOnly(context.read<AppDateProvider>().today) != date ||
+          readLetterProvider.hasDeliveredLetterOn(date)) {
+        return;
+      }
+
+      final currentWeather = weatherProvider.currentWeather;
+      if (currentWeather == null) {
+        return;
+      }
+
+      final normalLetters = letters
+          .where((letter) => letter.id != RoomPage._tutorialLetterId)
+          .toList();
       final letter = _letterDeliveryService.selectLetter(
-        letters: letters,
+        letters: normalLetters,
         currentSeason: context.read<AppDateProvider>().currentSeason,
         currentWeather: currentWeather,
         readLetterIds: readLetterProvider.readLetterIds,
@@ -211,15 +229,19 @@ class _RoomPageState extends State<RoomPage>
         return;
       }
 
-      final didDeliver = await readLetterProvider.deliver(
-        letter.id,
-        deliveredDate: date,
-      );
-      if (didDeliver && mounted) {
-        _startArrivalAnimation();
-      }
+      await _deliverAndAnimate(letter.id, date);
     } catch (_) {
       // Delivery is retried on a later Room rebuild or date change.
+    }
+  }
+
+  Future<void> _deliverAndAnimate(String letterId, DateTime date) async {
+    final didDeliver = await context.read<ReadLetterProvider>().deliver(
+      letterId,
+      deliveredDate: date,
+    );
+    if (didDeliver && mounted) {
+      _startArrivalAnimation();
     }
   }
 
@@ -593,3 +615,12 @@ double _letterArrivalOpacity(double animationValue) {
 }
 
 DateTime _dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
+
+Letter? _findLetterById(List<Letter> letters, String letterId) {
+  for (final letter in letters) {
+    if (letter.id == letterId) {
+      return letter;
+    }
+  }
+  return null;
+}

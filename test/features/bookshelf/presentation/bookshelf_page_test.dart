@@ -15,6 +15,67 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
+  testWidgets('読了済みtutorial_001を一覧から通常LetterPageで再読できる', (tester) async {
+    final readProvider = ReadLetterProvider(
+      _FakeReadLetterRepository(
+        ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 7)},
+        ),
+      ),
+    );
+    final shizukuProvider = ShizukuProvider(_FakeShizukuRepository(1));
+    await Future.wait([readProvider.load(), shizukuProvider.load()]);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: readProvider),
+          ChangeNotifierProvider.value(value: shizukuProvider),
+        ],
+        child: MaterialApp(
+          home: BookshelfPage(
+            letterRepository: _FakeLetterRepository([
+              _letter('tutorial_001', '雨つづり。へようこそ'),
+            ]),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('雨つづり。へようこそ'), findsOneWidget);
+    await tester.tap(find.text('雨つづり。へようこそ'));
+    await tester.pumpAndSettle();
+    expect(find.byType(LetterPage), findsOneWidget);
+  });
+
+  testWidgets('未読のtutorial_001は一覧に表示しない', (tester) async {
+    final readProvider = ReadLetterProvider(
+      _FakeReadLetterRepository(ReadLetterState(receivedLetters: {})),
+    );
+    final shizukuProvider = ShizukuProvider(_FakeShizukuRepository(0));
+    await Future.wait([readProvider.load(), shizukuProvider.load()]);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: readProvider),
+          ChangeNotifierProvider.value(value: shizukuProvider),
+        ],
+        child: MaterialApp(
+          home: BookshelfPage(
+            letterRepository: _FakeLetterRepository([
+              _letter('tutorial_001', '雨つづり。へようこそ'),
+            ]),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('雨つづり。へようこそ'), findsNothing);
+  });
+
   testWidgets('既読手紙に受取日を表示し未読手紙は表示しない', (tester) async {
     final readProvider = ReadLetterProvider(
       _FakeReadLetterRepository(

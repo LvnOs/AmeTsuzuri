@@ -2,6 +2,15 @@ schema_version: "1.0"
 
 letters:
 
+  - id: tutorial_001
+    title: "雨つづり。へようこそ"
+    season: any
+    weather: rain
+    tutorial: true
+    tags:
+      - tutorial
+    body_file: letters/tutorial_001.md
+
   - id: letter_20260807
     title: "朝顔"
     season: summer

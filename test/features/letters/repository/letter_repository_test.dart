@@ -7,6 +7,18 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('実データからtutorial_001と仮本文を読み込める', () async {
+    final letters = await LetterRepository().getAll();
+    final tutorial = letters.singleWhere(
+      (letter) => letter.id == 'tutorial_001',
+    );
+
+    expect(tutorial.title, '雨つづり。へようこそ');
+    expect(tutorial.body, contains('最初のご案内'));
+  });
+
   test('dateなしYAMLから配信と表示に必要なフィールドを読み込む', () async {
     final repository = LetterRepository(
       assetBundle: _MemoryAssetBundle({
@@ -49,7 +61,8 @@ void main() {
   });
 }
 
-String _yamlWithWeather(String weather, {String season = 'summer'}) => '''
+String _yamlWithWeather(String weather, {String season = 'summer'}) =>
+    '''
 letters:
   - id: letter_test
     title: "テストの手紙"

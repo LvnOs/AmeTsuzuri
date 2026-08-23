@@ -1023,6 +1023,148 @@ void main() {
     });
   });
 
+  group('初回チュートリアル手紙の配達', () {
+    testWidgets('未読なら通常候補よりtutorial_001を優先する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        letters: [_letter('letterA'), _letter('tutorial_001')],
+      );
+
+      expect(
+        harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
+        'tutorial_001',
+      );
+      expect(harness.weatherRepository.requestedDates, isEmpty);
+    });
+
+    testWidgets('季節と天候が一致しなくてもtutorial_001を配達する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        letters: [
+          _letter(
+            'tutorial_001',
+            season: SeasonType.winter,
+            weather: WeatherType.rain,
+          ),
+        ],
+      );
+
+      expect(
+        harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
+        'tutorial_001',
+      );
+      expect(harness.weatherRepository.requestedDates, isEmpty);
+    });
+
+    testWidgets('配達済み未読ならrebuildでも通常手紙へ変えない', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        letters: [_letter('tutorial_001'), _letter('letterA')],
+        initialReadState: ReadLetterState(
+          receivedLetters: {},
+          deliveredLetters: {'2026-08-07': 'tutorial_001'},
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
+        'tutorial_001',
+      );
+      expect(harness.letterRepository.getAllCallCount, 0);
+    });
+
+    testWidgets('当日に通常手紙が配達済みならtutorial_001で上書きしない', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        letters: [_letter('tutorial_001'), _letter('letterA')],
+        initialReadState: ReadLetterState(
+          receivedLetters: {},
+          deliveredLetters: {'2026-08-07': 'letterA'},
+        ),
+      );
+
+      expect(
+        harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
+        'letterA',
+      );
+      expect(harness.letterRepository.getAllCallCount, 0);
+    });
+
+    testWidgets('tutorial_001読了後は通常の季節天候候補を配達する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        letters: [_letter('tutorial_001'), _letter('letterA')],
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+        ),
+      );
+
+      expect(
+        harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
+        'letterA',
+      );
+      expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
+    });
+
+    testWidgets('通常配達候補からtutorial_001を除外する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        letters: [_letter('tutorial_001'), _letter('letterA')],
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+        ),
+      );
+
+      expect(
+        harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
+        isNot('tutorial_001'),
+      );
+      expect(
+        harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
+        'letterA',
+      );
+    });
+
+    testWidgets('tutorial_001の新規配達でも既存到着演出を開始する', (tester) async {
+      await _pumpRoom(tester, letters: [_letter('tutorial_001')]);
+
+      expect(_opacityForKey(tester, 'roomLetterLayer'), 0);
+      expect(find.byKey(const ValueKey('letterTapArea')), findsNothing);
+
+      await tester.pump(const Duration(milliseconds: 1000));
+      expect(find.byKey(const ValueKey('postArrivalGlow')), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 3450));
+      expect(_opacityForKey(tester, 'roomLetterLayer'), 1);
+      expect(find.byKey(const ValueKey('letterTapArea')), findsOneWidget);
+    });
+
+    testWidgets('tutorial_001を既存LetterPageで読み既読保存する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        letters: [_letter('tutorial_001')],
+        initialReadState: ReadLetterState(
+          receivedLetters: {},
+          deliveredLetters: {'2026-08-07': 'tutorial_001'},
+        ),
+      );
+
+      await _tapLetter(tester);
+
+      expect(find.byType(LetterPage), findsOneWidget);
+      expect(find.text('tutorial_001'), findsWidgets);
+      expect(
+        harness.readLetterProvider.readLetterIds,
+        contains('tutorial_001'),
+      );
+      expect(harness.shizukuProvider.currentShizuku, 40);
+    });
+  });
+
   group('手紙の到着演出', () {
     testWidgets('既存の当日配達は演出なしで手紙とtapAreaを即表示する', (tester) async {
       await _pumpRoom(
