@@ -105,6 +105,8 @@ class RoomPage extends StatefulWidget {
 
 class _RoomPageState extends State<RoomPage>
     with SingleTickerProviderStateMixin {
+  static const Duration _weatherRetryDelay = Duration(milliseconds: 750);
+
   late final LetterRepository _letterRepository;
   late final Future<List<Furniture>> _furnituresFuture;
   final LetterDeliveryService _letterDeliveryService =
@@ -225,11 +227,11 @@ class _RoomPageState extends State<RoomPage>
         }
       }
 
-      try {
-        if (weatherProvider.loadedDate != date) {
-          await weatherProvider.loadForDate(date);
-        }
-      } catch (_) {
+      final didLoadWeather = await _loadWeatherForNormalDelivery(
+        weatherProvider: weatherProvider,
+        date: date,
+      );
+      if (!didLoadWeather) {
         return;
       }
 
@@ -261,6 +263,44 @@ class _RoomPageState extends State<RoomPage>
     } catch (_) {
       // Delivery is retried on a later Room rebuild or date change.
     }
+  }
+
+  Future<bool> _loadWeatherForNormalDelivery({
+    required WeatherProvider weatherProvider,
+    required DateTime date,
+  }) async {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        if (weatherProvider.loadedDate != date) {
+          await weatherProvider.loadForDate(date);
+        }
+        return true;
+      } catch (_) {
+        if (attempt == 1) {
+          return false;
+        }
+
+        await Future<void>.delayed(_weatherRetryDelay);
+        if (!_canContinueDeliveryFor(date)) {
+          return false;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  bool _canContinueDeliveryFor(DateTime date) {
+    if (!mounted) {
+      return false;
+    }
+
+    final appDateProvider = context.read<AppDateProvider>();
+    final readLetterProvider = context.read<ReadLetterProvider>();
+    return appDateProvider.isLoaded &&
+        readLetterProvider.isLoaded &&
+        _dateOnly(appDateProvider.today) == date &&
+        !readLetterProvider.hasDeliveredLetterOn(date);
   }
 
   Future<void> _deliverAndAnimate(String letterId, DateTime date) async {
