@@ -64,10 +64,10 @@ class RoomPage extends StatefulWidget {
   // Desk-left furniture tuning for the 390 x 700 Room composition.
   static const String _deskSurfaceLeftSlotId = 'living_room_desk_surface_left';
   static const Alignment _deskSurfaceLeftFurnitureAlignment = Alignment(
-    -0.50,
+    -0.65,
     0.02,
   );
-  static const double _deskSurfaceLeftFurnitureScale = 0.20;
+  static const double _deskSurfaceLeftFurnitureScale = 0.25;
 
   // Arrival animation tuning. Defaults follow the existing post and letter.
   static const Duration _arrivalAnimationDuration = Duration(
