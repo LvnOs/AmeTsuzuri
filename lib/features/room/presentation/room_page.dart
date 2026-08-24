@@ -121,6 +121,18 @@ class RoomPage extends StatefulWidget {
   );
   static const Alignment _arrivalLightEndAlignment = _letterAlignment;
 
+  // Tutorial target glow tuning. Scale is relative to the room canvas width.
+  static const Duration _tutorialGlowDuration = Duration(milliseconds: 1800);
+  static const double _tutorialGlowMinimumOpacity = 0.07;
+  static const double _tutorialGlowMaximumOpacity = 0.36;
+  static const double _tutorialLetterGlowScale = 0.30;
+  static const double _tutorialBottleGlowScale = 0.23;
+  static const Alignment _tutorialBookshelfGlowAlignment = Alignment(
+    -0.83,
+    0.25,
+  );
+  static const double _tutorialBookshelfGlowScale = 0.27;
+
   // Chair composition tuning. Scale is relative to the room canvas width.
   static const Alignment _chairAlignment = Alignment(0, 0.72);
   static const double _chairScale = 0.47;
@@ -155,8 +167,7 @@ class RoomPage extends StatefulWidget {
   State<RoomPage> createState() => _RoomPageState();
 }
 
-class _RoomPageState extends State<RoomPage>
-    with SingleTickerProviderStateMixin {
+class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
   static const Duration _weatherRetryDelay = Duration(milliseconds: 750);
 
   late final LetterRepository _letterRepository;
@@ -169,6 +180,9 @@ class _RoomPageState extends State<RoomPage>
   bool _isArrivalAnimating = false;
   bool _isPrototypeOperationRunning = false;
   late final AnimationController _arrivalController;
+  late final AnimationController _tutorialGlowController;
+  _TutorialTarget _requestedTutorialTarget = _TutorialTarget.none;
+  bool _isTutorialGlowSyncScheduled = false;
 
   @override
   void initState() {
@@ -180,6 +194,10 @@ class _RoomPageState extends State<RoomPage>
       vsync: this,
       duration: RoomPage._arrivalAnimationDuration,
     )..addStatusListener(_onArrivalAnimationStatusChanged);
+    _tutorialGlowController = AnimationController(
+      vsync: this,
+      duration: RoomPage._tutorialGlowDuration,
+    );
   }
 
   @override
@@ -187,6 +205,7 @@ class _RoomPageState extends State<RoomPage>
     _arrivalController
       ..removeStatusListener(_onArrivalAnimationStatusChanged)
       ..dispose();
+    _tutorialGlowController.dispose();
     super.dispose();
   }
 
@@ -212,7 +231,7 @@ class _RoomPageState extends State<RoomPage>
       }
     }
 
-    _resolveTutorialTarget(
+    final tutorialTarget = _resolveTutorialTarget(
       areProvidersLoaded:
           readLetterProvider.isLoaded &&
           catalogProvider.isLoaded &&
@@ -229,6 +248,10 @@ class _RoomPageState extends State<RoomPage>
       hasPurchasedFurniture: catalogProvider.purchasedFurnitureIds.isNotEmpty,
       hasPlacedFurniture: placedFurnitureProvider.placedFurnitureIds.isNotEmpty,
     );
+    final visibleTutorialTarget = _isArrivalAnimating
+        ? _TutorialTarget.none
+        : tutorialTarget;
+    _scheduleTutorialGlowSync(visibleTutorialTarget);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -240,6 +263,8 @@ class _RoomPageState extends State<RoomPage>
               hasDeliveredLetter: showLetter,
               isArrivalAnimating: _isArrivalAnimating,
               arrivalAnimation: _arrivalController,
+              tutorialTarget: visibleTutorialTarget,
+              tutorialGlowAnimation: _tutorialGlowController,
               furnituresFuture: _furnituresFuture,
               deskSurfaceLeftFurnitureId: deskSurfaceLeftFurnitureId,
               onTapBottle: _onTapBottle,
@@ -253,6 +278,29 @@ class _RoomPageState extends State<RoomPage>
         ),
       ),
     );
+  }
+
+  void _scheduleTutorialGlowSync(_TutorialTarget target) {
+    _requestedTutorialTarget = target;
+    if (_isTutorialGlowSyncScheduled) {
+      return;
+    }
+
+    _isTutorialGlowSyncScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _isTutorialGlowSyncScheduled = false;
+      if (!mounted) {
+        return;
+      }
+
+      if (_requestedTutorialTarget == _TutorialTarget.none) {
+        _tutorialGlowController
+          ..stop()
+          ..value = 0;
+      } else if (!_tutorialGlowController.isAnimating) {
+        _tutorialGlowController.repeat(reverse: true);
+      }
+    });
   }
 
   void _scheduleDelivery(DateTime date) {
@@ -614,6 +662,8 @@ class _RoomBackgroundLayers extends StatelessWidget {
     required this.hasDeliveredLetter,
     required this.isArrivalAnimating,
     required this.arrivalAnimation,
+    required this.tutorialTarget,
+    required this.tutorialGlowAnimation,
     required this.furnituresFuture,
     required this.deskSurfaceLeftFurnitureId,
     required this.onTapBottle,
@@ -627,6 +677,8 @@ class _RoomBackgroundLayers extends StatelessWidget {
   final bool hasDeliveredLetter;
   final bool isArrivalAnimating;
   final Animation<double> arrivalAnimation;
+  final _TutorialTarget tutorialTarget;
+  final Animation<double> tutorialGlowAnimation;
   final Future<List<Furniture>> furnituresFuture;
   final String? deskSurfaceLeftFurnitureId;
   final VoidCallback onTapBottle;
@@ -672,6 +724,33 @@ class _RoomBackgroundLayers extends StatelessWidget {
                 'assets/images/room/room_base.png',
                 fit: BoxFit.cover,
               ),
+              if (tutorialTarget != _TutorialTarget.none)
+                _TutorialTargetGlow(
+                  key: ValueKey(
+                    'tutorial${switch (tutorialTarget) {
+                      _TutorialTarget.letter => 'Letter',
+                      _TutorialTarget.bottle => 'Bottle',
+                      _TutorialTarget.bookshelf => 'Bookshelf',
+                      _TutorialTarget.none => '',
+                    }}Glow',
+                  ),
+                  alignment: switch (tutorialTarget) {
+                    _TutorialTarget.letter => RoomPage._letterAlignment,
+                    _TutorialTarget.bottle => RoomPage._bottleAlignment,
+                    _TutorialTarget.bookshelf =>
+                      RoomPage._tutorialBookshelfGlowAlignment,
+                    _TutorialTarget.none => Alignment.center,
+                  },
+                  scale: switch (tutorialTarget) {
+                    _TutorialTarget.letter => RoomPage._tutorialLetterGlowScale,
+                    _TutorialTarget.bottle => RoomPage._tutorialBottleGlowScale,
+                    _TutorialTarget.bookshelf =>
+                      RoomPage._tutorialBookshelfGlowScale,
+                    _TutorialTarget.none => 0,
+                  },
+                  animation: tutorialGlowAnimation,
+                  roomWidth: constraints.maxWidth,
+                ),
               Align(
                 alignment: RoomPage._rugAlignment,
                 child: Transform.scale(
@@ -906,6 +985,57 @@ class _DeskSurfaceLeftFurniture extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _TutorialTargetGlow extends StatelessWidget {
+  const _TutorialTargetGlow({
+    super.key,
+    required this.alignment,
+    required this.scale,
+    required this.animation,
+    required this.roomWidth,
+  });
+
+  final Alignment alignment;
+  final double scale;
+  final Animation<double> animation;
+  final double roomWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Align(
+        alignment: alignment,
+        child: AnimatedBuilder(
+          animation: animation,
+          builder: (context, child) {
+            final curvedValue = Curves.easeInOut.transform(animation.value);
+            final opacity =
+                RoomPage._tutorialGlowMinimumOpacity +
+                curvedValue *
+                    (RoomPage._tutorialGlowMaximumOpacity -
+                        RoomPage._tutorialGlowMinimumOpacity);
+            return Opacity(opacity: opacity, child: child);
+          },
+          child: Container(
+            width: roomWidth * scale,
+            height: roomWidth * scale,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  Color(0xFFFFF7E5),
+                  Color(0x99FFF4D6),
+                  Color(0x00FFF4D6),
+                ],
+                stops: [0, 0.42, 1],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

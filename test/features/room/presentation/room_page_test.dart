@@ -134,6 +134,241 @@ void main() {
     });
   });
 
+  group('チュートリアル対象の継続Glow', () {
+    final letterGlow = find.byKey(const ValueKey('tutorialLetterGlow'));
+    final bottleGlow = find.byKey(const ValueKey('tutorialBottleGlow'));
+    final bookshelfGlow = find.byKey(const ValueKey('tutorialBookshelfGlow'));
+
+    testWidgets('tutorial未読かつ配達済みならletter Glowだけを表示する', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: {},
+          deliveredLetters: const {'2026-08-07': 'tutorial_001'},
+        ),
+      );
+
+      expect(letterGlow, findsOneWidget);
+      expect(bottleGlow, findsNothing);
+      expect(bookshelfGlow, findsNothing);
+    });
+
+    testWidgets('tutorial到着演出中はGlowを表示せず完了後にletter Glowを開始する', (tester) async {
+      await _pumpRoom(tester, letters: [_letter('tutorial_001')]);
+
+      expect(letterGlow, findsNothing);
+
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump();
+
+      expect(letterGlow, findsOneWidget);
+      expect(find.byKey(const ValueKey('postArrivalGlow')), findsNothing);
+    });
+
+    testWidgets('tutorial既読かつ瓶未確認ならbottle Glowだけを表示する', (tester) async {
+      await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+        ),
+      );
+
+      expect(letterGlow, findsNothing);
+      expect(bottleGlow, findsOneWidget);
+      expect(bookshelfGlow, findsNothing);
+    });
+
+    testWidgets('家具配置済みかつ未完了ならbookshelf Glowだけを表示する', (tester) async {
+      await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+        ),
+        initialPlacedFurnitureIds: const {_deskSurfaceLeftSlotId: 'wooden_mug'},
+      );
+
+      expect(letterGlow, findsNothing);
+      expect(bottleGlow, findsNothing);
+      expect(bookshelfGlow, findsOneWidget);
+    });
+
+    testWidgets('tutorial完了済みならGlowを表示しない', (tester) async {
+      await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+          hasOpenedTutorialBottle: true,
+          tutorialCompleted: true,
+        ),
+        initialPlacedFurnitureIds: const {_deskSurfaceLeftSlotId: 'wooden_mug'},
+      );
+
+      expect(letterGlow, findsNothing);
+      expect(bottleGlow, findsNothing);
+      expect(bookshelfGlow, findsNothing);
+    });
+
+    testWidgets('購入済み未配置ならGlowを表示しない', (tester) async {
+      await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+        ),
+        initialPurchasedFurnitureIds: const {'wooden_mug'},
+      );
+
+      expect(letterGlow, findsNothing);
+      expect(bottleGlow, findsNothing);
+      expect(bookshelfGlow, findsNothing);
+    });
+
+    testWidgets('必要Provider未ロードならGlowを表示しない', (tester) async {
+      await _pumpRoom(tester, loadCatalogProvider: false);
+
+      expect(letterGlow, findsNothing);
+      expect(bottleGlow, findsNothing);
+      expect(bookshelfGlow, findsNothing);
+    });
+
+    testWidgets('対象がletterからbottleへ変化するとGlowを切り替える', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: {},
+          deliveredLetters: const {'2026-08-07': 'tutorial_001'},
+        ),
+      );
+      expect(letterGlow, findsOneWidget);
+
+      await harness.readLetterProvider.markAsRead(
+        'tutorial_001',
+        receivedDate: DateTime(2026, 8, 7),
+      );
+      await tester.pump();
+
+      expect(letterGlow, findsNothing);
+      expect(bottleGlow, findsOneWidget);
+    });
+
+    testWidgets('対象がbottleからbookshelfへ変化するとGlowを切り替える', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+        ),
+      );
+      expect(bottleGlow, findsOneWidget);
+
+      await harness.placedFurnitureProvider.place(
+        slotId: _deskSurfaceLeftSlotId,
+        furnitureId: 'wooden_mug',
+        isPurchased: true,
+        allowedSlotIds: const [_deskSurfaceLeftSlotId],
+      );
+      await tester.pump();
+
+      expect(bottleGlow, findsNothing);
+      expect(bookshelfGlow, findsOneWidget);
+    });
+
+    testWidgets('tutorialCompletedへ変化すると全Glowを停止する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+        ),
+        initialPlacedFurnitureIds: const {_deskSurfaceLeftSlotId: 'wooden_mug'},
+      );
+      expect(bookshelfGlow, findsOneWidget);
+
+      await harness.readLetterProvider.completeTutorial();
+      await tester.pump();
+
+      expect(letterGlow, findsNothing);
+      expect(bottleGlow, findsNothing);
+      expect(bookshelfGlow, findsNothing);
+    });
+
+    testWidgets('GlowはIgnorePointerでtapAreaを遮らない', (tester) async {
+      await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+        ),
+      );
+
+      expect(
+        find.descendant(of: bottleGlow, matching: find.byType(IgnorePointer)),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('bottleTapArea')));
+      await _pumpRouteTransition(tester);
+      expect(find.byType(CatalogPage), findsOneWidget);
+    });
+
+    testWidgets('Glow動作中にRoomを破棄してもTicker例外がない', (tester) async {
+      await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 900));
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('到着ControllerとGlow Controllerの共存時もTicker leakがない', (
+      tester,
+    ) async {
+      await _pumpRoom(tester, letters: [_letter('tutorial_001')]);
+      await tester.pump(const Duration(milliseconds: 4350));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(letterGlow, findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Room再生成時も永続状態に対応するGlowだけを表示する', (tester) async {
+      await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+        ),
+      );
+      expect(bottleGlow, findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+        ),
+        initialPlacedFurnitureIds: const {_deskSurfaceLeftSlotId: 'wooden_mug'},
+      );
+
+      expect(letterGlow, findsNothing);
+      expect(bottleGlow, findsNothing);
+      expect(bookshelfGlow, findsOneWidget);
+    });
+  });
+
   group('今日の手紙の配達表示', () {
     testWidgets('未配達で候補があれば配達してletterレイヤーを表示する', (tester) async {
       final harness = await _pumpRoom(tester);
@@ -271,7 +506,7 @@ void main() {
       expect(harness.readLetterProvider.deliveredLetters, isEmpty);
 
       await tester.pump(const Duration(milliseconds: 750));
-      await tester.pumpAndSettle();
+      await tester.pump();
 
       expect(harness.weatherRepository.requestedDates, [
         DateTime(2026, 8, 7),
@@ -314,7 +549,7 @@ void main() {
       await harness.dateProvider.moveToNextDay();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 750));
-      await tester.pumpAndSettle();
+      await tester.pump();
 
       expect(
         harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
@@ -1357,6 +1592,7 @@ Future<_RoomHarness> _pumpRoom(
   bool blockNextReadLoad = false,
   bool failNextReadLoad = false,
   AppDateRepository? appDateRepository,
+  Set<String> initialPurchasedFurnitureIds = const {},
   Map<String, String> initialPlacedFurnitureIds = const {},
   List<Furniture> furnitures = _roomFurnitures,
 }) async {
@@ -1375,7 +1611,9 @@ Future<_RoomHarness> _pumpRoom(
     ..failNextLoad = failNextReadLoad;
   final shizukuProvider = ShizukuProvider(shizukuRepository);
   final readLetterProvider = ReadLetterProvider(readLetterRepository);
-  final catalogProvider = CatalogProvider(_FakePurchasedFurnitureRepository());
+  final catalogProvider = CatalogProvider(
+    _FakePurchasedFurnitureRepository(initialPurchasedFurnitureIds),
+  );
   final placedProvider = PlacedFurnitureProvider(
     _FakePlacedFurnitureRepository(initialPlacedFurnitureIds),
   );
@@ -1434,6 +1672,7 @@ Future<_RoomHarness> _pumpRoom(
     dateProvider: dateProvider,
     weatherRepository: weatherRepository,
     letterRepository: letterRepository,
+    catalogProvider: catalogProvider,
     placedFurnitureProvider: placedProvider,
   );
 }
@@ -1447,6 +1686,7 @@ class _RoomHarness {
     required this.dateProvider,
     required this.weatherRepository,
     required this.letterRepository,
+    required this.catalogProvider,
     required this.placedFurnitureProvider,
   });
 
@@ -1457,6 +1697,7 @@ class _RoomHarness {
   final AppDateProvider dateProvider;
   final _FakeWeatherRepository weatherRepository;
   final _FakeLetterRepository letterRepository;
+  final CatalogProvider catalogProvider;
   final PlacedFurnitureProvider placedFurnitureProvider;
 }
 
@@ -1699,8 +1940,13 @@ class _FakeReadLetterRepository extends ReadLetterRepository {
 }
 
 class _FakePurchasedFurnitureRepository extends PurchasedFurnitureRepository {
+  _FakePurchasedFurnitureRepository([Set<String> initialState = const {}])
+    : state = Set.of(initialState);
+
+  Set<String> state;
+
   @override
-  Future<Set<String>> loadPurchasedFurnitureIds() async => {};
+  Future<Set<String>> loadPurchasedFurnitureIds() async => Set.of(state);
 }
 
 class _FakePlacedFurnitureRepository extends PlacedFurnitureRepository {

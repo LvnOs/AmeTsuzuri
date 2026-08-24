@@ -29,9 +29,11 @@ void main() {
     final harness = await _pumpPrototypeRoom(tester);
 
     await tester.tap(find.byKey(const ValueKey('prototypeControls')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.byKey(const ValueKey('prototypeNextDay')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
 
     expect(harness.date.today, DateTime(2026, 8, 8));
     expect(harness.read.readLetterIds, {'tutorial_001'});
@@ -39,10 +41,7 @@ void main() {
       harness.read.deliveredLetterIdOn(DateTime(2026, 8, 7)),
       'tutorial_001',
     );
-    expect(
-      harness.read.deliveredLetterIdOn(DateTime(2026, 8, 8)),
-      'letter_01',
-    );
+    expect(harness.read.deliveredLetterIdOn(DateTime(2026, 8, 8)), 'letter_01');
     expect(harness.shizuku.currentShizuku, 20);
     expect(harness.catalog.purchasedFurnitureIds, {'wooden_mug'});
     expect(harness.placed.placedFurnitureIds, {
@@ -54,13 +53,15 @@ void main() {
     final harness = await _pumpPrototypeRoom(tester);
 
     await tester.tap(find.byKey(const ValueKey('prototypeControls')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.byKey(const ValueKey('prototypeReset')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text('最初からやり直しますか？'), findsOneWidget);
     await tester.tap(find.text('キャンセル'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.byType(RoomPage), findsOneWidget);
     expect(harness.shizuku.currentShizuku, 20);
@@ -73,9 +74,11 @@ void main() {
     );
 
     await tester.tap(find.byKey(const ValueKey('prototypeControls')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.byKey(const ValueKey('prototypeReset')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.text('最初から'));
     await tester.pump();
     await tester.pump();
@@ -110,9 +113,11 @@ void main() {
     );
 
     await tester.tap(find.byKey(const ValueKey('prototypeControls')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.byKey(const ValueKey('prototypeReset')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.text('最初から'));
     await tester.pump();
     await tester.pump();
