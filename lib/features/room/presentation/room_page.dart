@@ -21,6 +21,8 @@ import 'package:provider/provider.dart';
 
 enum _TutorialTarget { none, letter, bottle, bookshelf }
 
+enum _TutorialMove { none, letterToBottle, bottleToBookshelf }
+
 _TutorialTarget _resolveTutorialTarget({
   required bool areProvidersLoaded,
   required bool tutorialCompleted,
@@ -134,8 +136,12 @@ class RoomPage extends StatefulWidget {
   static const double _tutorialLetterGlowScale = 0.30;
   static const Alignment _tutorialBottleGlowAlignment = Alignment(0.66, -0.18);
   static const double _tutorialBottleGlowScale = 0.23;
+  static const Alignment _tutorialBookshelfMoveAlignment = Alignment(
+    -0.90,
+    0.25,
+  );
   static const Alignment _tutorialBookshelfGlowAlignment = Alignment(
-    -0.83,
+    -1.20,
     0.25,
   );
   static const double _tutorialBookshelfGlowScale = 0.27;
@@ -192,7 +198,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
   late final AnimationController _tutorialMoveController;
   _TutorialTarget _requestedTutorialTarget = _TutorialTarget.none;
   bool _isTutorialGlowSyncScheduled = false;
-  bool _isTutorialMoveAnimating = false;
+  _TutorialMove _tutorialMove = _TutorialMove.none;
 
   @override
   void initState() {
@@ -266,7 +272,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
       hasPlacedFurniture: placedFurnitureProvider.placedFurnitureIds.isNotEmpty,
     );
     final visibleTutorialTarget =
-        _isArrivalAnimating || _isTutorialMoveAnimating
+        _isArrivalAnimating || _tutorialMove != _TutorialMove.none
         ? _TutorialTarget.none
         : tutorialTarget;
     _scheduleTutorialGlowSync(visibleTutorialTarget);
@@ -283,7 +289,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
               arrivalAnimation: _arrivalController,
               tutorialTarget: visibleTutorialTarget,
               tutorialGlowAnimation: _tutorialGlowController,
-              isTutorialMoveAnimating: _isTutorialMoveAnimating,
+              tutorialMove: _tutorialMove,
               tutorialMoveAnimation: _tutorialMoveController,
               furnituresFuture: _furnituresFuture,
               deskSurfaceLeftFurnitureId: deskSurfaceLeftFurnitureId,
@@ -324,17 +330,26 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
   }
 
   void _startTutorialLetterToBottleMove() {
-    if (_isTutorialMoveAnimating || _isArrivalAnimating) {
+    if (_tutorialMove != _TutorialMove.none || _isArrivalAnimating) {
       return;
     }
 
-    setState(() => _isTutorialMoveAnimating = true);
+    setState(() => _tutorialMove = _TutorialMove.letterToBottle);
+    _tutorialMoveController.forward(from: 0);
+  }
+
+  void _startTutorialBottleToBookshelfMove() {
+    if (_tutorialMove != _TutorialMove.none || _isArrivalAnimating) {
+      return;
+    }
+
+    setState(() => _tutorialMove = _TutorialMove.bottleToBookshelf);
     _tutorialMoveController.forward(from: 0);
   }
 
   void _onTutorialMoveStatusChanged(AnimationStatus status) {
     if (status == AnimationStatus.completed && mounted) {
-      setState(() => _isTutorialMoveAnimating = false);
+      setState(() => _tutorialMove = _TutorialMove.none);
     }
   }
 
@@ -632,7 +647,17 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
   }
 
   void _onReturnFromCatalogAfterPlacement() {
-    // Step 9 will attach the bottle-to-bookshelf transition here.
+    final readLetterProvider = context.read<ReadLetterProvider>();
+    final catalogProvider = context.read<CatalogProvider>();
+    final placedFurnitureProvider = context.read<PlacedFurnitureProvider>();
+    if (readLetterProvider.isLoaded &&
+        catalogProvider.isLoaded &&
+        placedFurnitureProvider.isLoaded &&
+        readLetterProvider.readLetterIds.contains(RoomPage._tutorialLetterId) &&
+        !readLetterProvider.tutorialCompleted &&
+        placedFurnitureProvider.placedFurnitureIds.isNotEmpty) {
+      _startTutorialBottleToBookshelfMove();
+    }
   }
 
   Future<void> _onTapBookshelf() async {
@@ -644,14 +669,43 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     try {
       final readLetterProvider = context.read<ReadLetterProvider>();
       final shizukuProvider = context.read<ShizukuProvider>();
+      final catalogProvider = context.read<CatalogProvider>();
+      final placedFurnitureProvider = context.read<PlacedFurnitureProvider>();
       await Future.wait([
         if (!readLetterProvider.isLoaded) readLetterProvider.load(),
         if (!shizukuProvider.isLoaded) shizukuProvider.load(),
+        if (!catalogProvider.isLoaded) catalogProvider.load(),
+        if (!placedFurnitureProvider.isLoaded) placedFurnitureProvider.load(),
       ]);
       if (!mounted ||
           !readLetterProvider.isLoaded ||
-          !shizukuProvider.isLoaded) {
+          !shizukuProvider.isLoaded ||
+          !catalogProvider.isLoaded ||
+          !placedFurnitureProvider.isLoaded) {
         return;
+      }
+
+      final shouldCompleteTutorial =
+          readLetterProvider.readLetterIds.contains(
+            RoomPage._tutorialLetterId,
+          ) &&
+          placedFurnitureProvider.placedFurnitureIds.isNotEmpty &&
+          !readLetterProvider.tutorialCompleted;
+      if (shouldCompleteTutorial) {
+        final shouldOpenBookshelf = await _showBookshelfTutorialGuide();
+        if (shouldOpenBookshelf != true || !mounted) {
+          return;
+        }
+        final completed = await readLetterProvider.completeTutorial();
+        if (!mounted) {
+          return;
+        }
+        if (!completed) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('チュートリアルの完了を保存できませんでした')),
+          );
+          return;
+        }
       }
 
       await Navigator.of(context).push(
@@ -662,6 +716,25 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     } finally {
       _isNavigatingFromRoom = false;
     }
+  }
+
+  Future<bool?> _showBookshelfTutorialGuide() {
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        content: const Text('届いた手紙は、ここからいつでも読み返せます。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('あとで'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('本棚を開く'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _moveToNextDay() async {
@@ -741,7 +814,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
     required this.arrivalAnimation,
     required this.tutorialTarget,
     required this.tutorialGlowAnimation,
-    required this.isTutorialMoveAnimating,
+    required this.tutorialMove,
     required this.tutorialMoveAnimation,
     required this.furnituresFuture,
     required this.deskSurfaceLeftFurnitureId,
@@ -758,7 +831,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
   final Animation<double> arrivalAnimation;
   final _TutorialTarget tutorialTarget;
   final Animation<double> tutorialGlowAnimation;
-  final bool isTutorialMoveAnimating;
+  final _TutorialMove tutorialMove;
   final Animation<double> tutorialMoveAnimation;
   final Future<List<Furniture>> furnituresFuture;
   final String? deskSurfaceLeftFurnitureId;
@@ -906,11 +979,19 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   animation: arrivalAnimation,
                   roomWidth: constraints.maxWidth,
                 ),
-              if (isTutorialMoveAnimating)
+              if (tutorialMove != _TutorialMove.none)
                 _MovingLight(
-                  lightKey: const ValueKey('tutorialLetterToBottleMovingLight'),
-                  startAlignment: RoomPage._letterAlignment,
-                  endAlignment: RoomPage._bottleAlignment,
+                  lightKey: ValueKey(
+                    tutorialMove == _TutorialMove.letterToBottle
+                        ? 'tutorialLetterToBottleMovingLight'
+                        : 'tutorialBottleToBookshelfMovingLight',
+                  ),
+                  startAlignment: tutorialMove == _TutorialMove.letterToBottle
+                      ? RoomPage._letterAlignment
+                      : RoomPage._bottleAlignment,
+                  endAlignment: tutorialMove == _TutorialMove.letterToBottle
+                      ? RoomPage._bottleAlignment
+                      : RoomPage._tutorialBookshelfMoveAlignment,
                   animation: tutorialMoveAnimation,
                   roomWidth: constraints.maxWidth,
                   maximumOpacity: 0.56,

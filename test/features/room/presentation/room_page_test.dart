@@ -1841,6 +1841,158 @@ void main() {
     expect(find.byType(CatalogPage), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  group('Step 9 tutorial completion', () {
+    testWidgets(
+      'successful tutorial placement starts bottle to bookshelf move',
+      (tester) async {
+        final harness = await _pumpRoom(
+          tester,
+          initialReadState: ReadLetterState(
+            receivedLetters: {'tutorial_001': DateTime(2026, 8, 7)},
+            deliveredLetters: const {'2026-08-07': 'tutorial_001'},
+            hasOpenedTutorialBottle: true,
+          ),
+          initialPurchasedFurnitureIds: const {'wooden_mug'},
+        );
+
+        await tester.tap(find.byKey(const ValueKey('bottleTapArea')));
+        await _pumpRouteTransition(tester);
+        await harness.placedFurnitureProvider.place(
+          slotId: _deskSurfaceLeftSlotId,
+          furnitureId: 'wooden_mug',
+          isPurchased: true,
+          allowedSlotIds: const [_deskSurfaceLeftSlotId],
+        );
+        Navigator.of(tester.element(find.byType(CatalogPage))).pop(true);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+
+        expect(
+          find.byKey(const ValueKey('tutorialBottleToBookshelfMovingLight')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('tutorialBookshelfGlow')),
+          findsNothing,
+        );
+
+        await tester.pump(const Duration(milliseconds: 1400));
+        await tester.pump();
+        expect(
+          find.byKey(const ValueKey('tutorialBottleToBookshelfMovingLight')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('tutorialBookshelfGlow')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets('Room recreation shows bookshelf glow without replaying move', (
+      tester,
+    ) async {
+      await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 7)},
+          deliveredLetters: const {'2026-08-07': 'tutorial_001'},
+          hasOpenedTutorialBottle: true,
+        ),
+        initialPurchasedFurnitureIds: const {'wooden_mug'},
+        initialPlacedFurnitureIds: const {_deskSurfaceLeftSlotId: 'wooden_mug'},
+      );
+
+      expect(
+        find.byKey(const ValueKey('tutorialBookshelfGlow')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('tutorialBottleToBookshelfMovingLight')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('bookshelf guide completes tutorial before opening bookshelf', (
+      tester,
+    ) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 7)},
+          deliveredLetters: const {'2026-08-07': 'tutorial_001'},
+          hasOpenedTutorialBottle: true,
+        ),
+        initialPurchasedFurnitureIds: const {'wooden_mug'},
+        initialPlacedFurnitureIds: const {_deskSurfaceLeftSlotId: 'wooden_mug'},
+      );
+
+      await tester.tap(find.byKey(const ValueKey('bookshelfTapArea')));
+      await _pumpRouteTransition(tester);
+      expect(find.text('届いた手紙は、ここからいつでも読み返せます。'), findsOneWidget);
+
+      await tester.tap(find.text('本棚を開く'));
+      await _pumpRouteTransition(tester);
+
+      expect(harness.readLetterProvider.tutorialCompleted, isTrue);
+      expect(find.byType(BookshelfPage), findsOneWidget);
+      expect(find.byKey(const ValueKey('tutorialBookshelfGlow')), findsNothing);
+    });
+
+    testWidgets('completion save failure stays in Room and permits retry', (
+      tester,
+    ) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 7)},
+          deliveredLetters: const {'2026-08-07': 'tutorial_001'},
+          hasOpenedTutorialBottle: true,
+        ),
+        initialPurchasedFurnitureIds: const {'wooden_mug'},
+        initialPlacedFurnitureIds: const {_deskSurfaceLeftSlotId: 'wooden_mug'},
+      );
+      harness.readLetterRepository.failNextSave = true;
+
+      await tester.tap(find.byKey(const ValueKey('bookshelfTapArea')));
+      await _pumpRouteTransition(tester);
+      await tester.tap(find.text('本棚を開く'));
+      await _pumpRouteTransition(tester);
+
+      expect(harness.readLetterProvider.tutorialCompleted, isFalse);
+      expect(find.byType(BookshelfPage), findsNothing);
+      expect(
+        find.byKey(const ValueKey('tutorialBookshelfGlow')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('bookshelfTapArea')));
+      await _pumpRouteTransition(tester);
+      expect(find.text('届いた手紙は、ここからいつでも読み返せます。'), findsOneWidget);
+    });
+
+    testWidgets(
+      'bookshelf before placement opens normally without completion',
+      (tester) async {
+        final harness = await _pumpRoom(
+          tester,
+          initialReadState: ReadLetterState(
+            receivedLetters: {'tutorial_001': DateTime(2026, 8, 7)},
+            deliveredLetters: const {'2026-08-07': 'tutorial_001'},
+            hasOpenedTutorialBottle: true,
+          ),
+        );
+
+        await tester.tap(find.byKey(const ValueKey('bookshelfTapArea')));
+        await _pumpRouteTransition(tester);
+
+        expect(find.text('届いた手紙は、ここからいつでも読み返せます。'), findsNothing);
+        expect(harness.readLetterProvider.tutorialCompleted, isFalse);
+        expect(find.byType(BookshelfPage), findsOneWidget);
+      },
+    );
+  });
 }
 
 const _deskSurfaceLeftSlotId = 'living_room_desk_surface_left';
