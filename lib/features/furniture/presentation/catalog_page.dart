@@ -272,9 +272,9 @@ class _CatalogPageState extends State<CatalogPage> {
       );
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('家具を迎えられませんでした')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('家具を迎えられませんでした')));
       }
       return;
     }
@@ -331,9 +331,9 @@ class _CatalogPageState extends State<CatalogPage> {
             children: [
               Text(
                 'どこに置きますか？',
-                style: Theme.of(dialogContext).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                style: Theme.of(
+                  dialogContext,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
               if (isJustPurchased) ...[
                 const SizedBox(height: 12),
@@ -442,8 +442,13 @@ class _CatalogPageState extends State<CatalogPage> {
       return;
     }
 
+    if (result == PlaceFurnitureResult.success) {
+      Navigator.of(context).pop(true);
+      return;
+    }
+
     final message = switch (result) {
-      PlaceFurnitureResult.success => '${furniture.name}を配置しました',
+      PlaceFurnitureResult.success => throw StateError('handled above'),
       PlaceFurnitureResult.notPurchased => '未購入の家具は配置できません',
       PlaceFurnitureResult.invalidSlot => 'この場所には配置できません',
     };

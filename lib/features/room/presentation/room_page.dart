@@ -615,17 +615,24 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
         return;
       }
 
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(
+      final didPlaceFurniture = await Navigator.of(context).push<bool>(
+        MaterialPageRoute<bool>(
           builder: (context) =>
               CatalogPage(showTutorialGuide: showTutorialGuide),
         ),
       );
+      if (mounted && didPlaceFurniture == true) {
+        _onReturnFromCatalogAfterPlacement();
+      }
     } catch (_) {
       // Keep the Room available so the tutorial action can be retried.
     } finally {
       _isNavigatingFromRoom = false;
     }
+  }
+
+  void _onReturnFromCatalogAfterPlacement() {
+    // Step 9 will attach the bottle-to-bookshelf transition here.
   }
 
   Future<void> _onTapBookshelf() async {

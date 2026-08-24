@@ -416,8 +416,9 @@ void main() {
       expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
         _deskSurfaceLeftSlotId: 'ink_bottle',
       });
-      expect(_purchasedCheckInTile(_woodenMug.name), findsOneWidget);
-      expect(_purchasedCheckInTile(_inkBottle.name), findsOneWidget);
+      expect(harness.catalogProvider.isPurchased('wooden_mug'), isTrue);
+      expect(harness.catalogProvider.isPurchased('ink_bottle'), isTrue);
+      expect(find.byType(CatalogPage), findsNothing);
     });
 
     testWidgets('机上Aから取り外した購入済み家具を再配置できる', (tester) async {
@@ -657,15 +658,13 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(_furnitureTile('家具A'));
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('placementOption-test_slot')),
-      );
+      await tester.tap(find.byKey(const ValueKey('placementOption-test_slot')));
       await tester.pumpAndSettle();
 
       expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
         'test_slot': 'furniture_a',
       });
-      expect(find.byType(CatalogPage), findsOneWidget);
+      expect(find.byType(CatalogPage), findsNothing);
     });
 
     testWidgets('購入成功後の自動Dialogから既存配置処理で配置できる', (tester) async {
@@ -676,15 +675,13 @@ void main() {
       );
 
       await _buyFurniture(tester, '家具A');
-      await tester.tap(
-        find.byKey(const ValueKey('placementOption-test_slot')),
-      );
+      await tester.tap(find.byKey(const ValueKey('placementOption-test_slot')));
       await tester.pumpAndSettle();
 
       expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
         'test_slot': 'furniture_a',
       });
-      expect(find.byType(CatalogPage), findsOneWidget);
+      expect(find.byType(CatalogPage), findsNothing);
     });
 
     for (final showTutorialGuide in [true, false]) {
@@ -720,7 +717,10 @@ void main() {
       await tester.tap(_furnitureTile('複数配置家具'));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const ValueKey('placementOption-slot_a')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('placementOption-slot_a')),
+        findsOneWidget,
+      );
       expect(
         find.byKey(const ValueKey('placementOption-long_slot')),
         findsOneWidget,
@@ -788,6 +788,64 @@ void main() {
       await harness.finishPurchase(tester);
     });
   });
+  group('CatalogPage placement result', () {
+    testWidgets('successful placement returns true and closes Catalog', (
+      tester,
+    ) async {
+      final harness = await _pumpCatalog(
+        tester,
+        openAsRoute: true,
+        purchasedFurnitureIds: const {'furniture_c'},
+      );
+
+      await tester.tap(_furnitureTile(_furnitureC.name));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('placementOption-test_slot')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CatalogPage), findsNothing);
+      expect(find.text('catalogResult:true'), findsOneWidget);
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        'test_slot': 'furniture_c',
+      });
+    });
+
+    testWidgets('placement cancellation leaves Catalog open', (tester) async {
+      await _pumpCatalog(
+        tester,
+        openAsRoute: true,
+        purchasedFurnitureIds: const {'furniture_c'},
+      );
+
+      await tester.tap(_furnitureTile(_furnitureC.name));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('キャンセル'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CatalogPage), findsOneWidget);
+      expect(find.text('catalogResult:null'), findsNothing);
+    });
+
+    testWidgets('new purchase placement returns directly from Catalog', (
+      tester,
+    ) async {
+      final harness = await _pumpCatalog(
+        tester,
+        openAsRoute: true,
+        blockPurchase: false,
+        purchasedFurnitureIds: const {},
+      );
+
+      await _buyFurniture(tester, _furnitureA.name);
+      await tester.tap(find.byKey(const ValueKey('placementOption-test_slot')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CatalogPage), findsNothing);
+      expect(find.text('catalogResult:true'), findsOneWidget);
+      expect(harness.catalogProvider.isPurchased('furniture_a'), isTrue);
+      expect(harness.shizukuProvider.currentShizuku, 70);
+    });
+  });
 }
 
 Finder _progressInTile(String furnitureName) {
@@ -835,6 +893,7 @@ Future<void> _buyFurniture(WidgetTester tester, String furnitureName) async {
 
 Future<_CatalogHarness> _pumpCatalog(
   WidgetTester tester, {
+  bool openAsRoute = false,
   bool showTutorialGuide = false,
   bool blockPurchase = true,
   bool failNextShizukuSave = false,
@@ -865,6 +924,12 @@ Future<_CatalogHarness> _pumpCatalog(
     placedFurnitureProvider.load(),
   ]);
 
+  final catalogPage = CatalogPage(
+    showTutorialGuide: showTutorialGuide,
+    furnitureRepository: _FakeFurnitureRepository(furnitures),
+    placementSlotRepository: _FakePlacementSlotRepository(),
+  );
+
   await tester.pumpWidget(
     MultiProvider(
       providers: [
@@ -873,11 +938,9 @@ Future<_CatalogHarness> _pumpCatalog(
         ChangeNotifierProvider.value(value: placedFurnitureProvider),
       ],
       child: MaterialApp(
-        home: CatalogPage(
-          showTutorialGuide: showTutorialGuide,
-          furnitureRepository: _FakeFurnitureRepository(furnitures),
-          placementSlotRepository: _FakePlacementSlotRepository(),
-        ),
+        home: openAsRoute
+            ? _CatalogRouteHost(catalogPage: catalogPage)
+            : catalogPage,
       ),
     ),
   );
@@ -885,6 +948,10 @@ Future<_CatalogHarness> _pumpCatalog(
     await tester.pumpAndSettle();
   } else {
     await tester.pump();
+  }
+  if (openAsRoute) {
+    await tester.tap(find.byKey(const ValueKey('openCatalog')));
+    await tester.pumpAndSettle();
   }
 
   return _CatalogHarness(
@@ -894,6 +961,42 @@ Future<_CatalogHarness> _pumpCatalog(
     shizukuProvider: shizukuProvider,
     placedFurnitureProvider: placedFurnitureProvider,
   );
+}
+
+class _CatalogRouteHost extends StatefulWidget {
+  const _CatalogRouteHost({required this.catalogPage});
+
+  final CatalogPage catalogPage;
+
+  @override
+  State<_CatalogRouteHost> createState() => _CatalogRouteHostState();
+}
+
+class _CatalogRouteHostState extends State<_CatalogRouteHost> {
+  bool? _catalogResult;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Column(
+        children: [
+          Text('catalogResult:$_catalogResult'),
+          FilledButton(
+            key: const ValueKey('openCatalog'),
+            onPressed: () async {
+              final result = await Navigator.of(context).push<bool>(
+                MaterialPageRoute<bool>(builder: (_) => widget.catalogPage),
+              );
+              if (mounted) {
+                setState(() => _catalogResult = result);
+              }
+            },
+            child: const Text('open'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _CatalogHarness {

@@ -1824,6 +1824,23 @@ void main() {
       }
     });
   });
+
+  testWidgets('Room receives the successful Catalog placement result', (
+    tester,
+  ) async {
+    await _pumpRoom(tester);
+
+    await tester.tap(find.byKey(const ValueKey('bottleTapArea')));
+    await _pumpRouteTransition(tester);
+    expect(find.byType(CatalogPage), findsOneWidget);
+
+    Navigator.of(tester.element(find.byType(CatalogPage))).pop(true);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(RoomPage), findsOneWidget);
+    expect(find.byType(CatalogPage), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 const _deskSurfaceLeftSlotId = 'living_room_desk_surface_left';
