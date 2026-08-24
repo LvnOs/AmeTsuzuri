@@ -596,9 +596,33 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
 
     _isNavigatingFromRoom = true;
     try {
+      final readLetterProvider = context.read<ReadLetterProvider>();
+      final catalogProvider = context.read<CatalogProvider>();
+      final isTutorialGuideEligible =
+          readLetterProvider.isLoaded &&
+          catalogProvider.isLoaded &&
+          readLetterProvider.readLetterIds.contains(
+            RoomPage._tutorialLetterId,
+          ) &&
+          !readLetterProvider.hasOpenedTutorialBottle &&
+          !readLetterProvider.tutorialCompleted &&
+          catalogProvider.purchasedFurnitureIds.isEmpty;
+
+      final showTutorialGuide = isTutorialGuideEligible
+          ? await readLetterProvider.markTutorialBottleOpened()
+          : false;
+      if (!mounted) {
+        return;
+      }
+
       await Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (context) => const CatalogPage()),
+        MaterialPageRoute<void>(
+          builder: (context) =>
+              CatalogPage(showTutorialGuide: showTutorialGuide),
+        ),
       );
+    } catch (_) {
+      // Keep the Room available so the tutorial action can be retried.
     } finally {
       _isNavigatingFromRoom = false;
     }

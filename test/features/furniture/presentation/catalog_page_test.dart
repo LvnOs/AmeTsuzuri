@@ -126,9 +126,7 @@ void main() {
       expect(_catalogFurnitureRows, findsOneWidget);
     });
 
-    testWidgets('非公開家具の旧購入・旧配置データがあっても公開家具を操作できる', (
-      tester,
-    ) async {
+    testWidgets('非公開家具の旧購入・旧配置データがあっても公開家具を操作できる', (tester) async {
       await _pumpCatalog(
         tester,
         furnitures: const [_furnitureA, _hiddenFurniture],
@@ -147,6 +145,22 @@ void main() {
   });
 
   group('CatalogPageの家具目録ビジュアル', () {
+    testWidgets('tutorial初回導線では家具一覧の前に短いガイドを表示する', (tester) async {
+      await _pumpCatalog(tester, showTutorialGuide: true);
+
+      expect(find.text('気に入った家具を、ひとつ迎えてみましょう。'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('catalogFurnitureList')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('通常表示ではtutorialガイドを表示しない', (tester) async {
+      await _pumpCatalog(tester);
+
+      expect(find.text('気に入った家具を、ひとつ迎えてみましょう。'), findsNothing);
+    });
+
     testWidgets('背景と紙面と目録ヘッダーを表示する', (tester) async {
       await _pumpCatalog(tester);
 
@@ -271,11 +285,7 @@ void main() {
   });
 
   group('CatalogPageの家具画像プレビュー', () {
-    for (final furniture in [
-      _woodenMug,
-      _inkBottle,
-      _woodenFoxFigure,
-    ]) {
+    for (final furniture in [_woodenMug, _inkBottle, _woodenFoxFigure]) {
       testWidgets('${furniture.id}はFurniture.imagePathの画像を表示する', (
         tester,
       ) async {
@@ -357,11 +367,7 @@ void main() {
   });
 
   group('正式3家具のMVP操作', () {
-    for (final furniture in [
-      _woodenMug,
-      _inkBottle,
-      _woodenFoxFigure,
-    ]) {
+    for (final furniture in [_woodenMug, _inkBottle, _woodenFoxFigure]) {
       testWidgets('${furniture.id}を30雫で購入できる', (tester) async {
         await _pumpCatalog(
           tester,
@@ -387,9 +393,7 @@ void main() {
         tester,
         furnitures: const [_woodenMug, _inkBottle],
         purchasedFurnitureIds: const {'wooden_mug', 'ink_bottle'},
-        placedFurnitureIds: const {
-          _deskSurfaceLeftSlotId: 'wooden_mug',
-        },
+        placedFurnitureIds: const {_deskSurfaceLeftSlotId: 'wooden_mug'},
       );
 
       await tester.tap(_furnitureTile(_inkBottle.name));
@@ -399,10 +403,9 @@ void main() {
       await tester.tap(find.text('置き換える'));
       await tester.pumpAndSettle();
 
-      expect(
-        harness.placedFurnitureProvider.placedFurnitureIds,
-        const {_deskSurfaceLeftSlotId: 'ink_bottle'},
-      );
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _deskSurfaceLeftSlotId: 'ink_bottle',
+      });
       expect(_purchasedCheckInTile(_woodenMug.name), findsOneWidget);
       expect(_purchasedCheckInTile(_inkBottle.name), findsOneWidget);
     });
@@ -412,9 +415,7 @@ void main() {
         tester,
         furnitures: const [_woodenMug],
         purchasedFurnitureIds: const {'wooden_mug'},
-        placedFurnitureIds: const {
-          _deskSurfaceLeftSlotId: 'wooden_mug',
-        },
+        placedFurnitureIds: const {_deskSurfaceLeftSlotId: 'wooden_mug'},
       );
 
       await tester.tap(_furnitureTile(_woodenMug.name));
@@ -428,10 +429,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('机上A'));
       await tester.pumpAndSettle();
-      expect(
-        harness.placedFurnitureProvider.placedFurnitureIds,
-        const {_deskSurfaceLeftSlotId: 'wooden_mug'},
-      );
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _deskSurfaceLeftSlotId: 'wooden_mug',
+      });
     });
   });
 
@@ -481,7 +481,10 @@ void main() {
     });
 
     testWidgets('配置済み家具に配置を変えると表示し配置操作へ進める', (tester) async {
-      await _pumpCatalog(tester, placedFurnitureIds: {'test_slot': 'furniture_c'});
+      await _pumpCatalog(
+        tester,
+        placedFurnitureIds: {'test_slot': 'furniture_c'},
+      );
 
       expect(find.text('配置を変える'), findsOneWidget);
       expect(_purchasedCheckInTile('家具C'), findsOneWidget);
@@ -627,6 +630,7 @@ Future<void> _startPurchase(WidgetTester tester, String furnitureName) async {
 
 Future<_CatalogHarness> _pumpCatalog(
   WidgetTester tester, {
+  bool showTutorialGuide = false,
   bool blockPurchase = true,
   bool loadShizukuProvider = true,
   bool loadCatalogProvider = true,
@@ -664,6 +668,7 @@ Future<_CatalogHarness> _pumpCatalog(
       ],
       child: MaterialApp(
         home: CatalogPage(
+          showTutorialGuide: showTutorialGuide,
           furnitureRepository: _FakeFurnitureRepository(furnitures),
           placementSlotRepository: _FakePlacementSlotRepository(),
         ),

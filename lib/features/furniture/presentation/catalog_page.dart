@@ -12,10 +12,12 @@ import '../provider/placed_furniture_provider.dart';
 class CatalogPage extends StatefulWidget {
   const CatalogPage({
     super.key,
+    this.showTutorialGuide = false,
     this.furnitureRepository,
     this.placementSlotRepository,
   });
 
+  final bool showTutorialGuide;
   final FurnitureRepository? furnitureRepository;
   final PlacementSlotRepository? placementSlotRepository;
 
@@ -102,6 +104,18 @@ class _CatalogPageState extends State<CatalogPage> {
                     ),
                     const SizedBox(height: 10),
                     _buildShizukuBalance(shizukuProvider),
+                    if (widget.showTutorialGuide) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        '気に入った家具を、ひとつ迎えてみましょう。',
+                        style: TextStyle(
+                          color: _secondaryInkColor,
+                          fontSize: 14,
+                          height: 1.5,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 18),
                     const Divider(height: 1, thickness: 0.8, color: _ruleColor),
                     Expanded(
@@ -129,9 +143,7 @@ class _CatalogPageState extends State<CatalogPage> {
 
                           final furnitures = snapshot.data ?? [];
                           final availableFurnitures = furnitures
-                              .where(
-                                (furniture) => furniture.initialAvailable,
-                              )
+                              .where((furniture) => furniture.initialAvailable)
                               .toList();
                           if (availableFurnitures.isEmpty) {
                             return const Center(
@@ -159,7 +171,8 @@ class _CatalogPageState extends State<CatalogPage> {
                               final isPurchasing =
                                   catalogProvider.purchasingFurnitureId ==
                                   furniture.id;
-                              final isPlaced = placedFurnitureProvider
+                              final isPlaced =
+                                  placedFurnitureProvider
                                       .getSlotIdByFurnitureId(furniture.id) !=
                                   null;
 
@@ -354,9 +367,9 @@ class _CatalogPageState extends State<CatalogPage> {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${furniture.name}を取り外しました')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${furniture.name}を取り外しました')));
       return;
     }
 
@@ -389,9 +402,9 @@ class _CatalogPageState extends State<CatalogPage> {
       PlaceFurnitureResult.invalidSlot => 'この場所には配置できません',
     };
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<bool?> _showReplacementConfirmation(BuildContext context) {
@@ -545,8 +558,7 @@ class _FurniturePreview extends StatelessWidget {
           'assets/images/${furniture.imagePath}',
           key: ValueKey('catalogFurnitureImage-${furniture.id}'),
           fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) =>
-              const SizedBox.expand(),
+          errorBuilder: (context, error, stackTrace) => const SizedBox.expand(),
         ),
       ),
     );

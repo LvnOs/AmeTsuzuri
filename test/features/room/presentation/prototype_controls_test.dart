@@ -102,6 +102,18 @@ void main() {
 
     await tester.pump(const Duration(milliseconds: 4350));
     expect(find.byKey(const ValueKey('roomLetterLayer')), findsOneWidget);
+
+    await harness.read.markAsRead(
+      'tutorial_001',
+      receivedDate: DateTime(2026, 8, 7),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('bottleTapArea')));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(harness.read.hasOpenedTutorialBottle, isTrue);
+    expect(find.text('気に入った家具を、ひとつ迎えてみましょう。'), findsOneWidget);
   });
 
   testWidgets('reset失敗時は中継画面で再試行できる', (tester) async {

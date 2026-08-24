@@ -1076,6 +1076,126 @@ void main() {
   });
 
   group('Roomオブジェクトからの画面遷移', () {
+    testWidgets('tutorial初回瓶タップで確認済みを保存しCatalogガイドを表示する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 7)},
+          deliveredLetters: const {'2026-08-07': 'tutorial_001'},
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('bottleTapArea')));
+      await _pumpRouteTransition(tester);
+
+      expect(harness.readLetterProvider.hasOpenedTutorialBottle, isTrue);
+      expect(harness.readLetterRepository.saveCallCount, 1);
+      expect(find.byType(CatalogPage), findsOneWidget);
+      expect(find.text('気に入った家具を、ひとつ迎えてみましょう。'), findsOneWidget);
+    });
+
+    testWidgets('購入済み家具があるtutorial状態ではガイドを表示しない', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialPurchasedFurnitureIds: const {'wooden_mug'},
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 7)},
+          deliveredLetters: const {'2026-08-07': 'tutorial_001'},
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('bottleTapArea')));
+      await _pumpRouteTransition(tester);
+
+      expect(harness.readLetterProvider.hasOpenedTutorialBottle, isFalse);
+      expect(find.text('気に入った家具を、ひとつ迎えてみましょう。'), findsNothing);
+    });
+
+    testWidgets('tutorial完了済みではCatalogガイドを表示しない', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 7)},
+          deliveredLetters: const {'2026-08-07': 'tutorial_001'},
+          tutorialCompleted: true,
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('bottleTapArea')));
+      await _pumpRouteTransition(tester);
+
+      expect(find.text('気に入った家具を、ひとつ迎えてみましょう。'), findsNothing);
+    });
+
+    testWidgets('通常プレイの瓶タップではCatalogガイドを表示しない', (tester) async {
+      await _pumpRoom(tester);
+
+      await tester.tap(find.byKey(const ValueKey('bottleTapArea')));
+      await _pumpRouteTransition(tester);
+
+      expect(find.text('気に入った家具を、ひとつ迎えてみましょう。'), findsNothing);
+    });
+
+    testWidgets('購入せずCatalogから戻っても瓶Glowを再開しない', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 7)},
+          deliveredLetters: const {'2026-08-07': 'tutorial_001'},
+        ),
+      );
+      expect(find.byKey(const ValueKey('tutorialBottleGlow')), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('bottleTapArea')));
+      await _pumpRouteTransition(tester);
+      await tester.pageBack();
+      await _pumpRouteTransition(tester);
+
+      expect(harness.catalogProvider.purchasedFurnitureIds, isEmpty);
+      expect(harness.readLetterProvider.hasOpenedTutorialBottle, isTrue);
+      expect(find.byKey(const ValueKey('tutorialBottleGlow')), findsNothing);
+    });
+
+    testWidgets('瓶確認済み状態でRoomを再生成しても瓶Glowと移動光を表示しない', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 7)},
+          deliveredLetters: const {'2026-08-07': 'tutorial_001'},
+          hasOpenedTutorialBottle: true,
+        ),
+      );
+
+      expect(find.byKey(const ValueKey('tutorialBottleGlow')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('tutorialLetterToBottleMovingLight')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('瓶確認保存失敗時はRoom状態を維持して再試行できる', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        failNextReadSave: true,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 7)},
+          deliveredLetters: const {'2026-08-07': 'tutorial_001'},
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('bottleTapArea')));
+      await tester.pump();
+
+      expect(find.byType(CatalogPage), findsNothing);
+      expect(harness.readLetterProvider.hasOpenedTutorialBottle, isFalse);
+      expect(find.byKey(const ValueKey('tutorialBottleGlow')), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('bottleTapArea')));
+      await _pumpRouteTransition(tester);
+      expect(find.byType(CatalogPage), findsOneWidget);
+      expect(harness.readLetterProvider.hasOpenedTutorialBottle, isTrue);
+    });
+
     testWidgets('瓶と本棚の透明タップ領域が存在する', (tester) async {
       await _pumpRoom(tester);
 
