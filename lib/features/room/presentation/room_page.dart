@@ -126,12 +126,14 @@ class RoomPage extends StatefulWidget {
   static const double _tutorialGlowMinimumOpacity = 0.07;
   static const double _tutorialGlowMaximumOpacity = 0.36;
   static const double _tutorialLetterGlowScale = 0.30;
+  static const Alignment _tutorialBottleGlowAlignment = Alignment(0.66, -0.18);
   static const double _tutorialBottleGlowScale = 0.23;
   static const Alignment _tutorialBookshelfGlowAlignment = Alignment(
     -0.83,
     0.25,
   );
   static const double _tutorialBookshelfGlowScale = 0.27;
+  static const Duration _tutorialMoveDuration = Duration(milliseconds: 1300);
 
   // Chair composition tuning. Scale is relative to the room canvas width.
   static const Alignment _chairAlignment = Alignment(0, 0.72);
@@ -181,8 +183,10 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
   bool _isPrototypeOperationRunning = false;
   late final AnimationController _arrivalController;
   late final AnimationController _tutorialGlowController;
+  late final AnimationController _tutorialMoveController;
   _TutorialTarget _requestedTutorialTarget = _TutorialTarget.none;
   bool _isTutorialGlowSyncScheduled = false;
+  bool _isTutorialMoveAnimating = false;
 
   @override
   void initState() {
@@ -198,6 +202,10 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
       vsync: this,
       duration: RoomPage._tutorialGlowDuration,
     );
+    _tutorialMoveController = AnimationController(
+      vsync: this,
+      duration: RoomPage._tutorialMoveDuration,
+    )..addStatusListener(_onTutorialMoveStatusChanged);
   }
 
   @override
@@ -206,6 +214,9 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
       ..removeStatusListener(_onArrivalAnimationStatusChanged)
       ..dispose();
     _tutorialGlowController.dispose();
+    _tutorialMoveController
+      ..removeStatusListener(_onTutorialMoveStatusChanged)
+      ..dispose();
     super.dispose();
   }
 
@@ -248,7 +259,8 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
       hasPurchasedFurniture: catalogProvider.purchasedFurnitureIds.isNotEmpty,
       hasPlacedFurniture: placedFurnitureProvider.placedFurnitureIds.isNotEmpty,
     );
-    final visibleTutorialTarget = _isArrivalAnimating
+    final visibleTutorialTarget =
+        _isArrivalAnimating || _isTutorialMoveAnimating
         ? _TutorialTarget.none
         : tutorialTarget;
     _scheduleTutorialGlowSync(visibleTutorialTarget);
@@ -265,6 +277,8 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
               arrivalAnimation: _arrivalController,
               tutorialTarget: visibleTutorialTarget,
               tutorialGlowAnimation: _tutorialGlowController,
+              isTutorialMoveAnimating: _isTutorialMoveAnimating,
+              tutorialMoveAnimation: _tutorialMoveController,
               furnituresFuture: _furnituresFuture,
               deskSurfaceLeftFurnitureId: deskSurfaceLeftFurnitureId,
               onTapBottle: _onTapBottle,
@@ -301,6 +315,21 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
         _tutorialGlowController.repeat(reverse: true);
       }
     });
+  }
+
+  void _startTutorialLetterToBottleMove() {
+    if (_isTutorialMoveAnimating || _isArrivalAnimating) {
+      return;
+    }
+
+    setState(() => _isTutorialMoveAnimating = true);
+    _tutorialMoveController.forward(from: 0);
+  }
+
+  void _onTutorialMoveStatusChanged(AnimationStatus status) {
+    if (status == AnimationStatus.completed && mounted) {
+      setState(() => _isTutorialMoveAnimating = false);
+    }
   }
 
   void _scheduleDelivery(DateTime date) {
@@ -487,6 +516,12 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
         return;
       }
       final deliveredLetterId = initialDeliveredLetterId;
+      final wasUnreadBeforeOpening = !readLetterProvider.readLetterIds.contains(
+        deliveredLetterId,
+      );
+      final shouldMoveToBottleAfterReading =
+          deliveredLetterId == RoomPage._tutorialLetterId &&
+          wasUnreadBeforeOpening;
 
       final letters = await _letterRepository.getAll();
       if (!mounted ||
@@ -531,11 +566,16 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
       if (!mounted) {
         return;
       }
-      Navigator.of(context).push(
+      await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (context) => LetterPage(letter: deliveredLetter!),
         ),
       );
+      if (mounted &&
+          shouldMoveToBottleAfterReading &&
+          !context.read<ReadLetterProvider>().tutorialCompleted) {
+        _startTutorialLetterToBottleMove();
+      }
     } catch (_) {
       // Keep the delivered letter in the Room so the user can try again later.
     } finally {
@@ -664,6 +704,8 @@ class _RoomBackgroundLayers extends StatelessWidget {
     required this.arrivalAnimation,
     required this.tutorialTarget,
     required this.tutorialGlowAnimation,
+    required this.isTutorialMoveAnimating,
+    required this.tutorialMoveAnimation,
     required this.furnituresFuture,
     required this.deskSurfaceLeftFurnitureId,
     required this.onTapBottle,
@@ -679,6 +721,8 @@ class _RoomBackgroundLayers extends StatelessWidget {
   final Animation<double> arrivalAnimation;
   final _TutorialTarget tutorialTarget;
   final Animation<double> tutorialGlowAnimation;
+  final bool isTutorialMoveAnimating;
+  final Animation<double> tutorialMoveAnimation;
   final Future<List<Furniture>> furnituresFuture;
   final String? deskSurfaceLeftFurnitureId;
   final VoidCallback onTapBottle;
@@ -736,7 +780,8 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   ),
                   alignment: switch (tutorialTarget) {
                     _TutorialTarget.letter => RoomPage._letterAlignment,
-                    _TutorialTarget.bottle => RoomPage._bottleAlignment,
+                    _TutorialTarget.bottle =>
+                      RoomPage._tutorialBottleGlowAlignment,
                     _TutorialTarget.bookshelf =>
                       RoomPage._tutorialBookshelfGlowAlignment,
                     _TutorialTarget.none => Alignment.center,
@@ -817,6 +862,15 @@ class _RoomBackgroundLayers extends StatelessWidget {
                 _ArrivalMovingLight(
                   animation: arrivalAnimation,
                   roomWidth: constraints.maxWidth,
+                ),
+              if (isTutorialMoveAnimating)
+                _MovingLight(
+                  lightKey: const ValueKey('tutorialLetterToBottleMovingLight'),
+                  startAlignment: RoomPage._letterAlignment,
+                  endAlignment: RoomPage._bottleAlignment,
+                  animation: tutorialMoveAnimation,
+                  roomWidth: constraints.maxWidth,
+                  maximumOpacity: 0.56,
                 ),
               if (hasDeliveredLetter)
                 Align(
@@ -1094,39 +1148,77 @@ class _ArrivalMovingLight extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
+    return _MovingLight(
+      lightKey: const ValueKey('arrivalMovingLight'),
+      startAlignment: RoomPage._arrivalLightStartAlignment,
+      endAlignment: RoomPage._arrivalLightEndAlignment,
       animation: animation,
-      builder: (context, child) {
-        final value = animation.value;
-        if (value < RoomPage._arrivalGlowEnd ||
-            value >= RoomPage._arrivalMoveEnd) {
-          return const SizedBox.shrink();
-        }
-        final moveProgress =
-            ((value - RoomPage._arrivalGlowEnd) /
-                    (RoomPage._arrivalMoveEnd - RoomPage._arrivalGlowEnd))
-                .clamp(0.0, 1.0);
-        final curvedProgress = Curves.easeInOut.transform(moveProgress);
-        final alignment = Alignment.lerp(
-          RoomPage._arrivalLightStartAlignment,
-          RoomPage._arrivalLightEndAlignment,
-          curvedProgress,
-        )!;
-        final opacity = math.sin(moveProgress * math.pi).clamp(0.0, 1.0) * 0.62;
+      roomWidth: roomWidth,
+      maximumOpacity: 0.62,
+      intervalStart: RoomPage._arrivalGlowEnd,
+      intervalEnd: RoomPage._arrivalMoveEnd,
+    );
+  }
+}
 
-        return Align(
-          alignment: alignment,
-          child: Opacity(opacity: opacity, child: child),
-        );
-      },
-      child: Container(
-        key: const ValueKey('arrivalMovingLight'),
-        width: roomWidth * 0.037,
-        height: roomWidth * 0.037,
-        decoration: const BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [Color(0xFFFFF6DD), Color(0x00FFF6DD)],
+class _MovingLight extends StatelessWidget {
+  const _MovingLight({
+    this.lightKey,
+    required this.startAlignment,
+    required this.endAlignment,
+    required this.animation,
+    required this.roomWidth,
+    required this.maximumOpacity,
+    this.intervalStart = 0,
+    this.intervalEnd = 1,
+  });
+
+  final Key? lightKey;
+  final Alignment startAlignment;
+  final Alignment endAlignment;
+  final Animation<double> animation;
+  final double roomWidth;
+  final double maximumOpacity;
+  final double intervalStart;
+  final double intervalEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: AnimatedBuilder(
+        animation: animation,
+        builder: (context, child) {
+          if (animation.value < intervalStart ||
+              animation.value >= intervalEnd) {
+            return const SizedBox.shrink();
+          }
+          final moveProgress =
+              ((animation.value - intervalStart) /
+                      (intervalEnd - intervalStart))
+                  .clamp(0.0, 1.0);
+          final curvedProgress = Curves.easeInOut.transform(moveProgress);
+          final alignment = Alignment.lerp(
+            startAlignment,
+            endAlignment,
+            curvedProgress,
+          )!;
+          final opacity =
+              math.sin(moveProgress * math.pi).clamp(0.0, 1.0) * maximumOpacity;
+
+          return Align(
+            key: lightKey,
+            alignment: alignment,
+            child: Opacity(opacity: opacity, child: child),
+          );
+        },
+        child: Container(
+          width: roomWidth * 0.037,
+          height: roomWidth * 0.037,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: RadialGradient(
+              colors: [Color(0xFFFFF6DD), Color(0x00FFF6DD)],
+            ),
           ),
         ),
       ),

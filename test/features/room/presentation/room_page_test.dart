@@ -137,6 +137,7 @@ void main() {
   group('チュートリアル対象の継続Glow', () {
     final letterGlow = find.byKey(const ValueKey('tutorialLetterGlow'));
     final bottleGlow = find.byKey(const ValueKey('tutorialBottleGlow'));
+
     final bookshelfGlow = find.byKey(const ValueKey('tutorialBookshelfGlow'));
 
     testWidgets('tutorial未読かつ配達済みならletter Glowだけを表示する', (tester) async {
@@ -237,6 +238,7 @@ void main() {
     testWidgets('対象がletterからbottleへ変化するとGlowを切り替える', (tester) async {
       final harness = await _pumpRoom(
         tester,
+        letters: [_letter('tutorial_001')],
         initialReadState: ReadLetterState(
           receivedLetters: {},
           deliveredLetters: const {'2026-08-07': 'tutorial_001'},
@@ -366,6 +368,173 @@ void main() {
       expect(letterGlow, findsNothing);
       expect(bottleGlow, findsNothing);
       expect(bookshelfGlow, findsOneWidget);
+    });
+  });
+
+  group('tutorial初読後の手紙から瓶への移動光', () {
+    final movingLight = find.byKey(
+      const ValueKey('tutorialLetterToBottleMovingLight'),
+    );
+    final letterGlow = find.byKey(const ValueKey('tutorialLetterGlow'));
+    final bottleGlow = find.byKey(const ValueKey('tutorialBottleGlow'));
+
+    Future<_RoomHarness> openUnreadTutorial(WidgetTester tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        letters: [_letter('tutorial_001')],
+        initialReadState: ReadLetterState(
+          receivedLetters: {},
+          deliveredLetters: const {'2026-08-07': 'tutorial_001'},
+        ),
+      );
+      expect(letterGlow, findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('letterTapArea')));
+      await pumpUntilLetterPage(tester);
+      expect(find.byType(LetterPage), findsOneWidget);
+      return harness;
+    }
+
+    Future<void> returnToRoom(WidgetTester tester) async {
+      await tester.pageBack();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    testWidgets('tutorial初読は30滴を付与して既読保存する', (tester) async {
+      final harness = await openUnreadTutorial(tester);
+
+      expect(harness.shizukuProvider.currentShizuku, 60);
+      expect(
+        harness.readLetterProvider.readLetterIds,
+        contains('tutorial_001'),
+      );
+      expect(movingLight, findsNothing);
+    });
+
+    testWidgets('tutorial初読画面からRoomへ戻ると移動光を一度表示する', (tester) async {
+      await openUnreadTutorial(tester);
+      await returnToRoom(tester);
+
+      expect(movingLight, findsOneWidget);
+      expect(letterGlow, findsNothing);
+    });
+
+    testWidgets('移動中はbottle Glowを抑止し完了後に表示する', (tester) async {
+      await openUnreadTutorial(tester);
+      await returnToRoom(tester);
+
+      expect(movingLight, findsOneWidget);
+      expect(bottleGlow, findsNothing);
+
+      await tester.pump(const Duration(milliseconds: 1300));
+      await tester.pump();
+
+      expect(movingLight, findsNothing);
+      expect(bottleGlow, findsOneWidget);
+    });
+
+    testWidgets('tutorial既読再読後は移動光を表示しない', (tester) async {
+      await _pumpRoom(
+        tester,
+        letters: [_letter('tutorial_001')],
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 7)},
+          deliveredLetters: const {'2026-08-07': 'tutorial_001'},
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('letterTapArea')));
+      await pumpUntilLetterPage(tester);
+      await returnToRoom(tester);
+
+      expect(movingLight, findsNothing);
+      expect(bottleGlow, findsOneWidget);
+    });
+
+    testWidgets('通常手紙の初読後は移動光を表示しない', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+          deliveredLetters: const {'2026-08-07': 'letterA'},
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('letterTapArea')));
+      await pumpUntilLetterPage(tester);
+      await returnToRoom(tester);
+
+      expect(movingLight, findsNothing);
+    });
+
+    testWidgets('tutorial既読状態でRoomを再生成しても移動光なしでbottle Glowのみ', (tester) async {
+      await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+        ),
+      );
+
+      expect(movingLight, findsNothing);
+      expect(bottleGlow, findsOneWidget);
+    });
+
+    testWidgets('tutorial未読配達済みでRoomを再生成するとletter Glowのみ', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: {},
+          deliveredLetters: const {'2026-08-07': 'tutorial_001'},
+        ),
+      );
+
+      expect(movingLight, findsNothing);
+      expect(letterGlow, findsOneWidget);
+      expect(bottleGlow, findsNothing);
+    });
+
+    testWidgets('移動中にRoomを破棄してもTicker例外がない', (tester) async {
+      await openUnreadTutorial(tester);
+      await returnToRoom(tester);
+      expect(movingLight, findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('移動中のrebuildでアニメーションを最初から再開しない', (tester) async {
+      final harness = await openUnreadTutorial(tester);
+      await returnToRoom(tester);
+      await tester.pump(const Duration(milliseconds: 700));
+
+      await harness.readLetterProvider.load();
+      await tester.pump();
+      expect(movingLight, findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 650));
+      await tester.pump();
+      expect(movingLight, findsNothing);
+      expect(bottleGlow, findsOneWidget);
+    });
+
+    testWidgets('到着演出中は手紙を開けずtutorial移動光も開始しない', (tester) async {
+      await _pumpRoom(tester, letters: [_letter('tutorial_001')]);
+
+      expect(find.byKey(const ValueKey('letterTapArea')), findsNothing);
+      expect(movingLight, findsNothing);
+    });
+
+    testWidgets('LetterPage表示中にtutorial完了状態になった場合は移動光を開始しない', (tester) async {
+      final harness = await openUnreadTutorial(tester);
+      await harness.readLetterProvider.completeTutorial();
+      await returnToRoom(tester);
+
+      expect(movingLight, findsNothing);
+      expect(bottleGlow, findsNothing);
     });
   });
 
@@ -1545,6 +1714,12 @@ final _placedFurnitureLayer = find.byKey(
 Future<void> _pumpRouteTransition(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(seconds: 1));
+}
+
+Future<void> pumpUntilLetterPage(WidgetTester tester) async {
+  for (var i = 0; i < 20 && find.byType(LetterPage).evaluate().isEmpty; i++) {
+    await tester.pump(const Duration(milliseconds: 50));
+  }
 }
 
 Future<void> _tapLetter(WidgetTester tester) async {
