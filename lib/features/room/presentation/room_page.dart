@@ -8,6 +8,7 @@ import 'package:ame_tsuzuri/features/letters/provider/shizuku_provider.dart';
 import 'package:ame_tsuzuri/features/letters/service/letter_delivery_service.dart';
 import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart';
 import 'package:ame_tsuzuri/features/furniture/presentation/catalog_page.dart';
+import 'package:ame_tsuzuri/features/furniture/provider/catalog_provider.dart';
 import 'package:ame_tsuzuri/features/room/presentation/prototype_controls.dart';
 import 'package:ame_tsuzuri/features/room/presentation/prototype_reset_page.dart';
 import 'package:ame_tsuzuri/features/furniture/provider/placed_furniture_provider.dart';
@@ -17,6 +18,34 @@ import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
 import 'package:ame_tsuzuri/shared/provider/weather_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+enum _TutorialTarget { none, letter, bottle, bookshelf }
+
+_TutorialTarget _resolveTutorialTarget({
+  required bool areProvidersLoaded,
+  required bool tutorialCompleted,
+  required bool isTutorialRead,
+  required bool hasTutorialLetterInRoom,
+  required bool hasOpenedTutorialBottle,
+  required bool hasPurchasedFurniture,
+  required bool hasPlacedFurniture,
+}) {
+  if (!areProvidersLoaded || tutorialCompleted) {
+    return _TutorialTarget.none;
+  }
+  if (!isTutorialRead) {
+    return hasTutorialLetterInRoom
+        ? _TutorialTarget.letter
+        : _TutorialTarget.none;
+  }
+  if (hasPlacedFurniture) {
+    return _TutorialTarget.bookshelf;
+  }
+  if (!hasOpenedTutorialBottle && !hasPurchasedFurniture) {
+    return _TutorialTarget.bottle;
+  }
+  return _TutorialTarget.none;
+}
 
 class RoomPage extends StatefulWidget {
   const RoomPage({super.key, this.letterRepository, this.furnitureRepository});
@@ -101,6 +130,27 @@ class RoomPage extends StatefulWidget {
   static const double _rugWidthScale = 0.898;
   static const double _rugHeightScale = 0.80;
 
+  @visibleForTesting
+  static String resolveTutorialTargetForTesting({
+    required bool areProvidersLoaded,
+    required bool tutorialCompleted,
+    required bool isTutorialRead,
+    required bool hasTutorialLetterInRoom,
+    required bool hasOpenedTutorialBottle,
+    required bool hasPurchasedFurniture,
+    required bool hasPlacedFurniture,
+  }) {
+    return _resolveTutorialTarget(
+      areProvidersLoaded: areProvidersLoaded,
+      tutorialCompleted: tutorialCompleted,
+      isTutorialRead: isTutorialRead,
+      hasTutorialLetterInRoom: hasTutorialLetterInRoom,
+      hasOpenedTutorialBottle: hasOpenedTutorialBottle,
+      hasPurchasedFurniture: hasPurchasedFurniture,
+      hasPlacedFurniture: hasPlacedFurniture,
+    ).name;
+  }
+
   @override
   State<RoomPage> createState() => _RoomPageState();
 }
@@ -144,6 +194,7 @@ class _RoomPageState extends State<RoomPage>
   Widget build(BuildContext context) {
     final appDateProvider = context.watch<AppDateProvider>();
     final readLetterProvider = context.watch<ReadLetterProvider>();
+    final catalogProvider = context.watch<CatalogProvider>();
     final placedFurnitureProvider = context.watch<PlacedFurnitureProvider>();
     context.watch<WeatherProvider>();
 
@@ -160,6 +211,24 @@ class _RoomPageState extends State<RoomPage>
         _scheduleDelivery(today);
       }
     }
+
+    _resolveTutorialTarget(
+      areProvidersLoaded:
+          readLetterProvider.isLoaded &&
+          catalogProvider.isLoaded &&
+          placedFurnitureProvider.isLoaded,
+      tutorialCompleted: readLetterProvider.tutorialCompleted,
+      isTutorialRead: readLetterProvider.readLetterIds.contains(
+        RoomPage._tutorialLetterId,
+      ),
+      hasTutorialLetterInRoom:
+          showLetter &&
+          readLetterProvider.deliveredLetterIdOn(appDateProvider.today) ==
+              RoomPage._tutorialLetterId,
+      hasOpenedTutorialBottle: readLetterProvider.hasOpenedTutorialBottle,
+      hasPurchasedFurniture: catalogProvider.purchasedFurnitureIds.isNotEmpty,
+      hasPlacedFurniture: placedFurnitureProvider.placedFurnitureIds.isNotEmpty,
+    );
 
     return Scaffold(
       backgroundColor: Colors.black,

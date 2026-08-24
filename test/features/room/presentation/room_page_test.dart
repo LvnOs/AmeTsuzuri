@@ -29,6 +29,111 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
+  group('チュートリアル誘導対象の導出', () {
+    String resolve({
+      bool areProvidersLoaded = true,
+      bool tutorialCompleted = false,
+      bool isTutorialRead = true,
+      bool hasTutorialLetterInRoom = false,
+      bool hasOpenedTutorialBottle = false,
+      bool hasPurchasedFurniture = false,
+      bool hasPlacedFurniture = false,
+    }) {
+      return RoomPage.resolveTutorialTargetForTesting(
+        areProvidersLoaded: areProvidersLoaded,
+        tutorialCompleted: tutorialCompleted,
+        isTutorialRead: isTutorialRead,
+        hasTutorialLetterInRoom: hasTutorialLetterInRoom,
+        hasOpenedTutorialBottle: hasOpenedTutorialBottle,
+        hasPurchasedFurniture: hasPurchasedFurniture,
+        hasPlacedFurniture: hasPlacedFurniture,
+      );
+    }
+
+    test('Provider未ロードならnone', () {
+      expect(
+        resolve(
+          areProvidersLoaded: false,
+          isTutorialRead: false,
+          hasTutorialLetterInRoom: true,
+        ),
+        'none',
+      );
+    });
+
+    test('tutorial未読かつRoomに配達済みならletter', () {
+      expect(
+        resolve(isTutorialRead: false, hasTutorialLetterInRoom: true),
+        'letter',
+      );
+    });
+
+    test('tutorial既読で瓶未確認かつ家具未購入・未配置ならbottle', () {
+      expect(resolve(), 'bottle');
+    });
+
+    test('瓶確認済みで家具未購入・未配置ならnone', () {
+      expect(resolve(hasOpenedTutorialBottle: true), 'none');
+    });
+
+    test('瓶未確認でも家具購入済み・未配置ならnone', () {
+      expect(resolve(hasPurchasedFurniture: true), 'none');
+    });
+
+    test('瓶確認済みかつ家具購入済み・未配置ならnone', () {
+      expect(
+        resolve(hasOpenedTutorialBottle: true, hasPurchasedFurniture: true),
+        'none',
+      );
+    });
+
+    test('tutorial既読かつ家具配置済みで未完了ならbookshelf', () {
+      expect(resolve(hasPlacedFurniture: true), 'bookshelf');
+    });
+
+    test('家具配置済みでもtutorial完了済みならnone', () {
+      expect(
+        resolve(hasPlacedFurniture: true, tutorialCompleted: true),
+        'none',
+      );
+    });
+
+    test('tutorial未読と家具配置済みが競合したらletterを優先', () {
+      expect(
+        resolve(
+          isTutorialRead: false,
+          hasTutorialLetterInRoom: true,
+          hasPlacedFurniture: true,
+        ),
+        'letter',
+      );
+    });
+
+    test('本棚を先に開いた想定でも家具未配置ならbookshelfにしない', () {
+      expect(resolve(hasOpenedTutorialBottle: true), 'none');
+    });
+
+    test('reset相当では配達前none、配達後letter', () {
+      expect(resolve(isTutorialRead: false), 'none');
+      expect(
+        resolve(isTutorialRead: false, hasTutorialLetterInRoom: true),
+        'letter',
+      );
+    });
+
+    test('通常プレイのtutorial完了状態ならnone', () {
+      expect(
+        resolve(
+          tutorialCompleted: true,
+          hasOpenedTutorialBottle: true,
+          hasPurchasedFurniture: true,
+          hasPlacedFurniture: true,
+        ),
+        'none',
+      );
+    });
+  });
+
   group('今日の手紙の配達表示', () {
     testWidgets('未配達で候補があれば配達してletterレイヤーを表示する', (tester) async {
       final harness = await _pumpRoom(tester);

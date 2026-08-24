@@ -6,6 +6,161 @@ import 'package:ame_tsuzuri/features/letters/repository/read_letter_repository.d
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('初期状態ではチュートリアル状態が両方false', () {
+    final provider = ReadLetterProvider(
+      _FakeReadLetterRepository(_emptyState()),
+    );
+
+    expect(provider.hasOpenedTutorialBottle, isFalse);
+    expect(provider.tutorialCompleted, isFalse);
+  });
+
+  group('tutorial progress', () {
+    test('瓶確認を保存成功後に反映して通知する', () async {
+      final repository = _FakeReadLetterRepository(_emptyState());
+      final provider = await _loadProvider(repository);
+      var notificationCount = 0;
+      provider.addListener(() => notificationCount++);
+
+      expect(await provider.markTutorialBottleOpened(), isTrue);
+
+      expect(provider.hasOpenedTutorialBottle, isTrue);
+      expect(provider.tutorialCompleted, isFalse);
+      expect(repository.state.hasOpenedTutorialBottle, isTrue);
+      expect(repository.saveCallCount, 1);
+      expect(notificationCount, 1);
+    });
+
+    test('瓶確認済みなら再保存も通知もしない', () async {
+      final repository = _FakeReadLetterRepository(
+        ReadLetterState(receivedLetters: {}, hasOpenedTutorialBottle: true),
+      );
+      final provider = await _loadProvider(repository);
+      var notificationCount = 0;
+      provider.addListener(() => notificationCount++);
+
+      expect(await provider.markTutorialBottleOpened(), isFalse);
+
+      expect(repository.saveCallCount, 0);
+      expect(notificationCount, 0);
+    });
+
+    test('瓶確認の保存失敗時は既存状態を維持して通知しない', () async {
+      final repository = _FakeReadLetterRepository(_emptyState())
+        ..failSave = true;
+      final provider = await _loadProvider(repository);
+      var notificationCount = 0;
+      provider.addListener(() => notificationCount++);
+
+      await expectLater(
+        provider.markTutorialBottleOpened(),
+        throwsA(isA<StateError>()),
+      );
+
+      expect(provider.hasOpenedTutorialBottle, isFalse);
+      expect(repository.state.hasOpenedTutorialBottle, isFalse);
+      expect(notificationCount, 0);
+    });
+
+    test('チュートリアル完了を保存成功後に反映して通知する', () async {
+      final repository = _FakeReadLetterRepository(_emptyState());
+      final provider = await _loadProvider(repository);
+      var notificationCount = 0;
+      provider.addListener(() => notificationCount++);
+
+      expect(await provider.completeTutorial(), isTrue);
+
+      expect(provider.tutorialCompleted, isTrue);
+      expect(provider.hasOpenedTutorialBottle, isFalse);
+      expect(repository.state.tutorialCompleted, isTrue);
+      expect(repository.saveCallCount, 1);
+      expect(notificationCount, 1);
+    });
+
+    test('チュートリアル完了済みなら再保存も通知もしない', () async {
+      final repository = _FakeReadLetterRepository(
+        ReadLetterState(receivedLetters: {}, tutorialCompleted: true),
+      );
+      final provider = await _loadProvider(repository);
+      var notificationCount = 0;
+      provider.addListener(() => notificationCount++);
+
+      expect(await provider.completeTutorial(), isFalse);
+
+      expect(repository.saveCallCount, 0);
+      expect(notificationCount, 0);
+    });
+
+    test('チュートリアル完了の保存失敗時は既存状態を維持して通知しない', () async {
+      final repository = _FakeReadLetterRepository(_emptyState())
+        ..failSave = true;
+      final provider = await _loadProvider(repository);
+      var notificationCount = 0;
+      provider.addListener(() => notificationCount++);
+
+      await expectLater(
+        provider.completeTutorial(),
+        throwsA(isA<StateError>()),
+      );
+
+      expect(provider.tutorialCompleted, isFalse);
+      expect(repository.state.tutorialCompleted, isFalse);
+      expect(notificationCount, 0);
+    });
+
+    test('瓶確認済み状態でmarkAsReadしてもチュートリアル状態を維持する', () async {
+      final repository = _FakeReadLetterRepository(
+        ReadLetterState(receivedLetters: {}, hasOpenedTutorialBottle: true),
+      );
+      final provider = await _loadProvider(repository);
+
+      await provider.markAsRead('letterA', receivedDate: DateTime(2026, 8, 8));
+
+      expect(provider.hasOpenedTutorialBottle, isTrue);
+      expect(repository.state.hasOpenedTutorialBottle, isTrue);
+    });
+
+    test('チュートリアル完了状態でdeliverしてもチュートリアル状態を維持する', () async {
+      final repository = _FakeReadLetterRepository(
+        ReadLetterState(receivedLetters: {}, tutorialCompleted: true),
+      );
+      final provider = await _loadProvider(repository);
+
+      await provider.deliver('letterA', deliveredDate: DateTime(2026, 8, 8));
+
+      expect(provider.tutorialCompleted, isTrue);
+      expect(repository.state.tutorialCompleted, isTrue);
+    });
+
+    test('resetでチュートリアル状態を両方falseへ戻す', () async {
+      final repository = _FakeReadLetterRepository(
+        ReadLetterState(
+          receivedLetters: {},
+          hasOpenedTutorialBottle: true,
+          tutorialCompleted: true,
+        ),
+      );
+      final provider = await _loadProvider(repository);
+
+      await provider.reset();
+
+      expect(provider.hasOpenedTutorialBottle, isFalse);
+      expect(provider.tutorialCompleted, isFalse);
+    });
+
+    test('保存後にProviderを再生成してloadしてもチュートリアル状態を復元する', () async {
+      final repository = _FakeReadLetterRepository(_emptyState());
+      final firstProvider = await _loadProvider(repository);
+      await firstProvider.markTutorialBottleOpened();
+      await firstProvider.completeTutorial();
+
+      final reloadedProvider = await _loadProvider(repository);
+
+      expect(reloadedProvider.hasOpenedTutorialBottle, isTrue);
+      expect(reloadedProvider.tutorialCompleted, isTrue);
+    });
+  });
+
   test('進行中のloadは同じFutureを共有してRepositoryを一度だけ読む', () async {
     final repository = _BlockingLoadReadLetterRepository();
     final provider = ReadLetterProvider(repository);
@@ -35,9 +190,7 @@ void main() {
     final retry = provider.load();
     expect(repository.loadCallCount, 2);
     repository.completeLoad(
-      ReadLetterState(
-        receivedLetters: {'letterA': DateTime(2026, 8, 8)},
-      ),
+      ReadLetterState(receivedLetters: {'letterA': DateTime(2026, 8, 8)}),
     );
     await retry;
 
@@ -48,10 +201,7 @@ void main() {
   test('受取日ありと不明のStateをロードする', () async {
     final repository = _FakeReadLetterRepository(
       ReadLetterState(
-        receivedLetters: {
-          'letterA': DateTime(2026, 8, 8),
-          'legacy': null,
-        },
+        receivedLetters: {'letterA': DateTime(2026, 8, 8), 'legacy': null},
       ),
     );
     final provider = ReadLetterProvider(repository);
@@ -92,9 +242,7 @@ void main() {
     expect(result, isTrue);
     expect(provider.readLetterIds, {'letterA'});
     expect(provider.receivedDateFor('letterA'), DateTime(2026, 8, 8));
-    expect(repository.state.receivedLetters, {
-      'letterA': DateTime(2026, 8, 8),
-    });
+    expect(repository.state.receivedLetters, {'letterA': DateTime(2026, 8, 8)});
     expect(repository.saveCallCount, 1);
     expect(notificationCount, 1);
   });
@@ -142,10 +290,7 @@ void main() {
     );
     final provider = await _loadProvider(repository);
 
-    await provider.markAsRead(
-      'letterB',
-      receivedDate: DateTime(2026, 8, 10),
-    );
+    await provider.markAsRead('letterB', receivedDate: DateTime(2026, 8, 10));
 
     expect(provider.receivedLetters, {
       'letterA': DateTime(2026, 8, 8),
@@ -162,10 +307,7 @@ void main() {
     provider.addListener(() => notificationCount++);
 
     await expectLater(
-      provider.markAsRead(
-        'letterB',
-        receivedDate: DateTime(2026, 8, 10),
-      ),
+      provider.markAsRead('letterB', receivedDate: DateTime(2026, 8, 10)),
       throwsA(isA<StateError>()),
     );
 
@@ -212,9 +354,7 @@ void main() {
     test('指定日に受け取ったLetter IDを返し時刻は無視する', () async {
       final provider = await _loadProvider(
         _FakeReadLetterRepository(
-          ReadLetterState(
-            receivedLetters: {'letterA': DateTime(2026, 8, 8)},
-          ),
+          ReadLetterState(receivedLetters: {'letterA': DateTime(2026, 8, 8)}),
         ),
       );
 
@@ -228,10 +368,7 @@ void main() {
       final provider = await _loadProvider(
         _FakeReadLetterRepository(
           ReadLetterState(
-            receivedLetters: {
-              'letterA': DateTime(2026, 8, 7),
-              'legacy': null,
-            },
+            receivedLetters: {'letterA': DateTime(2026, 8, 7), 'legacy': null},
           ),
         ),
       );
@@ -252,10 +389,7 @@ void main() {
         ),
       );
 
-      expect(
-        provider.receivedLetterIdOn(DateTime(2026, 8, 8)),
-        'letterB',
-      );
+      expect(provider.receivedLetterIdOn(DateTime(2026, 8, 8)), 'letterB');
     });
 
     test('同日に複数履歴があればMap順の最初のIDを返す', () async {
@@ -275,18 +409,14 @@ void main() {
 
     test('問い合わせで状態変更・保存・通知をしない', () async {
       final repository = _FakeReadLetterRepository(
-        ReadLetterState(
-          receivedLetters: {'letterA': DateTime(2026, 8, 8)},
-        ),
+        ReadLetterState(receivedLetters: {'letterA': DateTime(2026, 8, 8)}),
       );
       final provider = await _loadProvider(repository);
       var notificationCount = 0;
       provider.addListener(() => notificationCount++);
 
       expect(provider.receivedLetterIdOn(DateTime(2026, 8, 8)), 'letterA');
-      expect(provider.receivedLetters, {
-        'letterA': DateTime(2026, 8, 8),
-      });
+      expect(provider.receivedLetters, {'letterA': DateTime(2026, 8, 8)});
       expect(repository.saveCallCount, 0);
       expect(notificationCount, 0);
     });
@@ -296,9 +426,7 @@ void main() {
     test('同じ年月日の受取履歴があればtrueを返す', () async {
       final provider = await _loadProvider(
         _FakeReadLetterRepository(
-          ReadLetterState(
-            receivedLetters: {'letterA': DateTime(2026, 8, 8)},
-          ),
+          ReadLetterState(receivedLetters: {'letterA': DateTime(2026, 8, 8)}),
         ),
       );
 
@@ -311,9 +439,7 @@ void main() {
     test('別日の受取履歴だけならfalseを返す', () async {
       final provider = await _loadProvider(
         _FakeReadLetterRepository(
-          ReadLetterState(
-            receivedLetters: {'letterA': DateTime(2026, 8, 7)},
-          ),
+          ReadLetterState(receivedLetters: {'letterA': DateTime(2026, 8, 7)}),
         ),
       );
 
@@ -349,18 +475,14 @@ void main() {
     test('問い合わせでは状態変更も通知も行わない', () async {
       final provider = await _loadProvider(
         _FakeReadLetterRepository(
-          ReadLetterState(
-            receivedLetters: {'letterA': DateTime(2026, 8, 8)},
-          ),
+          ReadLetterState(receivedLetters: {'letterA': DateTime(2026, 8, 8)}),
         ),
       );
       var notificationCount = 0;
       provider.addListener(() => notificationCount++);
 
       expect(provider.hasReceivedLetterOn(DateTime(2026, 8, 8)), isTrue);
-      expect(provider.receivedLetters, {
-        'letterA': DateTime(2026, 8, 8),
-      });
+      expect(provider.receivedLetters, {'letterA': DateTime(2026, 8, 8)});
       expect(notificationCount, 0);
     });
   });
@@ -381,9 +503,7 @@ void main() {
       expect(provider.hasDeliveredLetterOn(DateTime(2026, 8, 8)), isTrue);
       expect(provider.deliveredLetterIdOn(DateTime(2026, 8, 8, 1)), 'letterA');
       expect(provider.hasDeliveredLetterOn(DateTime(2026, 8, 9)), isFalse);
-      expect(repository.state.deliveredLetters, {
-        '2026-08-08': 'letterA',
-      });
+      expect(repository.state.deliveredLetters, {'2026-08-08': 'letterA'});
     });
 
     test('同じ日への重複配達は同じIDでも別IDでも上書きしない', () async {
@@ -391,10 +511,7 @@ void main() {
       final provider = await _loadProvider(repository);
 
       expect(
-        await provider.deliver(
-          'letterA',
-          deliveredDate: DateTime(2026, 8, 8),
-        ),
+        await provider.deliver('letterA', deliveredDate: DateTime(2026, 8, 8)),
         isTrue,
       );
       expect(
@@ -405,10 +522,7 @@ void main() {
         isFalse,
       );
       expect(
-        await provider.deliver(
-          'letterB',
-          deliveredDate: DateTime(2026, 8, 8),
-        ),
+        await provider.deliver('letterB', deliveredDate: DateTime(2026, 8, 8)),
         isFalse,
       );
 
@@ -422,10 +536,7 @@ void main() {
       final provider = await _loadProvider(repository);
 
       await expectLater(
-        provider.deliver(
-          'letterA',
-          deliveredDate: DateTime(2026, 8, 8),
-        ),
+        provider.deliver('letterA', deliveredDate: DateTime(2026, 8, 8)),
         throwsA(isA<StateError>()),
       );
 
@@ -436,16 +547,10 @@ void main() {
       final repository = _FakeReadLetterRepository(_emptyState());
       final provider = await _loadProvider(repository);
 
-      await provider.deliver(
-        'letterA',
-        deliveredDate: DateTime(2026, 8, 8),
-      );
+      await provider.deliver('letterA', deliveredDate: DateTime(2026, 8, 8));
       expect(provider.readLetterIds, isNot(contains('letterA')));
 
-      await provider.markAsRead(
-        'letterA',
-        receivedDate: DateTime(2026, 8, 8),
-      );
+      await provider.markAsRead('letterA', receivedDate: DateTime(2026, 8, 8));
 
       expect(provider.deliveredLetterIdOn(DateTime(2026, 8, 8)), 'letterA');
       expect(provider.readLetterIds, contains('letterA'));

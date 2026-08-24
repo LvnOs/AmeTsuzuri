@@ -15,6 +15,8 @@ class ReadLetterProvider extends ChangeNotifier {
   Set<String> get readLetterIds => _state.readLetterIds;
   Map<String, DateTime?> get receivedLetters => _state.receivedLetters;
   Map<String, String> get deliveredLetters => _state.deliveredLetters;
+  bool get hasOpenedTutorialBottle => _state.hasOpenedTutorialBottle;
+  bool get tutorialCompleted => _state.tutorialCompleted;
   DateTime? receivedDateFor(String letterId) => receivedLetters[letterId];
   bool get isLoaded => _isLoaded;
 
@@ -81,11 +83,10 @@ class ReadLetterProvider extends ChangeNotifier {
       receivedDate.day,
     );
     final nextState = ReadLetterState(
-      receivedLetters: {
-        ..._state.receivedLetters,
-        letterId: normalizedDate,
-      },
+      receivedLetters: {..._state.receivedLetters, letterId: normalizedDate},
       deliveredLetters: _state.deliveredLetters,
+      hasOpenedTutorialBottle: _state.hasOpenedTutorialBottle,
+      tutorialCompleted: _state.tutorialCompleted,
     );
 
     await _repository.saveState(nextState);
@@ -108,6 +109,8 @@ class ReadLetterProvider extends ChangeNotifier {
     final nextState = ReadLetterState(
       receivedLetters: _state.receivedLetters,
       deliveredLetters: {..._state.deliveredLetters, dateKey: letterId},
+      hasOpenedTutorialBottle: _state.hasOpenedTutorialBottle,
+      tutorialCompleted: _state.tutorialCompleted,
     );
 
     await _repository.saveState(nextState);
@@ -115,6 +118,44 @@ class ReadLetterProvider extends ChangeNotifier {
     _state = nextState;
     notifyListeners();
 
+    return true;
+  }
+
+  Future<bool> markTutorialBottleOpened() async {
+    if (_state.hasOpenedTutorialBottle) {
+      return false;
+    }
+
+    final nextState = ReadLetterState(
+      receivedLetters: _state.receivedLetters,
+      deliveredLetters: _state.deliveredLetters,
+      hasOpenedTutorialBottle: true,
+      tutorialCompleted: _state.tutorialCompleted,
+    );
+
+    await _repository.saveState(nextState);
+
+    _state = nextState;
+    notifyListeners();
+    return true;
+  }
+
+  Future<bool> completeTutorial() async {
+    if (_state.tutorialCompleted) {
+      return false;
+    }
+
+    final nextState = ReadLetterState(
+      receivedLetters: _state.receivedLetters,
+      deliveredLetters: _state.deliveredLetters,
+      hasOpenedTutorialBottle: _state.hasOpenedTutorialBottle,
+      tutorialCompleted: true,
+    );
+
+    await _repository.saveState(nextState);
+
+    _state = nextState;
+    notifyListeners();
     return true;
   }
 

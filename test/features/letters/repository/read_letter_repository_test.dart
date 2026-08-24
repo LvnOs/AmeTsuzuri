@@ -19,16 +19,13 @@ void main() {
     await repository.saveState(
       ReadLetterState(
         receivedLetters: {},
-        deliveredLetters: {
-          '2026-08-08': 'letterA',
-          '2026-08-09': 'letterB',
-        },
+        deliveredLetters: {'2026-08-08': 'letterA', '2026-08-09': 'letterB'},
       ),
     );
 
     final prefs = await SharedPreferences.getInstance();
     final saved = jsonDecode(prefs.getString(stateKey)!);
-    expect(saved['version'], 2);
+    expect(saved['version'], 3);
     expect(saved['deliveredLetters'], {
       '2026-08-08': 'letterA',
       '2026-08-09': 'letterB',
@@ -39,6 +36,49 @@ void main() {
       '2026-08-08': 'letterA',
       '2026-08-09': 'letterB',
     });
+  });
+
+  test('version 3でチュートリアル状態を保存して再ロードできる', () async {
+    final repository = ReadLetterRepository();
+    await repository.saveState(
+      ReadLetterState(
+        receivedLetters: {'tutorial_001': DateTime(2026, 8, 7)},
+        deliveredLetters: {'2026-08-07': 'tutorial_001'},
+        hasOpenedTutorialBottle: true,
+        tutorialCompleted: true,
+      ),
+    );
+
+    final prefs = await SharedPreferences.getInstance();
+    final saved = jsonDecode(prefs.getString(stateKey)!);
+    expect(saved, {
+      'version': 3,
+      'receivedLetters': {'tutorial_001': '2026-08-07'},
+      'deliveredLetters': {'2026-08-07': 'tutorial_001'},
+      'hasOpenedTutorialBottle': true,
+      'tutorialCompleted': true,
+    });
+
+    final reloaded = await repository.loadState();
+    expect(reloaded.hasOpenedTutorialBottle, isTrue);
+    expect(reloaded.tutorialCompleted, isTrue);
+  });
+
+  test('version 2データではチュートリアル状態をfalseとして読む', () async {
+    SharedPreferences.setMockInitialValues({
+      stateKey: jsonEncode({
+        'version': 2,
+        'receivedLetters': {'tutorial_001': '2026-08-07'},
+        'deliveredLetters': {'2026-08-07': 'tutorial_001'},
+      }),
+    });
+
+    final state = await ReadLetterRepository().loadState();
+
+    expect(state.receivedLetters, {'tutorial_001': DateTime(2026, 8, 7)});
+    expect(state.deliveredLetters, {'2026-08-07': 'tutorial_001'});
+    expect(state.hasOpenedTutorialBottle, isFalse);
+    expect(state.tutorialCompleted, isFalse);
   });
 
   test('旧version 1形式は受取日から日ごとの配達IDを復元する', () async {
@@ -66,6 +106,23 @@ void main() {
       '2026-08-08': 'first',
       '2026-08-09': 'otherDay',
     });
+    expect(state.hasOpenedTutorialBottle, isFalse);
+    expect(state.tutorialCompleted, isFalse);
+  });
+
+  test('version 3でもチュートリアルフィールド欠落時はfalseとして読む', () async {
+    SharedPreferences.setMockInitialValues({
+      stateKey: jsonEncode({
+        'version': 3,
+        'receivedLetters': {},
+        'deliveredLetters': {},
+      }),
+    });
+
+    final state = await ReadLetterRepository().loadState();
+
+    expect(state.hasOpenedTutorialBottle, isFalse);
+    expect(state.tutorialCompleted, isFalse);
   });
 
   test('resetStateは既読と配達の両方を消す', () async {
@@ -74,6 +131,8 @@ void main() {
       ReadLetterState(
         receivedLetters: {'letterA': DateTime(2026, 8, 8)},
         deliveredLetters: {'2026-08-08': 'letterA'},
+        hasOpenedTutorialBottle: true,
+        tutorialCompleted: true,
       ),
     );
 
@@ -82,6 +141,8 @@ void main() {
     final state = await repository.loadState();
     expect(state.receivedLetters, isEmpty);
     expect(state.deliveredLetters, isEmpty);
+    expect(state.hasOpenedTutorialBottle, isFalse);
+    expect(state.tutorialCompleted, isFalse);
   });
 
   test('新旧データがなければ空Stateを保存して返す', () async {
@@ -102,7 +163,7 @@ void main() {
     expect(state.receivedLetters, {'letterA': null, 'letterB': null});
     final prefs = await SharedPreferences.getInstance();
     final saved = jsonDecode(prefs.getString(stateKey)!);
-    expect(saved['version'], 2);
+    expect(saved['version'], 3);
     expect(saved['receivedLetters'], {'letterA': null, 'letterB': null});
     expect(saved['deliveredLetters'], isEmpty);
     expect(prefs.getStringList(legacyKey), ['letterA', 'letterB']);
@@ -211,9 +272,7 @@ void main() {
     });
     final repository = ReadLetterRepository();
     await repository.saveState(
-      ReadLetterState(
-        receivedLetters: {'newLetter': DateTime(2026, 8, 8)},
-      ),
+      ReadLetterState(receivedLetters: {'newLetter': DateTime(2026, 8, 8)}),
     );
 
     await repository.resetState();
@@ -228,6 +287,8 @@ void main() {
     await repository.saveState(
       ReadLetterState(
         receivedLetters: {'dated': DateTime(2026, 8, 8)},
+        hasOpenedTutorialBottle: true,
+        tutorialCompleted: true,
       ),
     );
 
@@ -239,6 +300,8 @@ void main() {
       'newLetter': null,
     });
     expect(await repository.loadReadLetterIds(), {'dated', 'newLetter'});
+    expect(state.hasOpenedTutorialBottle, isTrue);
+    expect(state.tutorialCompleted, isTrue);
   });
 
   test('移行後もShizukuRepositoryが旧既読IDを移行元にできる', () async {
@@ -260,7 +323,10 @@ void main() {
     source['letterB'] = null;
 
     expect(state.receivedLetters.keys, {'letterA'});
-    expect(() => state.receivedLetters['letterB'] = null, throwsUnsupportedError);
+    expect(
+      () => state.receivedLetters['letterB'] = null,
+      throwsUnsupportedError,
+    );
     expect(() => state.readLetterIds.add('letterB'), throwsUnsupportedError);
   });
 }

@@ -11,7 +11,7 @@ class ReadLetterRepository {
 
   static const String _stateKey = 'readLetterState';
   static const String _legacyIdsKey = 'readLetterIds';
-  static const int _currentVersion = 2;
+  static const int _currentVersion = 3;
 
   final SetStringOverride? setStringOverride;
 
@@ -41,6 +41,8 @@ class ReadLetterRepository {
         ),
       ),
       'deliveredLetters': state.deliveredLetters,
+      'hasOpenedTutorialBottle': state.hasOpenedTutorialBottle,
+      'tutorialCompleted': state.tutorialCompleted,
     });
 
     final didSave = setStringOverride != null
@@ -55,9 +57,7 @@ class ReadLetterRepository {
   }
 
   Future<void> resetState() async {
-    await saveState(
-      ReadLetterState(receivedLetters: {}, deliveredLetters: {}),
-    );
+    await saveState(ReadLetterState(receivedLetters: {}, deliveredLetters: {}));
 
     final prefs = await SharedPreferences.getInstance();
     final didRemoveLegacyIds = await prefs.remove(_legacyIdsKey);
@@ -79,6 +79,8 @@ class ReadLetterRepository {
       ReadLetterState(
         receivedLetters: receivedLetters,
         deliveredLetters: currentState.deliveredLetters,
+        hasOpenedTutorialBottle: currentState.hasOpenedTutorialBottle,
+        tutorialCompleted: currentState.tutorialCompleted,
       ),
     );
   }
@@ -161,6 +163,12 @@ class ReadLetterRepository {
       return ReadLetterState(
         receivedLetters: receivedLetters,
         deliveredLetters: deliveredLetters,
+        hasOpenedTutorialBottle: decoded['hasOpenedTutorialBottle'] is bool
+            ? decoded['hasOpenedTutorialBottle'] as bool
+            : false,
+        tutorialCompleted: decoded['tutorialCompleted'] is bool
+            ? decoded['tutorialCompleted'] as bool
+            : false,
       );
     } on FormatException {
       return null;
