@@ -99,6 +99,15 @@ const _hiddenFurniture = Furniture(
   imagePath: 'unused.png',
   initialAvailable: false,
 );
+const _multiSlotFurniture = Furniture(
+  id: 'multi_slot_furniture',
+  name: '複数配置家具',
+  price: 30,
+  size: 'small',
+  slotIds: ['slot_a', 'long_slot'],
+  imagePath: 'unused.png',
+  initialAvailable: true,
+);
 
 void main() {
   testWidgets('Providerロード中は進捗表示しロード後に家具一覧へ切り替わる', (tester) async {
@@ -344,10 +353,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(AlertDialog), findsOneWidget);
       expect(
-        find.descendant(
-          of: find.byType(AlertDialog),
-          matching: find.byType(ListTile),
-        ),
+        find.byKey(const ValueKey('placementOption-test_slot')),
         findsOneWidget,
       );
     });
@@ -398,7 +404,11 @@ void main() {
 
       await tester.tap(_furnitureTile(_inkBottle.name));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('机上A'));
+      await tester.tap(
+        find.byKey(
+          const ValueKey('placementOption-living_room_desk_surface_left'),
+        ),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('置き換える'));
       await tester.pumpAndSettle();
@@ -427,7 +437,11 @@ void main() {
 
       await tester.tap(_furnitureTile(_woodenMug.name));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('机上A'));
+      await tester.tap(
+        find.byKey(
+          const ValueKey('placementOption-living_room_desk_surface_left'),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
         _deskSurfaceLeftSlotId: 'wooden_mug',
@@ -477,7 +491,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('配置する'), findsOneWidget);
-      expect(find.text('配置可能な場所'), findsOneWidget);
+      expect(find.text('どこに置きますか？'), findsOneWidget);
+      expect(find.text('迎えた家具を、部屋に置いてみましょう。'), findsNothing);
+      expect(find.text('置く場所を選んでください。'), findsOneWidget);
+      expect(find.text('テスト配置場所に置く'), findsOneWidget);
     });
 
     testWidgets('配置済み家具に配置を変えると表示し配置操作へ進める', (tester) async {
@@ -493,6 +510,13 @@ void main() {
 
       expect(find.text('現在の配置場所：テスト配置場所'), findsOneWidget);
       expect(find.text('取り外す'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('placementOption-test_slot')),
+          matching: find.byIcon(Icons.check_circle_outline),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('雫未ロード中は所持雫をダッシュ表示にする', (tester) async {
@@ -551,7 +575,9 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('配置可能な場所'), findsOneWidget);
+      expect(find.text('どこに置きますか？'), findsOneWidget);
+      expect(find.text('置く場所を選んでください。'), findsOneWidget);
+      expect(find.text('迎えた家具を、部屋に置いてみましょう。'), findsOneWidget);
     });
 
     testWidgets('購入確認キャンセルでは購入も配置Dialog表示もしない', (tester) async {
@@ -631,7 +657,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(_furnitureTile('家具A'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('テスト配置場所'));
+      await tester.tap(
+        find.byKey(const ValueKey('placementOption-test_slot')),
+      );
       await tester.pumpAndSettle();
 
       expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
@@ -648,7 +676,9 @@ void main() {
       );
 
       await _buyFurniture(tester, '家具A');
-      await tester.tap(find.text('テスト配置場所'));
+      await tester.tap(
+        find.byKey(const ValueKey('placementOption-test_slot')),
+      );
       await tester.pumpAndSettle();
 
       expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
@@ -670,11 +700,35 @@ void main() {
 
           await _buyFurniture(tester, '家具A');
 
-          expect(find.text('配置可能な場所'), findsOneWidget);
+          expect(find.text('どこに置きますか？'), findsOneWidget);
           expect(find.byType(AlertDialog), findsOneWidget);
         },
       );
     }
+
+    testWidgets('320px幅でも複数slotと長い名前を縦ボタンで表示できる', (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await _pumpCatalog(
+        tester,
+        furnitures: const [_multiSlotFurniture],
+        purchasedFurnitureIds: const {'multi_slot_furniture'},
+      );
+
+      await tester.tap(_furnitureTile('複数配置家具'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('placementOption-slot_a')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('placementOption-long_slot')),
+        findsOneWidget,
+      );
+      expect(find.text('窓辺に置く'), findsOneWidget);
+      expect(find.text('とても長い名前の配置場所に置く'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
   });
 
   group('CatalogPageの購入排他制御', () {
@@ -726,8 +780,8 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(find.text('配置可能な場所'), findsOneWidget);
-      expect(find.text('テスト配置場所'), findsOneWidget);
+      expect(find.text('どこに置きますか？'), findsOneWidget);
+      expect(find.text('テスト配置場所に置く'), findsOneWidget);
 
       await tester.tap(find.text('キャンセル'));
       await tester.pump();
@@ -876,7 +930,12 @@ class _FakePlacementSlotRepository extends PlacementSlotRepository {
   @override
   Future<PlacementSlot?> getById(String slotId) async => PlacementSlot(
     id: slotId,
-    name: slotId == _deskSurfaceLeftSlotId ? '机上A' : 'テスト配置場所',
+    name: switch (slotId) {
+      _deskSurfaceLeftSlotId => '机上A',
+      'slot_a' => '窓辺',
+      'long_slot' => 'とても長い名前の配置場所',
+      _ => 'テスト配置場所',
+    },
     type: 'surface',
     maxItems: 1,
   );

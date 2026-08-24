@@ -295,14 +295,15 @@ class _CatalogPageState extends State<CatalogPage> {
     ).showSnackBar(SnackBar(content: Text(message)));
 
     if (result == FurniturePurchaseResult.success) {
-      await _showPlacementDialog(context, furniture);
+      await _showPlacementDialog(context, furniture, isJustPurchased: true);
     }
   }
 
   Future<void> _showPlacementDialog(
     BuildContext context,
-    Furniture furniture,
-  ) async {
+    Furniture furniture, {
+    bool isJustPurchased = false,
+  }) async {
     final placedFurnitureProvider = context.read<PlacedFurnitureProvider>();
     final currentSlotId = placedFurnitureProvider.getSlotIdByFurnitureId(
       furniture.id,
@@ -329,23 +330,54 @@ class _CatalogPageState extends State<CatalogPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
+                'どこに置きますか？',
+                style: Theme.of(dialogContext).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (isJustPurchased) ...[
+                const SizedBox(height: 12),
+                const Text('迎えた家具を、部屋に置いてみましょう。'),
+              ],
+              const SizedBox(height: 8),
+              const Text('置く場所を選んでください。'),
+              const SizedBox(height: 16),
+              Text(
                 currentSlot == null
                     ? '現在の配置場所：未配置'
                     : '現在の配置場所：${currentSlot.name}',
               ),
-              const SizedBox(height: 16),
-              const Text('配置可能な場所'),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               ...slots.map(
-                (slot) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(slot.name),
-                  trailing: slot.id == currentSlotId
-                      ? const Icon(Icons.check)
-                      : null,
-                  onTap: () {
-                    Navigator.of(dialogContext).pop(slot.id);
-                  },
+                (slot) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      key: ValueKey('placementOption-${slot.id}'),
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop(slot.id);
+                      },
+                      icon: Icon(
+                        slot.id == currentSlotId
+                            ? Icons.check_circle_outline
+                            : Icons.chair_outlined,
+                        size: 20,
+                      ),
+                      label: Text(
+                        '${slot.name}に置く',
+                        textAlign: TextAlign.center,
+                        softWrap: true,
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
