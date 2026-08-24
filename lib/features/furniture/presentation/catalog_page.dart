@@ -264,10 +264,20 @@ class _CatalogPageState extends State<CatalogPage> {
 
     final shizukuProvider = context.read<ShizukuProvider>();
 
-    final result = await catalogProvider.buy(
-      furniture: furniture,
-      shizukuProvider: shizukuProvider,
-    );
+    late final FurniturePurchaseResult result;
+    try {
+      result = await catalogProvider.buy(
+        furniture: furniture,
+        shizukuProvider: shizukuProvider,
+      );
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('家具を迎えられませんでした')),
+        );
+      }
+      return;
+    }
 
     if (!context.mounted) {
       return;
@@ -283,6 +293,10 @@ class _CatalogPageState extends State<CatalogPage> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+
+    if (result == FurniturePurchaseResult.success) {
+      await _showPlacementDialog(context, furniture);
+    }
   }
 
   Future<void> _showPlacementDialog(

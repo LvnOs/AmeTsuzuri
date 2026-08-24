@@ -533,6 +533,150 @@ void main() {
     });
   });
 
+  group('購入成功後の配置Dialog自動表示', () {
+    testWidgets('購入した家具の配置Dialogだけを自動表示する', (tester) async {
+      await _pumpCatalog(
+        tester,
+        blockPurchase: false,
+        purchasedFurnitureIds: const {},
+      );
+
+      await _buyFurniture(tester, '家具A');
+
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('家具A'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('配置可能な場所'), findsOneWidget);
+    });
+
+    testWidgets('購入確認キャンセルでは購入も配置Dialog表示もしない', (tester) async {
+      final harness = await _pumpCatalog(
+        tester,
+        blockPurchase: false,
+        purchasedFurnitureIds: const {},
+      );
+
+      await tester.tap(_furnitureTile('家具A'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('やめる'));
+      await tester.pumpAndSettle();
+
+      expect(harness.catalogProvider.isPurchased('furniture_a'), isFalse);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(CatalogPage), findsOneWidget);
+    });
+
+    testWidgets('購入失敗では配置Dialogを表示せず状態を維持する', (tester) async {
+      final harness = await _pumpCatalog(
+        tester,
+        blockPurchase: false,
+        failNextShizukuSave: true,
+        purchasedFurnitureIds: const {},
+      );
+
+      await _buyFurniture(tester, '家具A');
+
+      expect(find.text('家具を迎えられませんでした'), findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(harness.catalogProvider.isPurchased('furniture_a'), isFalse);
+      expect(harness.shizukuProvider.currentShizuku, 100);
+    });
+
+    testWidgets('雫不足では配置Dialogを表示しない', (tester) async {
+      await _pumpCatalog(
+        tester,
+        blockPurchase: false,
+        initialShizuku: 20,
+        purchasedFurnitureIds: const {},
+      );
+
+      await _buyFurniture(tester, '家具A');
+
+      expect(find.text('雫が足りません'), findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+
+    testWidgets('自動配置をキャンセルしても購入と雫消費を維持しCatalogに残る', (tester) async {
+      final harness = await _pumpCatalog(
+        tester,
+        blockPurchase: false,
+        purchasedFurnitureIds: const {},
+      );
+
+      await _buyFurniture(tester, '家具A');
+      await tester.tap(find.text('キャンセル'));
+      await tester.pumpAndSettle();
+
+      expect(harness.catalogProvider.isPurchased('furniture_a'), isTrue);
+      expect(harness.shizukuProvider.currentShizuku, 70);
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, isEmpty);
+      expect(find.byType(CatalogPage), findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+
+    testWidgets('自動配置キャンセル後も同じ家具を再操作して配置できる', (tester) async {
+      final harness = await _pumpCatalog(
+        tester,
+        blockPurchase: false,
+        purchasedFurnitureIds: const {},
+      );
+
+      await _buyFurniture(tester, '家具A');
+      await tester.tap(find.text('キャンセル'));
+      await tester.pumpAndSettle();
+      await tester.tap(_furnitureTile('家具A'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('テスト配置場所'));
+      await tester.pumpAndSettle();
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        'test_slot': 'furniture_a',
+      });
+      expect(find.byType(CatalogPage), findsOneWidget);
+    });
+
+    testWidgets('購入成功後の自動Dialogから既存配置処理で配置できる', (tester) async {
+      final harness = await _pumpCatalog(
+        tester,
+        blockPurchase: false,
+        purchasedFurnitureIds: const {},
+      );
+
+      await _buyFurniture(tester, '家具A');
+      await tester.tap(find.text('テスト配置場所'));
+      await tester.pumpAndSettle();
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        'test_slot': 'furniture_a',
+      });
+      expect(find.byType(CatalogPage), findsOneWidget);
+    });
+
+    for (final showTutorialGuide in [true, false]) {
+      testWidgets(
+        '${showTutorialGuide ? 'tutorial初回' : '通常'}Catalogでも購入後に自動表示する',
+        (tester) async {
+          await _pumpCatalog(
+            tester,
+            showTutorialGuide: showTutorialGuide,
+            blockPurchase: false,
+            purchasedFurnitureIds: const {},
+          );
+
+          await _buyFurniture(tester, '家具A');
+
+          expect(find.text('配置可能な場所'), findsOneWidget);
+          expect(find.byType(AlertDialog), findsOneWidget);
+        },
+      );
+    }
+  });
+
   group('CatalogPageの購入排他制御', () {
     testWidgets('購入中は同じ未購入家具を再操作できない', (tester) async {
       final harness = await _pumpCatalog(tester);
@@ -628,10 +772,18 @@ Future<void> _startPurchase(WidgetTester tester, String furnitureName) async {
   await tester.pump(const Duration(seconds: 1));
 }
 
+Future<void> _buyFurniture(WidgetTester tester, String furnitureName) async {
+  await tester.tap(_furnitureTile(furnitureName));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('迎える'));
+  await tester.pumpAndSettle();
+}
+
 Future<_CatalogHarness> _pumpCatalog(
   WidgetTester tester, {
   bool showTutorialGuide = false,
   bool blockPurchase = true,
+  bool failNextShizukuSave = false,
   bool loadShizukuProvider = true,
   bool loadCatalogProvider = true,
   int initialShizuku = 100,
@@ -642,7 +794,7 @@ Future<_CatalogHarness> _pumpCatalog(
   final shizukuRepository = _BlockingShizukuRepository(
     blockSave: blockPurchase,
     initialShizuku: initialShizuku,
-  );
+  )..failNextSave = failNextShizukuSave;
   addTearDown(shizukuRepository.completeSave);
   final catalogRepository = _FakePurchasedFurnitureRepository(
     purchasedFurnitureIds,
@@ -685,6 +837,7 @@ Future<_CatalogHarness> _pumpCatalog(
     shizukuRepository: shizukuRepository,
     catalogRepository: catalogRepository,
     catalogProvider: catalogProvider,
+    shizukuProvider: shizukuProvider,
     placedFurnitureProvider: placedFurnitureProvider,
   );
 }
@@ -694,12 +847,14 @@ class _CatalogHarness {
     required this.shizukuRepository,
     required this.catalogRepository,
     required this.catalogProvider,
+    required this.shizukuProvider,
     required this.placedFurnitureProvider,
   });
 
   final _BlockingShizukuRepository shizukuRepository;
   final _FakePurchasedFurnitureRepository catalogRepository;
   final CatalogProvider catalogProvider;
+  final ShizukuProvider shizukuProvider;
   final PlacedFurnitureProvider placedFurnitureProvider;
 
   Future<void> finishPurchase(WidgetTester tester) async {
@@ -753,6 +908,7 @@ class _BlockingShizukuRepository extends ShizukuRepository {
   final int initialShizuku;
   final Completer<void> _saveCompleter = Completer<void>();
   int saveCallCount = 0;
+  bool failNextSave = false;
 
   @override
   Future<ShizukuState> loadState() async =>
@@ -761,6 +917,10 @@ class _BlockingShizukuRepository extends ShizukuRepository {
   @override
   Future<void> saveState(ShizukuState state) {
     saveCallCount++;
+    if (failNextSave) {
+      failNextSave = false;
+      throw StateError('save failed');
+    }
     return blockSave ? _saveCompleter.future : Future.value();
   }
 
