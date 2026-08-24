@@ -1993,6 +1993,69 @@ void main() {
       },
     );
   });
+
+  testWidgets('v0.2.1初回体験を配達から本棚のtutorial完了まで通せる', (tester) async {
+    final harness = await _pumpRoom(
+      tester,
+      letters: [_letter('tutorial_001')],
+      initialShizukuState: const ShizukuState(
+        currentShizuku: 0,
+        rewardedLetterIds: {},
+      ),
+    );
+
+    expect(harness.shizukuProvider.currentShizuku, 0);
+    await tester.pump(const Duration(milliseconds: 4450));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('tutorialLetterGlow')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('letterTapArea')));
+    await pumpUntilLetterPage(tester);
+    expect(find.byType(LetterPage), findsOneWidget);
+    expect(harness.shizukuProvider.currentShizuku, 30);
+    expect(harness.readLetterProvider.readLetterIds, contains('tutorial_001'));
+
+    await tester.pageBack();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(
+      find.byKey(const ValueKey('tutorialLetterToBottleMovingLight')),
+      findsOneWidget,
+    );
+    await tester.pump(const Duration(milliseconds: 1400));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('tutorialBottleGlow')), findsOneWidget);
+
+    expect(await harness.readLetterProvider.markTutorialBottleOpened(), isTrue);
+    final purchaseResult = await harness.catalogProvider.buy(
+      furniture: _roomFurnitures.first,
+      shizukuProvider: harness.shizukuProvider,
+    );
+    expect(purchaseResult.name, 'success');
+    expect(harness.catalogProvider.isPurchased('wooden_mug'), isTrue);
+    expect(harness.shizukuProvider.currentShizuku, 0);
+
+    final placementResult = await harness.placedFurnitureProvider.place(
+      slotId: _deskSurfaceLeftSlotId,
+      furnitureId: 'wooden_mug',
+      isPurchased: true,
+      allowedSlotIds: const [_deskSurfaceLeftSlotId],
+    );
+    expect(placementResult, PlaceFurnitureResult.success);
+    expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+      _deskSurfaceLeftSlotId: 'wooden_mug',
+    });
+    await tester.pump();
+    expect(find.byKey(const ValueKey('tutorialBookshelfGlow')), findsOneWidget);
+
+    expect(await harness.readLetterProvider.completeTutorial(), isTrue);
+    await tester.pump();
+    expect(harness.readLetterProvider.tutorialCompleted, isTrue);
+    expect(find.byKey(const ValueKey('tutorialLetterGlow')), findsNothing);
+    expect(find.byKey(const ValueKey('tutorialBottleGlow')), findsNothing);
+    expect(find.byKey(const ValueKey('tutorialBookshelfGlow')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 const _deskSurfaceLeftSlotId = 'living_room_desk_surface_left';
@@ -2411,6 +2474,16 @@ class _FakePurchasedFurnitureRepository extends PurchasedFurnitureRepository {
 
   @override
   Future<Set<String>> loadPurchasedFurnitureIds() async => Set.of(state);
+
+  @override
+  Future<void> savePurchasedFurnitureIds(Set<String> furnitureIds) async {
+    state = Set.of(furnitureIds);
+  }
+
+  @override
+  Future<void> clear() async {
+    state = {};
+  }
 }
 
 class _FakePlacedFurnitureRepository extends PlacedFurnitureRepository {

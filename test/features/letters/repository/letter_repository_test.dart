@@ -17,8 +17,10 @@ void main() {
 
     expect(tutorial.title, '雨つづり。へようこそ');
     expect(tutorial.body, contains('この部屋には、雨の日になると手紙が届きます。'));
-    expect(tutorial.body, contains('まずは、この手紙といっしょに30雫をどうぞ。'));
-    expect(tutorial.body, contains('本棚からいつでも読み返せます。'));
+    expect(tutorial.body, contains('まずは、この手紙といっしょに30滴をどうぞ。'));
+    expect(tutorial.body, contains('雫は、この部屋に置く家具と交換することができます。'));
+    expect(tutorial.body, isNot(contains('窓辺の瓶を開くと')));
+    expect(tutorial.body, isNot(contains('本棚からいつでも読み返せます')));
   });
 
   test('dateなしYAMLから配信と表示に必要なフィールドを読み込む', () async {
