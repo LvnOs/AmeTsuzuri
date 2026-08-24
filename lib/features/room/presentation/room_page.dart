@@ -125,6 +125,12 @@ class RoomPage extends StatefulWidget {
   static const Duration _tutorialGlowDuration = Duration(milliseconds: 1800);
   static const double _tutorialGlowMinimumOpacity = 0.07;
   static const double _tutorialGlowMaximumOpacity = 0.36;
+  static const double _tutorialBottleGlowMaximumOpacity = 0.55;
+  static const List<Color> _tutorialBottleGlowColors = [
+    Color(0xFFFFFFFF),
+    Color(0xCCFFF4D6),
+    Color(0x00FFF4D6),
+  ];
   static const double _tutorialLetterGlowScale = 0.30;
   static const Alignment _tutorialBottleGlowAlignment = Alignment(0.66, -0.18);
   static const double _tutorialBottleGlowScale = 0.23;
@@ -793,6 +799,12 @@ class _RoomBackgroundLayers extends StatelessWidget {
                       RoomPage._tutorialBookshelfGlowScale,
                     _TutorialTarget.none => 0,
                   },
+                  maximumOpacity: tutorialTarget == _TutorialTarget.bottle
+                      ? RoomPage._tutorialBottleGlowMaximumOpacity
+                      : RoomPage._tutorialGlowMaximumOpacity,
+                  colors: tutorialTarget == _TutorialTarget.bottle
+                      ? RoomPage._tutorialBottleGlowColors
+                      : null,
                   animation: tutorialGlowAnimation,
                   roomWidth: constraints.maxWidth,
                 ),
@@ -1050,12 +1062,16 @@ class _TutorialTargetGlow extends StatelessWidget {
     required this.scale,
     required this.animation,
     required this.roomWidth,
+    required this.maximumOpacity,
+    this.colors,
   });
 
   final Alignment alignment;
   final double scale;
   final Animation<double> animation;
   final double roomWidth;
+  final double maximumOpacity;
+  final List<Color>? colors;
 
   @override
   Widget build(BuildContext context) {
@@ -1069,22 +1085,23 @@ class _TutorialTargetGlow extends StatelessWidget {
             final opacity =
                 RoomPage._tutorialGlowMinimumOpacity +
                 curvedValue *
-                    (RoomPage._tutorialGlowMaximumOpacity -
-                        RoomPage._tutorialGlowMinimumOpacity);
+                    (maximumOpacity - RoomPage._tutorialGlowMinimumOpacity);
             return Opacity(opacity: opacity, child: child);
           },
           child: Container(
             width: roomWidth * scale,
             height: roomWidth * scale,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: RadialGradient(
-                colors: [
-                  Color(0xFFFFF7E5),
-                  Color(0x99FFF4D6),
-                  Color(0x00FFF4D6),
-                ],
-                stops: [0, 0.42, 1],
+                colors:
+                    colors ??
+                    const [
+                      Color(0xFFFFF7E5),
+                      Color(0x99FFF4D6),
+                      Color(0x00FFF4D6),
+                    ],
+                stops: const [0, 0.42, 1],
               ),
             ),
           ),
