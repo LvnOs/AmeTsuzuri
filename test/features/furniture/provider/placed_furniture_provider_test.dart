@@ -5,6 +5,182 @@ import 'package:ame_tsuzuri/features/furniture/repository/placed_furniture_repos
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('FIX済み配置仕様', () {
+    test('空slotへ家具を配置する', () async {
+      final repository = _FakePlacedRepository();
+      final provider = PlacedFurnitureProvider(repository);
+      await provider.load();
+
+      final result = await provider.place(
+        slotId: 'desk_a',
+        furnitureId: 'wooden_mug',
+        isPurchased: true,
+        allowedSlotIds: const ['desk_a', 'desk_b'],
+      );
+
+      expect(result, PlaceFurnitureResult.success);
+      expect(provider.placedFurnitureIds, {'desk_a': 'wooden_mug'});
+      expect(repository.ids, {'desk_a': 'wooden_mug'});
+    });
+
+    test('occupied slotへ別家具を配置すると新家具で上書きする', () async {
+      final repository = _FakePlacedRepository(
+        ids: {'desk_a': 'wooden_mug'},
+      );
+      final provider = PlacedFurnitureProvider(repository);
+      await provider.load();
+
+      final result = await provider.place(
+        slotId: 'desk_a',
+        furnitureId: 'ink_bottle',
+        isPurchased: true,
+        allowedSlotIds: const ['desk_a', 'desk_b'],
+      );
+
+      expect(result, PlaceFurnitureResult.success);
+      expect(provider.placedFurnitureIds, {'desk_a': 'ink_bottle'});
+      expect(repository.ids, {'desk_a': 'ink_bottle'});
+    });
+
+    test('occupied slotから追い出された家具の購入状態は失われない', () async {
+      final purchasedFurnitureIds = {'wooden_mug', 'ink_bottle'};
+      final repository = _FakePlacedRepository(
+        ids: {'desk_a': 'wooden_mug'},
+      );
+      final provider = PlacedFurnitureProvider(repository);
+      await provider.load();
+
+      await provider.place(
+        slotId: 'desk_a',
+        furnitureId: 'ink_bottle',
+        isPurchased: purchasedFurnitureIds.contains('ink_bottle'),
+        allowedSlotIds: const ['desk_a', 'desk_b'],
+      );
+
+      expect(provider.placedFurnitureIds, {'desk_a': 'ink_bottle'});
+      expect(purchasedFurnitureIds, {'wooden_mug', 'ink_bottle'});
+      expect(provider.getSlotIdByFurnitureId('wooden_mug'), isNull);
+    });
+
+    test('配置済み家具を別slotへ移動すると元slotが空になる', () async {
+      final repository = _FakePlacedRepository(
+        ids: {'desk_a': 'wooden_mug'},
+      );
+      final provider = PlacedFurnitureProvider(repository);
+      await provider.load();
+
+      await provider.place(
+        slotId: 'desk_b',
+        furnitureId: 'wooden_mug',
+        isPurchased: true,
+        allowedSlotIds: const ['desk_a', 'desk_b'],
+      );
+
+      expect(provider.placedFurnitureIds, {'desk_b': 'wooden_mug'});
+      expect(provider.placedFurnitureIds, isNot(contains('desk_a')));
+    });
+
+    test('移動先がoccupiedでもswapせず移動先の家具を未配置にする', () async {
+      final repository = _FakePlacedRepository(
+        ids: {'desk_a': 'wooden_mug', 'desk_b': 'ink_bottle'},
+      );
+      final provider = PlacedFurnitureProvider(repository);
+      await provider.load();
+
+      await provider.place(
+        slotId: 'desk_b',
+        furnitureId: 'wooden_mug',
+        isPurchased: true,
+        allowedSlotIds: const ['desk_a', 'desk_b'],
+      );
+
+      expect(provider.placedFurnitureIds, {'desk_b': 'wooden_mug'});
+      expect(provider.getSlotIdByFurnitureId('ink_bottle'), isNull);
+    });
+
+    test('同じ家具を通常操作で別slotへ配置してもコピーしない', () async {
+      final repository = _FakePlacedRepository();
+      final provider = PlacedFurnitureProvider(repository);
+      await provider.load();
+
+      await provider.place(
+        slotId: 'desk_a',
+        furnitureId: 'wooden_mug',
+        isPurchased: true,
+        allowedSlotIds: const ['desk_a', 'desk_b'],
+      );
+      await provider.place(
+        slotId: 'desk_b',
+        furnitureId: 'wooden_mug',
+        isPurchased: true,
+        allowedSlotIds: const ['desk_a', 'desk_b'],
+      );
+
+      expect(provider.placedFurnitureIds, {'desk_b': 'wooden_mug'});
+      expect(
+        provider.placedFurnitureIds.values.where(
+          (furnitureId) => furnitureId == 'wooden_mug',
+        ),
+        hasLength(1),
+      );
+    });
+
+    test('Repository保存失敗時は配置Mapを操作前の状態に維持する', () async {
+      final repository = _FakePlacedRepository(
+        ids: {'desk_a': 'wooden_mug', 'desk_b': 'ink_bottle'},
+      )..failSave = true;
+      final provider = PlacedFurnitureProvider(repository);
+      await provider.load();
+
+      await expectLater(
+        provider.place(
+          slotId: 'desk_b',
+          furnitureId: 'wooden_mug',
+          isPurchased: true,
+          allowedSlotIds: const ['desk_a', 'desk_b'],
+        ),
+        throwsStateError,
+      );
+
+      expect(provider.placedFurnitureIds, {
+        'desk_a': 'wooden_mug',
+        'desk_b': 'ink_bottle',
+      });
+      expect(repository.ids, {
+        'desk_a': 'wooden_mug',
+        'desk_b': 'ink_bottle',
+      });
+    });
+  });
+
+  group('重複済み保存データの現状挙動', () {
+    test('移動時は最初に見つかった旧slotだけを削除し別の重複を残す', () async {
+      final repository = _FakePlacedRepository(
+        ids: {'desk_a': 'wooden_mug', 'desk_b': 'wooden_mug'},
+      );
+      final provider = PlacedFurnitureProvider(repository);
+      await provider.load();
+
+      await provider.place(
+        slotId: 'window_a',
+        furnitureId: 'wooden_mug',
+        isPurchased: true,
+        allowedSlotIds: const ['desk_a', 'desk_b', 'window_a'],
+      );
+
+      expect(provider.placedFurnitureIds, {
+        'desk_b': 'wooden_mug',
+        'window_a': 'wooden_mug',
+      });
+      expect(
+        provider.placedFurnitureIds.values.where(
+          (furnitureId) => furnitureId == 'wooden_mug',
+        ),
+        hasLength(2),
+      );
+    });
+  });
+
   test('並行loadはRepository読み込みを1回に共有する', () async {
     final repository = _FakePlacedRepository()..blockLoad = true;
     final provider = PlacedFurnitureProvider(repository);
@@ -63,8 +239,10 @@ class _FakePlacedRepository extends PlacedFurnitureRepository {
   bool blockLoad = false;
   bool failClear = false;
   bool failLoad = false;
+  bool failSave = false;
   int loadCallCount = 0;
   int clearCallCount = 0;
+  int saveCallCount = 0;
   Completer<Map<String, String>>? _loadCompleter;
 
   @override
@@ -83,6 +261,17 @@ class _FakePlacedRepository extends PlacedFurnitureRepository {
 
   void completeLoad(Map<String, String> value) =>
       _loadCompleter!.complete(value);
+
+  @override
+  Future<void> savePlacedFurnitureIds(
+    Map<String, String> placedFurnitureIds,
+  ) async {
+    saveCallCount++;
+    if (failSave) {
+      throw StateError('save failed');
+    }
+    ids = Map.of(placedFurnitureIds);
+  }
 
   @override
   Future<void> clear() async {
