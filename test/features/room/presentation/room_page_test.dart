@@ -134,6 +134,84 @@ void main() {
     });
   });
 
+  group('tutorial光演出の視認性設定', () {
+    test('移動光は1300ms・拡大サイズ・暖色Gradientを使用する', () {
+      expect(
+        RoomPage.tutorialMoveDurationForTesting,
+        const Duration(milliseconds: 1300),
+      );
+      expect(RoomPage.tutorialMoveLightScaleForTesting, 0.055);
+      expect(RoomPage.tutorialMoveLightMaximumOpacityForTesting, 0.74);
+      expect(RoomPage.tutorialMoveLightColorsForTesting, const [
+        Color(0xFFFFFFFF),
+        Color(0xFFFFF0C2),
+        Color(0xB8E6A552),
+        Color(0x00C98732),
+      ]);
+    });
+
+    test('移動光Opacityは早く立ち上がり中盤を保って終点で消える', () {
+      expect(RoomPage.tutorialMovingLightOpacityForTesting(0), 0);
+      expect(
+        RoomPage.tutorialMovingLightOpacityForTesting(0.08),
+        greaterThan(0.5),
+      );
+      expect(RoomPage.tutorialMovingLightOpacityForTesting(0.5), 1);
+      expect(RoomPage.tutorialMovingLightOpacityForTesting(0.78), 1);
+      expect(
+        RoomPage.tutorialMovingLightOpacityForTesting(0.9),
+        inExclusiveRange(0, 1),
+      );
+      expect(RoomPage.tutorialMovingLightOpacityForTesting(1), 0);
+    });
+
+    test('Glowは2.6秒周期・明確な明暗差・暖色Gradientを使用する', () {
+      expect(
+        RoomPage.tutorialGlowDurationForTesting,
+        const Duration(milliseconds: 1300),
+      );
+      expect(RoomPage.tutorialGlowMinimumOpacityForTesting, 0.14);
+      expect(RoomPage.tutorialLetterGlowMaximumOpacityForTesting, 0.48);
+      expect(RoomPage.tutorialBottleGlowMaximumOpacityForTesting, 0.60);
+      expect(RoomPage.tutorialBookshelfGlowMaximumOpacityForTesting, 0.53);
+      expect(RoomPage.tutorialGlowColorsForTesting, const [
+        Color(0xFFFFFAEC),
+        Color(0xCCF8DFA0),
+        Color(0x66D89A45),
+        Color(0x00C47A2C),
+      ]);
+      expect(RoomPage.tutorialBottleGlowColorsForTesting, const [
+        Color(0xFFFFFFFF),
+        Color(0xE6FFE7AC),
+        Color(0x80E4A34A),
+        Color(0x00C8792B),
+      ]);
+    });
+
+    test('Glowだけ本棚の内側へ寄せ、瓶と移動経路は維持する', () {
+      expect(
+        RoomPage.tutorialBottleGlowAlignmentForTesting,
+        const Alignment(0.66, -0.18),
+      );
+      expect(
+        RoomPage.tutorialBookshelfGlowAlignmentForTesting,
+        const Alignment(-0.98, 0.25),
+      );
+      expect(
+        RoomPage.tutorialLetterAlignmentForTesting,
+        const Alignment(0, 0.07),
+      );
+      expect(
+        RoomPage.tutorialBottleAlignmentForTesting,
+        const Alignment(0.58, -0.18),
+      );
+      expect(
+        RoomPage.tutorialBookshelfMoveAlignmentForTesting,
+        const Alignment(-0.90, 0.25),
+      );
+    });
+  });
+
   group('チュートリアル対象の継続Glow', () {
     final letterGlow = find.byKey(const ValueKey('tutorialLetterGlow'));
     final bottleGlow = find.byKey(const ValueKey('tutorialBottleGlow'));

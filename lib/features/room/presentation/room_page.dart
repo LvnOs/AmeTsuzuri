@@ -124,14 +124,22 @@ class RoomPage extends StatefulWidget {
   static const Alignment _arrivalLightEndAlignment = _letterAlignment;
 
   // Tutorial target glow tuning. Scale is relative to the room canvas width.
-  static const Duration _tutorialGlowDuration = Duration(milliseconds: 1800);
-  static const double _tutorialGlowMinimumOpacity = 0.07;
-  static const double _tutorialGlowMaximumOpacity = 0.36;
-  static const double _tutorialBottleGlowMaximumOpacity = 0.55;
+  static const Duration _tutorialGlowDuration = Duration(milliseconds: 1300);
+  static const double _tutorialGlowMinimumOpacity = 0.14;
+  static const double _tutorialLetterGlowMaximumOpacity = 0.48;
+  static const double _tutorialBottleGlowMaximumOpacity = 0.60;
+  static const double _tutorialBookshelfGlowMaximumOpacity = 0.53;
+  static const List<Color> _tutorialGlowColors = [
+    Color(0xFFFFFAEC),
+    Color(0xCCF8DFA0),
+    Color(0x66D89A45),
+    Color(0x00C47A2C),
+  ];
   static const List<Color> _tutorialBottleGlowColors = [
     Color(0xFFFFFFFF),
-    Color(0xCCFFF4D6),
-    Color(0x00FFF4D6),
+    Color(0xE6FFE7AC),
+    Color(0x80E4A34A),
+    Color(0x00C8792B),
   ];
   static const double _tutorialLetterGlowScale = 0.30;
   static const Alignment _tutorialBottleGlowAlignment = Alignment(0.66, -0.18);
@@ -141,11 +149,81 @@ class RoomPage extends StatefulWidget {
     0.25,
   );
   static const Alignment _tutorialBookshelfGlowAlignment = Alignment(
-    -1.20,
+    -1.25,
     0.25,
   );
   static const double _tutorialBookshelfGlowScale = 0.27;
   static const Duration _tutorialMoveDuration = Duration(milliseconds: 1300);
+  static const double _tutorialMoveLightScale = 0.055;
+  static const double _tutorialMoveLightMaximumOpacity = 0.74;
+  static const List<Color> _tutorialMoveLightColors = [
+    Color(0xFFFFFFFF),
+    Color(0xFFFFF0C2),
+    Color(0xB8E6A552),
+    Color(0x00C98732),
+  ];
+
+  @visibleForTesting
+  static Duration get tutorialGlowDurationForTesting => _tutorialGlowDuration;
+
+  @visibleForTesting
+  static Duration get tutorialMoveDurationForTesting => _tutorialMoveDuration;
+
+  @visibleForTesting
+  static double get tutorialGlowMinimumOpacityForTesting =>
+      _tutorialGlowMinimumOpacity;
+
+  @visibleForTesting
+  static double get tutorialLetterGlowMaximumOpacityForTesting =>
+      _tutorialLetterGlowMaximumOpacity;
+
+  @visibleForTesting
+  static double get tutorialBottleGlowMaximumOpacityForTesting =>
+      _tutorialBottleGlowMaximumOpacity;
+
+  @visibleForTesting
+  static double get tutorialBookshelfGlowMaximumOpacityForTesting =>
+      _tutorialBookshelfGlowMaximumOpacity;
+
+  @visibleForTesting
+  static List<Color> get tutorialGlowColorsForTesting => _tutorialGlowColors;
+
+  @visibleForTesting
+  static List<Color> get tutorialBottleGlowColorsForTesting =>
+      _tutorialBottleGlowColors;
+
+  @visibleForTesting
+  static double get tutorialMoveLightScaleForTesting => _tutorialMoveLightScale;
+
+  @visibleForTesting
+  static double get tutorialMoveLightMaximumOpacityForTesting =>
+      _tutorialMoveLightMaximumOpacity;
+
+  @visibleForTesting
+  static List<Color> get tutorialMoveLightColorsForTesting =>
+      _tutorialMoveLightColors;
+
+  @visibleForTesting
+  static Alignment get tutorialBottleGlowAlignmentForTesting =>
+      _tutorialBottleGlowAlignment;
+
+  @visibleForTesting
+  static Alignment get tutorialBookshelfGlowAlignmentForTesting =>
+      _tutorialBookshelfGlowAlignment;
+
+  @visibleForTesting
+  static Alignment get tutorialLetterAlignmentForTesting => _letterAlignment;
+
+  @visibleForTesting
+  static Alignment get tutorialBottleAlignmentForTesting => _bottleAlignment;
+
+  @visibleForTesting
+  static Alignment get tutorialBookshelfMoveAlignmentForTesting =>
+      _tutorialBookshelfMoveAlignment;
+
+  @visibleForTesting
+  static double tutorialMovingLightOpacityForTesting(double progress) =>
+      _tutorialMovingLightOpacity(progress);
 
   // Chair composition tuning. Scale is relative to the room canvas width.
   static const Alignment _chairAlignment = Alignment(0, 0.72);
@@ -903,9 +981,15 @@ class _RoomBackgroundLayers extends StatelessWidget {
                       RoomPage._tutorialBookshelfGlowScale,
                     _TutorialTarget.none => 0,
                   },
-                  maximumOpacity: tutorialTarget == _TutorialTarget.bottle
-                      ? RoomPage._tutorialBottleGlowMaximumOpacity
-                      : RoomPage._tutorialGlowMaximumOpacity,
+                  maximumOpacity: switch (tutorialTarget) {
+                    _TutorialTarget.letter =>
+                      RoomPage._tutorialLetterGlowMaximumOpacity,
+                    _TutorialTarget.bottle =>
+                      RoomPage._tutorialBottleGlowMaximumOpacity,
+                    _TutorialTarget.bookshelf =>
+                      RoomPage._tutorialBookshelfGlowMaximumOpacity,
+                    _TutorialTarget.none => 0,
+                  },
                   colors: tutorialTarget == _TutorialTarget.bottle
                       ? RoomPage._tutorialBottleGlowColors
                       : null,
@@ -994,7 +1078,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
                       : RoomPage._tutorialBookshelfMoveAlignment,
                   animation: tutorialMoveAnimation,
                   roomWidth: constraints.maxWidth,
-                  maximumOpacity: 0.56,
+                  maximumOpacity: RoomPage._tutorialMoveLightMaximumOpacity,
                 ),
               if (hasDeliveredLetter)
                 Align(
@@ -1206,14 +1290,8 @@ class _TutorialTargetGlow extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: RadialGradient(
-                colors:
-                    colors ??
-                    const [
-                      Color(0xFFFFF7E5),
-                      Color(0x99FFF4D6),
-                      Color(0x00FFF4D6),
-                    ],
-                stops: const [0, 0.42, 1],
+                colors: colors ?? RoomPage._tutorialGlowColors,
+                stops: const [0, 0.30, 0.68, 1],
               ),
             ),
           ),
@@ -1332,7 +1410,7 @@ class _MovingLight extends StatelessWidget {
             curvedProgress,
           )!;
           final opacity =
-              math.sin(moveProgress * math.pi).clamp(0.0, 1.0) * maximumOpacity;
+              _tutorialMovingLightOpacity(moveProgress) * maximumOpacity;
 
           return Align(
             key: lightKey,
@@ -1341,18 +1419,33 @@ class _MovingLight extends StatelessWidget {
           );
         },
         child: Container(
-          width: roomWidth * 0.037,
-          height: roomWidth * 0.037,
+          width: roomWidth * RoomPage._tutorialMoveLightScale,
+          height: roomWidth * RoomPage._tutorialMoveLightScale,
           decoration: const BoxDecoration(
             shape: BoxShape.circle,
             gradient: RadialGradient(
-              colors: [Color(0xFFFFF6DD), Color(0x00FFF6DD)],
+              colors: RoomPage._tutorialMoveLightColors,
+              stops: [0, 0.28, 0.64, 1],
             ),
           ),
         ),
       ),
     );
   }
+}
+
+double _tutorialMovingLightOpacity(double progress) {
+  final normalizedProgress = progress.clamp(0.0, 1.0);
+  if (normalizedProgress == 0 || normalizedProgress == 1) {
+    return 0;
+  }
+  if (normalizedProgress <= 0.16) {
+    return Curves.easeOutCubic.transform(normalizedProgress / 0.16);
+  }
+  if (normalizedProgress <= 0.78) {
+    return 1;
+  }
+  return 1 - Curves.easeInCubic.transform((normalizedProgress - 0.78) / 0.22);
 }
 
 double _letterArrivalOpacity(double animationValue) {
