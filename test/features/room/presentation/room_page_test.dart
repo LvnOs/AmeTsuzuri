@@ -195,7 +195,7 @@ void main() {
       );
       expect(
         RoomPage.tutorialBookshelfGlowAlignmentForTesting,
-        const Alignment(-0.98, 0.25),
+        const Alignment(-1.25, 0.25),
       );
       expect(
         RoomPage.tutorialLetterAlignmentForTesting,
@@ -221,6 +221,7 @@ void main() {
     testWidgets('tutorial未読かつ配達済みならletter Glowだけを表示する', (tester) async {
       await _pumpRoom(
         tester,
+        weather: WeatherType.sunny,
         initialReadState: ReadLetterState(
           receivedLetters: {},
           deliveredLetters: const {'2026-08-07': 'tutorial_001'},
@@ -449,6 +450,111 @@ void main() {
     });
   });
 
+  group('Room上のtutorialガイド', () {
+    const guideKey = ValueKey('tutorialRoomGuide');
+
+    testWidgets('bottle targetでは瓶ガイドだけを表示する', (tester) async {
+      await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+        ),
+      );
+
+      expect(find.byKey(guideKey), findsOneWidget);
+      expect(find.text('瓶を開いてみましょう。'), findsOneWidget);
+      expect(find.text('本棚を見てみましょう。'), findsNothing);
+    });
+
+    testWidgets('bookshelf targetでは本棚ガイドだけを表示する', (tester) async {
+      await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+          hasOpenedTutorialBottle: true,
+        ),
+        initialPlacedFurnitureIds: const {_deskSurfaceLeftSlotId: 'wooden_mug'},
+      );
+
+      expect(find.byKey(guideKey), findsOneWidget);
+      expect(find.text('本棚を見てみましょう。'), findsOneWidget);
+      expect(find.text('瓶を開いてみましょう。'), findsNothing);
+    });
+
+    testWidgets('letter targetとtutorial完了後はガイドを表示しない', (tester) async {
+      await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {},
+          deliveredLetters: const {'2026-08-07': 'tutorial_001'},
+        ),
+      );
+      expect(find.byKey(guideKey), findsNothing);
+
+      await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+          hasOpenedTutorialBottle: true,
+          tutorialCompleted: true,
+        ),
+        initialPlacedFurnitureIds: const {_deskSurfaceLeftSlotId: 'wooden_mug'},
+      );
+      expect(find.byKey(guideKey), findsNothing);
+    });
+
+    testWidgets('ガイドはタップを遮らず瓶確認後に消える', (tester) async {
+      await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+        ),
+      );
+
+      final guideIgnorePointer = find
+          .ancestor(
+            of: find.byKey(guideKey),
+            matching: find.byType(IgnorePointer),
+          )
+          .first;
+      expect(tester.widget<IgnorePointer>(guideIgnorePointer).ignoring, isTrue);
+      await tester.tap(find.byKey(const ValueKey('bottleTapArea')));
+      await tester.pump();
+      expect(find.byKey(guideKey), findsNothing);
+      await _pumpRouteTransition(tester);
+      expect(find.byType(CatalogPage), findsOneWidget);
+    });
+
+    testWidgets('320px・390px・PC幅でガイドがoverflowしない', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+
+      for (final size in const [
+        Size(320, 640),
+        Size(390, 700),
+        Size(1200, 800),
+      ]) {
+        tester.view.physicalSize = size;
+        await _pumpRoom(
+          tester,
+          weather: WeatherType.sunny,
+          initialReadState: ReadLetterState(
+            receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+          ),
+        );
+
+        expect(find.byKey(guideKey), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      }
+    });
+  });
+
   group('tutorial初読後の手紙から瓶への移動光', () {
     final movingLight = find.byKey(
       const ValueKey('tutorialLetterToBottleMovingLight'),
@@ -504,12 +610,14 @@ void main() {
 
       expect(movingLight, findsOneWidget);
       expect(bottleGlow, findsNothing);
+      expect(find.byKey(const ValueKey('tutorialRoomGuide')), findsNothing);
 
       await tester.pump(const Duration(milliseconds: 1300));
       await tester.pump();
 
       expect(movingLight, findsNothing);
       expect(bottleGlow, findsOneWidget);
+      expect(find.text('瓶を開いてみましょう。'), findsOneWidget);
     });
 
     testWidgets('tutorial既読再読後は移動光を表示しない', (tester) async {
@@ -528,6 +636,7 @@ void main() {
 
       expect(movingLight, findsNothing);
       expect(bottleGlow, findsOneWidget);
+      expect(find.text('瓶を開いてみましょう。'), findsOneWidget);
     });
 
     testWidgets('通常手紙の初読後は移動光を表示しない', (tester) async {
@@ -633,6 +742,7 @@ void main() {
     testWidgets('配達済み未読なら候補を再選択せずletterレイヤーを表示する', (tester) async {
       final harness = await _pumpRoom(
         tester,
+        weather: WeatherType.sunny,
         initialReadState: ReadLetterState(
           receivedLetters: {},
           deliveredLetters: {'2026-08-07': 'letterA'},
@@ -1954,6 +2064,7 @@ void main() {
           find.byKey(const ValueKey('tutorialBookshelfGlow')),
           findsNothing,
         );
+        expect(find.byKey(const ValueKey('tutorialRoomGuide')), findsNothing);
 
         await tester.pump(const Duration(milliseconds: 1400));
         await tester.pump();
@@ -1965,6 +2076,7 @@ void main() {
           find.byKey(const ValueKey('tutorialBookshelfGlow')),
           findsOneWidget,
         );
+        expect(find.text('本棚を見てみましょう。'), findsOneWidget);
       },
     );
 
@@ -1990,6 +2102,7 @@ void main() {
         find.byKey(const ValueKey('tutorialBottleToBookshelfMovingLight')),
         findsNothing,
       );
+      expect(find.text('本棚を見てみましょう。'), findsOneWidget);
     });
 
     testWidgets('bookshelf guide completes tutorial before opening bookshelf', (
@@ -2007,6 +2120,8 @@ void main() {
       );
 
       await tester.tap(find.byKey(const ValueKey('bookshelfTapArea')));
+      await tester.pump();
+      expect(find.byKey(const ValueKey('tutorialRoomGuide')), findsNothing);
       await _pumpRouteTransition(tester);
       expect(find.text('届いた手紙は、ここからいつでも読み返せます。'), findsOneWidget);
 
@@ -2016,6 +2131,35 @@ void main() {
       expect(harness.readLetterProvider.tutorialCompleted, isTrue);
       expect(find.byType(BookshelfPage), findsOneWidget);
       expect(find.byKey(const ValueKey('tutorialBookshelfGlow')), findsNothing);
+      expect(find.byKey(const ValueKey('tutorialRoomGuide')), findsNothing);
+    });
+
+    testWidgets('bookshelf guideの「あとで」でRoomガイドとPulseを再表示する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 7)},
+          hasOpenedTutorialBottle: true,
+        ),
+        initialPurchasedFurnitureIds: const {'wooden_mug'},
+        initialPlacedFurnitureIds: const {_deskSurfaceLeftSlotId: 'wooden_mug'},
+      );
+
+      expect(find.text('本棚を見てみましょう。'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('bookshelfTapArea')));
+      await _pumpRouteTransition(tester);
+      expect(find.byKey(const ValueKey('tutorialRoomGuide')), findsNothing);
+
+      await tester.tap(find.text('あとで'));
+      await _pumpRouteTransition(tester);
+
+      expect(harness.readLetterProvider.tutorialCompleted, isFalse);
+      expect(find.text('本棚を見てみましょう。'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('tutorialBookshelfGlow')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('completion save failure stays in Room and permits retry', (

@@ -154,20 +154,132 @@ void main() {
   });
 
   group('CatalogPageの家具目録ビジュアル', () {
-    testWidgets('tutorial初回導線では家具一覧の前に短いガイドを表示する', (tester) async {
-      await _pumpCatalog(tester, showTutorialGuide: true);
+    testWidgets('tutorial初回導線ではガイドDialogとCTAを表示する', (tester) async {
+      final harness = await _pumpCatalog(
+        tester,
+        showTutorialGuide: true,
+        purchasedFurnitureIds: const {},
+      );
 
+      expect(
+        find.byKey(const ValueKey('catalogTutorialGuideDialog')),
+        findsOneWidget,
+      );
       expect(find.text('気に入った家具を、ひとつ迎えてみましょう。'), findsOneWidget);
+      expect(find.text('家具を見る'), findsOneWidget);
+      expect(harness.shizukuProvider.currentShizuku, 100);
+      expect(harness.catalogProvider.purchasedFurnitureIds, isEmpty);
+      expect(find.text('30滴で迎えますか？'), findsNothing);
+
+      await tester.tap(
+        find.byKey(const ValueKey('catalogTutorialGuideContinue')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('catalogTutorialGuideDialog')),
+        findsNothing,
+      );
       expect(
         find.byKey(const ValueKey('catalogFurnitureList')),
         findsOneWidget,
       );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('catalogPaper')),
+          matching: find.text('気に入った家具を、ひとつ迎えてみましょう。'),
+        ),
+        findsNothing,
+      );
+
+      await tester.tap(_furnitureTile('家具A'));
+      await tester.pumpAndSettle();
+      expect(find.text('30滴で迎えますか？'), findsOneWidget);
     });
 
-    testWidgets('通常表示ではtutorialガイドを表示しない', (tester) async {
+    testWidgets('通常表示ではtutorialガイドDialogを表示しない', (tester) async {
       await _pumpCatalog(tester);
 
       expect(find.text('気に入った家具を、ひとつ迎えてみましょう。'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('catalogTutorialGuideDialog')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('CTAで閉じた後のrebuildとProvider通知でDialogを再表示しない', (tester) async {
+      final harness = await _pumpCatalog(tester, showTutorialGuide: true);
+      await tester.tap(
+        find.byKey(const ValueKey('catalogTutorialGuideContinue')),
+      );
+      await tester.pumpAndSettle();
+
+      tester.view.physicalSize = const Size(390, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pump();
+      await harness.placedFurnitureProvider.place(
+        slotId: 'test_slot',
+        furnitureId: 'furniture_c',
+        isPurchased: true,
+        allowedSlotIds: const ['test_slot'],
+      );
+      await tester.pump();
+
+      expect(
+        find.byKey(const ValueKey('catalogTutorialGuideDialog')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('barrierで閉じてもCatalogを維持してDialogを再表示しない', (tester) async {
+      final harness = await _pumpCatalog(tester, showTutorialGuide: true);
+
+      await tester.tapAt(const Offset(4, 4));
+      await tester.pumpAndSettle();
+      expect(find.byType(CatalogPage), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('catalogTutorialGuideDialog')),
+        findsNothing,
+      );
+
+      await harness.placedFurnitureProvider.place(
+        slotId: 'test_slot',
+        furnitureId: 'furniture_c',
+        isPurchased: true,
+        allowedSlotIds: const ['test_slot'],
+      );
+      await tester.pump();
+      expect(
+        find.byKey(const ValueKey('catalogTutorialGuideDialog')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('320px・390px・PC幅でtutorial Dialogがoverflowしない', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      for (final size in const [
+        Size(320, 640),
+        Size(390, 700),
+        Size(1200, 800),
+      ]) {
+        tester.view.physicalSize = size;
+        await _pumpCatalog(tester, showTutorialGuide: true);
+
+        expect(
+          find.byKey(const ValueKey('catalogTutorialGuideDialog')),
+          findsOneWidget,
+        );
+        final dialog = tester.widget<AlertDialog>(
+          find.byKey(const ValueKey('catalogTutorialGuideDialog')),
+        );
+        expect(dialog.constraints?.maxWidth, 360);
+        expect(tester.takeException(), isNull);
+      }
     });
 
     testWidgets('背景と紙面と目録ヘッダーを表示する', (tester) async {
@@ -694,6 +806,12 @@ void main() {
             blockPurchase: false,
             purchasedFurnitureIds: const {},
           );
+          if (showTutorialGuide) {
+            await tester.tap(
+              find.byKey(const ValueKey('catalogTutorialGuideContinue')),
+            );
+            await tester.pumpAndSettle();
+          }
 
           await _buyFurniture(tester, '家具A');
 

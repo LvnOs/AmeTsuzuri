@@ -350,7 +350,9 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
       hasPlacedFurniture: placedFurnitureProvider.placedFurnitureIds.isNotEmpty,
     );
     final visibleTutorialTarget =
-        _isArrivalAnimating || _tutorialMove != _TutorialMove.none
+        _isArrivalAnimating ||
+            _tutorialMove != _TutorialMove.none ||
+            _isNavigatingFromRoom
         ? _TutorialTarget.none
         : tutorialTarget;
     _scheduleTutorialGlowSync(visibleTutorialTarget);
@@ -687,7 +689,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
       return;
     }
 
-    _isNavigatingFromRoom = true;
+    setState(() => _isNavigatingFromRoom = true);
     try {
       final readLetterProvider = context.read<ReadLetterProvider>();
       final catalogProvider = context.read<CatalogProvider>();
@@ -720,7 +722,11 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     } catch (_) {
       // Keep the Room available so the tutorial action can be retried.
     } finally {
-      _isNavigatingFromRoom = false;
+      if (mounted) {
+        setState(() => _isNavigatingFromRoom = false);
+      } else {
+        _isNavigatingFromRoom = false;
+      }
     }
   }
 
@@ -743,7 +749,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
       return;
     }
 
-    _isNavigatingFromRoom = true;
+    setState(() => _isNavigatingFromRoom = true);
     try {
       final readLetterProvider = context.read<ReadLetterProvider>();
       final shizukuProvider = context.read<ShizukuProvider>();
@@ -792,7 +798,11 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     } catch (_) {
       // Keep the Room available so the user can retry after a load failure.
     } finally {
-      _isNavigatingFromRoom = false;
+      if (mounted) {
+        setState(() => _isNavigatingFromRoom = false);
+      } else {
+        _isNavigatingFromRoom = false;
+      }
     }
   }
 
@@ -1163,6 +1173,14 @@ class _RoomBackgroundLayers extends StatelessWidget {
                     ),
                   ),
                 ),
+              if (tutorialTarget == _TutorialTarget.bottle ||
+                  tutorialTarget == _TutorialTarget.bookshelf)
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  top: constraints.maxHeight * 0.10,
+                  child: _TutorialRoomGuide(target: tutorialTarget),
+                ),
               Positioned(
                 right: 10,
                 top: 10,
@@ -1176,6 +1194,57 @@ class _RoomBackgroundLayers extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _TutorialRoomGuide extends StatelessWidget {
+  const _TutorialRoomGuide({required this.target});
+
+  final _TutorialTarget target;
+
+  @override
+  Widget build(BuildContext context) {
+    final message = switch (target) {
+      _TutorialTarget.bottle => '瓶を開いてみましょう。',
+      _TutorialTarget.bookshelf => '本棚を見てみましょう。',
+      _TutorialTarget.none || _TutorialTarget.letter => '',
+    };
+
+    return IgnorePointer(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 280),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: const Color(0xE6FFF8E8),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0x407A6548)),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x263D342B),
+                  blurRadius: 10,
+                  offset: Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+              child: Text(
+                message,
+                key: const ValueKey('tutorialRoomGuide'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFF4A4034),
+                  fontSize: 14,
+                  height: 1.4,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

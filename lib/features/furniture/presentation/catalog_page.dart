@@ -37,6 +37,7 @@ class _CatalogPageState extends State<CatalogPage> {
   late final PlacementSlotRepository _placementSlotRepository;
 
   late final Future<List<Furniture>> _furnituresFuture;
+  bool _hasScheduledTutorialGuide = false;
 
   @override
   void initState() {
@@ -46,6 +47,38 @@ class _CatalogPageState extends State<CatalogPage> {
     _placementSlotRepository =
         widget.placementSlotRepository ?? PlacementSlotRepository();
     _furnituresFuture = _furnitureRepository.getAll();
+    _scheduleTutorialGuide();
+  }
+
+  void _scheduleTutorialGuide() {
+    if (!widget.showTutorialGuide || _hasScheduledTutorialGuide) {
+      return;
+    }
+    _hasScheduledTutorialGuide = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          key: const ValueKey('catalogTutorialGuideDialog'),
+          backgroundColor: _paperColor,
+          constraints: const BoxConstraints(maxWidth: 360),
+          content: const Text(
+            '気に入った家具を、ひとつ迎えてみましょう。',
+            style: TextStyle(color: _inkColor, height: 1.5),
+          ),
+          actions: [
+            FilledButton(
+              key: const ValueKey('catalogTutorialGuideContinue'),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('家具を見る'),
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   @override
@@ -104,18 +137,6 @@ class _CatalogPageState extends State<CatalogPage> {
                     ),
                     const SizedBox(height: 10),
                     _buildShizukuBalance(shizukuProvider),
-                    if (widget.showTutorialGuide) ...[
-                      const SizedBox(height: 12),
-                      const Text(
-                        '気に入った家具を、ひとつ迎えてみましょう。',
-                        style: TextStyle(
-                          color: _secondaryInkColor,
-                          fontSize: 14,
-                          height: 1.5,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                    ],
                     const SizedBox(height: 18),
                     const Divider(height: 1, thickness: 0.8, color: _ruleColor),
                     Expanded(
