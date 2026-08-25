@@ -1865,11 +1865,12 @@ void main() {
     });
   });
 
-  group('机上Aの配置家具', () {
+  group('机上A/Bの配置家具', () {
     testWidgets('PlacedFurnitureProvider未ロードでは表示せずクラッシュしない', (tester) async {
       await _pumpRoom(tester, loadPlacedFurnitureProvider: false);
 
       expect(_placedFurnitureLayer, findsNothing);
+      expect(_placedFurnitureRightLayer, findsNothing);
       expect(tester.takeException(), isNull);
     });
 
@@ -1899,7 +1900,44 @@ void main() {
           'assets/images/${entry.value}',
         );
       });
+
+      testWidgets('机上Bの${entry.key}を対応するPNGで表示する', (tester) async {
+        await _pumpRoom(
+          tester,
+          initialPlacedFurnitureIds: {_deskSurfaceRightSlotId: entry.key},
+        );
+
+        expect(_placedFurnitureRightLayer, findsOneWidget);
+        final image = tester.widget<Image>(
+          find.byKey(ValueKey('roomFurnitureImage-${entry.key}')),
+        );
+        expect(
+          (image.image as AssetImage).assetName,
+          'assets/images/${entry.value}',
+        );
+      });
     }
+
+    testWidgets('机上Aと机上Bへ別家具を同時表示する', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {
+          _deskSurfaceLeftSlotId: 'wooden_mug',
+          _deskSurfaceRightSlotId: 'ink_bottle',
+        },
+      );
+
+      expect(_placedFurnitureLayer, findsOneWidget);
+      expect(_placedFurnitureRightLayer, findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-wooden_mug')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-ink_bottle')),
+        findsOneWidget,
+      );
+    });
 
     testWidgets('Providerの配置交換をRoomへ反映する', (tester) async {
       final harness = await _pumpRoom(
@@ -1937,15 +1975,92 @@ void main() {
       expect(_placedFurnitureLayer, findsNothing);
     });
 
+    testWidgets('Provider通知で同じ家具を机上Aから机上Bへ移動する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: {_deskSurfaceLeftSlotId: 'wooden_mug'},
+      );
+
+      await harness.placedFurnitureProvider.place(
+        slotId: _deskSurfaceRightSlotId,
+        furnitureId: 'wooden_mug',
+        isPurchased: true,
+        allowedSlotIds: const [_deskSurfaceLeftSlotId, _deskSurfaceRightSlotId],
+      );
+      await tester.pumpAndSettle();
+
+      expect(_placedFurnitureLayer, findsNothing);
+      expect(_placedFurnitureRightLayer, findsOneWidget);
+    });
+
+    testWidgets('Provider通知で同じ家具を机上Bから机上Aへ移動する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: {_deskSurfaceRightSlotId: 'wooden_mug'},
+      );
+
+      await harness.placedFurnitureProvider.place(
+        slotId: _deskSurfaceLeftSlotId,
+        furnitureId: 'wooden_mug',
+        isPurchased: true,
+        allowedSlotIds: const [_deskSurfaceLeftSlotId, _deskSurfaceRightSlotId],
+      );
+      await tester.pumpAndSettle();
+
+      expect(_placedFurnitureLayer, findsOneWidget);
+      expect(_placedFurnitureRightLayer, findsNothing);
+    });
+
+    testWidgets('occupiedな机上Bへの移動はswapせず移動家具だけを表示する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {
+          _deskSurfaceLeftSlotId: 'wooden_mug',
+          _deskSurfaceRightSlotId: 'ink_bottle',
+        },
+      );
+
+      await harness.placedFurnitureProvider.place(
+        slotId: _deskSurfaceRightSlotId,
+        furnitureId: 'wooden_mug',
+        isPurchased: true,
+        allowedSlotIds: const [_deskSurfaceLeftSlotId, _deskSurfaceRightSlotId],
+      );
+      await tester.pump();
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _deskSurfaceRightSlotId: 'wooden_mug',
+      });
+      expect(_placedFurnitureLayer, findsNothing);
+      expect(_placedFurnitureRightLayer, findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-ink_bottle')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('机上Bから取り外すと対象slotの家具が消える', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: {_deskSurfaceRightSlotId: 'wooden_mug'},
+      );
+
+      await harness.placedFurnitureProvider.remove('wooden_mug');
+      await tester.pump();
+
+      expect(_placedFurnitureRightLayer, findsNothing);
+    });
+
     testWidgets('未対応スロットの配置家具は描画しない', (tester) async {
       await _pumpRoom(
         tester,
         initialPlacedFurnitureIds: const {
-          'living_room_desk_surface_right': 'wooden_mug',
+          'living_room_desk_surface_center': 'wooden_mug',
         },
       );
 
       expect(_placedFurnitureLayer, findsNothing);
+      expect(_placedFurnitureRightLayer, findsNothing);
     });
 
     testWidgets('存在しないfurnitureIdでもクラッシュしない', (tester) async {
@@ -1982,10 +2097,13 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('今日の手紙と机上A家具を同時に表示できる', (tester) async {
+    testWidgets('今日の手紙と机上A/B家具を同時に表示できる', (tester) async {
       await _pumpRoom(
         tester,
-        initialPlacedFurnitureIds: const {_deskSurfaceLeftSlotId: 'wooden_mug'},
+        initialPlacedFurnitureIds: const {
+          _deskSurfaceLeftSlotId: 'wooden_mug',
+          _deskSurfaceRightSlotId: 'ink_bottle',
+        },
         initialReadState: ReadLetterState(
           receivedLetters: const {},
           deliveredLetters: const {'2026-08-07': 'letterA'},
@@ -1993,6 +2111,7 @@ void main() {
       );
 
       expect(_placedFurnitureLayer, findsOneWidget);
+      expect(_placedFurnitureRightLayer, findsOneWidget);
       expect(find.byKey(const ValueKey('roomLetterLayer')), findsOneWidget);
     });
 
@@ -2281,8 +2400,12 @@ void main() {
 }
 
 const _deskSurfaceLeftSlotId = 'living_room_desk_surface_left';
+const _deskSurfaceRightSlotId = 'living_room_desk_surface_right';
 final _placedFurnitureLayer = find.byKey(
   const ValueKey('deskSurfaceLeftFurnitureLayer'),
+);
+final _placedFurnitureRightLayer = find.byKey(
+  const ValueKey('deskSurfaceRightFurnitureLayer'),
 );
 
 Future<void> _pumpRouteTransition(WidgetTester tester) async {
@@ -2465,7 +2588,7 @@ const List<Furniture> _roomFurnitures = [
     name: 'wooden mug',
     price: 30,
     size: 'small',
-    slotIds: [_deskSurfaceLeftSlotId],
+    slotIds: [_deskSurfaceLeftSlotId, _deskSurfaceRightSlotId],
     imagePath: 'furniture/desk/wooden_mug.png',
     initialAvailable: true,
   ),
@@ -2474,7 +2597,7 @@ const List<Furniture> _roomFurnitures = [
     name: 'ink bottle',
     price: 30,
     size: 'small',
-    slotIds: [_deskSurfaceLeftSlotId],
+    slotIds: [_deskSurfaceLeftSlotId, _deskSurfaceRightSlotId],
     imagePath: 'furniture/desk/ink_bottle.png',
     initialAvailable: true,
   ),
@@ -2483,7 +2606,7 @@ const List<Furniture> _roomFurnitures = [
     name: 'wooden fox figure',
     price: 30,
     size: 'small',
-    slotIds: [_deskSurfaceLeftSlotId],
+    slotIds: [_deskSurfaceLeftSlotId, _deskSurfaceRightSlotId],
     imagePath: 'furniture/desk/wooden_fox_figure.png',
     initialAvailable: true,
   ),

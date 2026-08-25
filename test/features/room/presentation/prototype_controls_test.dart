@@ -43,9 +43,10 @@ void main() {
     );
     expect(harness.read.deliveredLetterIdOn(DateTime(2026, 8, 8)), 'letter_01');
     expect(harness.shizuku.currentShizuku, 20);
-    expect(harness.catalog.purchasedFurnitureIds, {'wooden_mug'});
+    expect(harness.catalog.purchasedFurnitureIds, {'wooden_mug', 'ink_bottle'});
     expect(harness.placed.placedFurnitureIds, {
       'living_room_desk_surface_left': 'wooden_mug',
+      'living_room_desk_surface_right': 'ink_bottle',
     });
   });
 
@@ -166,9 +167,10 @@ Future<_PrototypeHarness> _pumpPrototypeRoom(
       'currentShizuku': 20,
       'rewardedLetterIds': ['tutorial_001'],
     }),
-    'purchasedFurnitureIds': ['wooden_mug'],
+    'purchasedFurnitureIds': ['wooden_mug', 'ink_bottle'],
     'placedFurnitureIds': jsonEncode({
       'living_room_desk_surface_left': 'wooden_mug',
+      'living_room_desk_surface_right': 'ink_bottle',
     }),
   });
 

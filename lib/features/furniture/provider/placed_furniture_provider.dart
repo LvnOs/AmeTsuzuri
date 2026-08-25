@@ -57,8 +57,11 @@ class PlacedFurnitureProvider extends ChangeNotifier {
       return PlaceFurnitureResult.invalidSlot;
     }
 
-    final currentSlotId = getSlotIdByFurnitureId(furnitureId);
-    if (currentSlotId == slotId) {
+    final currentSlotIds = _placedFurnitureIds.entries
+        .where((entry) => entry.value == furnitureId)
+        .map((entry) => entry.key)
+        .toList();
+    if (currentSlotIds.length == 1 && currentSlotIds.single == slotId) {
       return PlaceFurnitureResult.success;
     }
 
@@ -66,9 +69,9 @@ class PlacedFurnitureProvider extends ChangeNotifier {
       _placedFurnitureIds,
     );
 
-    if (currentSlotId != null) {
-      updatedPlacedFurnitureIds.remove(currentSlotId);
-    }
+    updatedPlacedFurnitureIds.removeWhere(
+      (_, placedFurnitureId) => placedFurnitureId == furnitureId,
+    );
 
     updatedPlacedFurnitureIds[slotId] = furnitureId;
 

@@ -24,9 +24,7 @@ void main() {
     });
 
     test('occupied slotへ別家具を配置すると新家具で上書きする', () async {
-      final repository = _FakePlacedRepository(
-        ids: {'desk_a': 'wooden_mug'},
-      );
+      final repository = _FakePlacedRepository(ids: {'desk_a': 'wooden_mug'});
       final provider = PlacedFurnitureProvider(repository);
       await provider.load();
 
@@ -44,9 +42,7 @@ void main() {
 
     test('occupied slotから追い出された家具の購入状態は失われない', () async {
       final purchasedFurnitureIds = {'wooden_mug', 'ink_bottle'};
-      final repository = _FakePlacedRepository(
-        ids: {'desk_a': 'wooden_mug'},
-      );
+      final repository = _FakePlacedRepository(ids: {'desk_a': 'wooden_mug'});
       final provider = PlacedFurnitureProvider(repository);
       await provider.load();
 
@@ -63,9 +59,7 @@ void main() {
     });
 
     test('配置済み家具を別slotへ移動すると元slotが空になる', () async {
-      final repository = _FakePlacedRepository(
-        ids: {'desk_a': 'wooden_mug'},
-      );
+      final repository = _FakePlacedRepository(ids: {'desk_a': 'wooden_mug'});
       final provider = PlacedFurnitureProvider(repository);
       await provider.load();
 
@@ -146,15 +140,29 @@ void main() {
         'desk_a': 'wooden_mug',
         'desk_b': 'ink_bottle',
       });
-      expect(repository.ids, {
-        'desk_a': 'wooden_mug',
-        'desk_b': 'ink_bottle',
-      });
+      expect(repository.ids, {'desk_a': 'wooden_mug', 'desk_b': 'ink_bottle'});
+    });
+
+    test('allowedSlotIdsに含まれないslotへの配置を拒否して状態を維持する', () async {
+      final repository = _FakePlacedRepository(ids: {'desk_a': 'wooden_mug'});
+      final provider = PlacedFurnitureProvider(repository);
+      await provider.load();
+
+      final result = await provider.place(
+        slotId: 'window_a',
+        furnitureId: 'wooden_mug',
+        isPurchased: true,
+        allowedSlotIds: const ['desk_a', 'desk_b'],
+      );
+
+      expect(result, PlaceFurnitureResult.invalidSlot);
+      expect(provider.placedFurnitureIds, {'desk_a': 'wooden_mug'});
+      expect(repository.saveCallCount, 0);
     });
   });
 
-  group('重複済み保存データの現状挙動', () {
-    test('移動時は最初に見つかった旧slotだけを削除し別の重複を残す', () async {
+  group('重複済み保存データの正規化', () {
+    test('重複2件から移動すると全旧slotを削除して新slotだけにする', () async {
       final repository = _FakePlacedRepository(
         ids: {'desk_a': 'wooden_mug', 'desk_b': 'wooden_mug'},
       );
@@ -168,16 +176,98 @@ void main() {
         allowedSlotIds: const ['desk_a', 'desk_b', 'window_a'],
       );
 
-      expect(provider.placedFurnitureIds, {
-        'desk_b': 'wooden_mug',
-        'window_a': 'wooden_mug',
-      });
+      expect(provider.placedFurnitureIds, {'window_a': 'wooden_mug'});
       expect(
         provider.placedFurnitureIds.values.where(
           (furnitureId) => furnitureId == 'wooden_mug',
         ),
-        hasLength(2),
+        hasLength(1),
       );
+    });
+
+    test('重複3件から移動しても新slotの1件だけにする', () async {
+      final repository = _FakePlacedRepository(
+        ids: {
+          'desk_a': 'wooden_mug',
+          'desk_b': 'wooden_mug',
+          'window_a': 'wooden_mug',
+        },
+      );
+      final provider = PlacedFurnitureProvider(repository);
+      await provider.load();
+
+      await provider.place(
+        slotId: 'hanging',
+        furnitureId: 'wooden_mug',
+        isPurchased: true,
+        allowedSlotIds: const ['desk_a', 'desk_b', 'window_a', 'hanging'],
+      );
+
+      expect(provider.placedFurnitureIds, {'hanging': 'wooden_mug'});
+      expect(repository.ids, {'hanging': 'wooden_mug'});
+    });
+
+    test('移動先自身が既存重複の1つでもそのslotの1件だけにする', () async {
+      final repository = _FakePlacedRepository(
+        ids: {'desk_a': 'wooden_mug', 'desk_b': 'wooden_mug'},
+      );
+      final provider = PlacedFurnitureProvider(repository);
+      await provider.load();
+
+      await provider.place(
+        slotId: 'desk_b',
+        furnitureId: 'wooden_mug',
+        isPurchased: true,
+        allowedSlotIds: const ['desk_a', 'desk_b'],
+      );
+
+      expect(provider.placedFurnitureIds, {'desk_b': 'wooden_mug'});
+      expect(repository.ids, {'desk_b': 'wooden_mug'});
+    });
+
+    test('occupied先への移動は全重複を削除してswapしない', () async {
+      final purchasedFurnitureIds = {'wooden_mug', 'lamp'};
+      final repository = _FakePlacedRepository(
+        ids: {'slot_a': 'wooden_mug', 'slot_b': 'lamp', 'slot_c': 'wooden_mug'},
+      );
+      final provider = PlacedFurnitureProvider(repository);
+      await provider.load();
+
+      await provider.place(
+        slotId: 'slot_b',
+        furnitureId: 'wooden_mug',
+        isPurchased: purchasedFurnitureIds.contains('wooden_mug'),
+        allowedSlotIds: const ['slot_a', 'slot_b', 'slot_c'],
+      );
+
+      expect(provider.placedFurnitureIds, {'slot_b': 'wooden_mug'});
+      expect(provider.getSlotIdByFurnitureId('lamp'), isNull);
+      expect(purchasedFurnitureIds, {'wooden_mug', 'lamp'});
+    });
+
+    test('保存失敗時はoccupied家具を含む重複元状態を維持する', () async {
+      final originalState = {
+        'slot_a': 'wooden_mug',
+        'slot_b': 'lamp',
+        'slot_c': 'wooden_mug',
+      };
+      final repository = _FakePlacedRepository(ids: originalState)
+        ..failSave = true;
+      final provider = PlacedFurnitureProvider(repository);
+      await provider.load();
+
+      await expectLater(
+        provider.place(
+          slotId: 'slot_b',
+          furnitureId: 'wooden_mug',
+          isPurchased: true,
+          allowedSlotIds: const ['slot_a', 'slot_b', 'slot_c'],
+        ),
+        throwsStateError,
+      );
+
+      expect(provider.placedFurnitureIds, originalState);
+      expect(repository.ids, originalState);
     });
   });
 

@@ -3,11 +3,8 @@ import 'package:ame_tsuzuri/features/furniture/repository/furniture_repository.d
 import 'package:flutter_test/flutter_test.dart';
 
 const _deskSurfaceLeftSlotId = 'living_room_desk_surface_left';
-const _mvpFurnitureIds = {
-  'wooden_mug',
-  'ink_bottle',
-  'wooden_fox_figure',
-};
+const _deskSurfaceRightSlotId = 'living_room_desk_surface_right';
+const _mvpFurnitureIds = {'wooden_mug', 'ink_bottle', 'wooden_fox_figure'};
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -32,13 +29,16 @@ void main() {
       expect(availableIds, _mvpFurnitureIds);
     });
 
-    test('正式3家具は30雫で机上Aだけへ配置できる', () {
+    test('正式3家具は30雫で机上Aと机上Bだけへ配置できる', () {
       for (final id in _mvpFurnitureIds) {
         final furniture = furnitures.singleWhere((item) => item.id == id);
 
         expect(furniture.price, 30, reason: id);
         expect(furniture.initialAvailable, isTrue, reason: id);
-        expect(furniture.slotIds, const [_deskSurfaceLeftSlotId], reason: id);
+        expect(furniture.slotIds, const [
+          _deskSurfaceLeftSlotId,
+          _deskSurfaceRightSlotId,
+        ], reason: id);
       }
     });
 

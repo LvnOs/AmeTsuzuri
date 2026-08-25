@@ -17,6 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 const _deskSurfaceLeftSlotId = 'living_room_desk_surface_left';
+const _deskSurfaceRightSlotId = 'living_room_desk_surface_right';
 
 const _furnitureA = Furniture(
   id: 'furniture_a',
@@ -59,7 +60,7 @@ const _woodenMug = Furniture(
   name: '木のマグ',
   price: 30,
   size: 'small',
-  slotIds: [_deskSurfaceLeftSlotId],
+  slotIds: [_deskSurfaceLeftSlotId, _deskSurfaceRightSlotId],
   imagePath: 'furniture/desk/wooden_mug.png',
   initialAvailable: true,
 );
@@ -68,7 +69,7 @@ const _inkBottle = Furniture(
   name: 'インク瓶',
   price: 30,
   size: 'small',
-  slotIds: [_deskSurfaceLeftSlotId],
+  slotIds: [_deskSurfaceLeftSlotId, _deskSurfaceRightSlotId],
   imagePath: 'furniture/desk/ink_bottle.png',
   initialAvailable: true,
 );
@@ -77,7 +78,7 @@ const _woodenFoxFigure = Furniture(
   name: '木彫りのキツネ',
   price: 30,
   size: 'small',
-  slotIds: [_deskSurfaceLeftSlotId],
+  slotIds: [_deskSurfaceLeftSlotId, _deskSurfaceRightSlotId],
   imagePath: 'furniture/desk/wooden_fox_figure.png',
   initialAvailable: true,
 );
@@ -559,6 +560,93 @@ void main() {
       expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
         _deskSurfaceLeftSlotId: 'wooden_mug',
       });
+    });
+
+    testWidgets('正式家具の配置Dialogに机上Aと机上Bを表示する', (tester) async {
+      await _pumpCatalog(
+        tester,
+        furnitures: const [_woodenMug],
+        purchasedFurnitureIds: const {'wooden_mug'},
+        placedFurnitureIds: const {_deskSurfaceRightSlotId: 'wooden_mug'},
+      );
+
+      await tester.tap(_furnitureTile(_woodenMug.name));
+      await tester.pumpAndSettle();
+
+      expect(find.text('机（左）に置く'), findsOneWidget);
+      expect(find.text('机（右）に置く'), findsOneWidget);
+      expect(find.text('現在の配置場所：机（右）'), findsOneWidget);
+    });
+
+    testWidgets('配置済み家具を机上Aから机上Bへ移動する', (tester) async {
+      final harness = await _pumpCatalog(
+        tester,
+        furnitures: const [_woodenMug],
+        purchasedFurnitureIds: const {'wooden_mug'},
+        placedFurnitureIds: const {_deskSurfaceLeftSlotId: 'wooden_mug'},
+      );
+
+      await tester.tap(_furnitureTile(_woodenMug.name));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey('placementOption-living_room_desk_surface_right'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _deskSurfaceRightSlotId: 'wooden_mug',
+      });
+    });
+
+    testWidgets('occupiedな机上Bへ移動してもswapせず旧家具の購入状態を維持する', (tester) async {
+      final harness = await _pumpCatalog(
+        tester,
+        furnitures: const [_woodenMug, _inkBottle],
+        purchasedFurnitureIds: const {'wooden_mug', 'ink_bottle'},
+        placedFurnitureIds: const {
+          _deskSurfaceLeftSlotId: 'wooden_mug',
+          _deskSurfaceRightSlotId: 'ink_bottle',
+        },
+      );
+
+      await tester.tap(_furnitureTile(_woodenMug.name));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey('placementOption-living_room_desk_surface_right'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('置き換える'));
+      await tester.pumpAndSettle();
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _deskSurfaceRightSlotId: 'wooden_mug',
+      });
+      expect(harness.catalogProvider.isPurchased('wooden_mug'), isTrue);
+      expect(harness.catalogProvider.isPurchased('ink_bottle'), isTrue);
+      expect(find.byType(CatalogPage), findsNothing);
+    });
+
+    testWidgets('320px幅でも正式家具の机上Aと机上Bをoverflowなく表示する', (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await _pumpCatalog(
+        tester,
+        furnitures: const [_woodenMug],
+        purchasedFurnitureIds: const {'wooden_mug'},
+      );
+
+      await tester.tap(_furnitureTile(_woodenMug.name));
+      await tester.pumpAndSettle();
+
+      expect(find.text('机（左）に置く'), findsOneWidget);
+      expect(find.text('机（右）に置く'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 
@@ -1152,7 +1240,8 @@ class _FakePlacementSlotRepository extends PlacementSlotRepository {
   Future<PlacementSlot?> getById(String slotId) async => PlacementSlot(
     id: slotId,
     name: switch (slotId) {
-      _deskSurfaceLeftSlotId => '机上A',
+      _deskSurfaceLeftSlotId => '机（左）',
+      _deskSurfaceRightSlotId => '机（右）',
       'slot_a' => '窓辺',
       'long_slot' => 'とても長い名前の配置場所',
       _ => 'テスト配置場所',

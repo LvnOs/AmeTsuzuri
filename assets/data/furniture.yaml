@@ -28,6 +28,7 @@ furniture:
     size: small
     slots:
       - living_room_desk_surface_left
+      - living_room_desk_surface_right
     image: furniture/desk/wooden_mug.png
     initial_available: true
 
@@ -83,6 +84,7 @@ furniture:
     size: small
     slots:
       - living_room_desk_surface_left
+      - living_room_desk_surface_right
     image: furniture/desk/ink_bottle.png
     initial_available: true
 
@@ -142,6 +144,7 @@ furniture:
     size: small
     slots:
       - living_room_desk_surface_left
+      - living_room_desk_surface_right
     image: furniture/desk/wooden_fox_figure.png
     initial_available: true
 
