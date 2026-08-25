@@ -120,6 +120,25 @@ class RoomPage extends StatefulWidget {
     'wooden_fox_figure': 1.05,
   };
 
+  // Window-shelf furniture tuning for the 390 x 700 Room composition.
+  static const String _windowShelfDecorSlotId =
+      'living_room_window_shelf_decor';
+  static const Alignment _windowShelfDecorFurnitureAlignment = Alignment(
+    -0.55,
+    -0.15,
+  );
+  static const double _windowShelfDecorFurnitureScale = 0.16;
+  static const Set<String> _windowShelfDecorFurnitureIds = {
+    'small_houseplant',
+    'wooden_bird_figure',
+    'small_glass_ornament',
+  };
+  static const Map<String, double> _windowShelfDecorScaleCorrections = {
+    'small_houseplant': 1,
+    'wooden_bird_figure': 0.85,
+    'small_glass_ornament': 0.78,
+  };
+
   // Arrival animation tuning. Defaults follow the existing post and letter.
   static const Duration _arrivalAnimationDuration = Duration(
     milliseconds: 4350,
@@ -345,6 +364,10 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
         ? placedFurnitureProvider.placedFurnitureIds[RoomPage
               ._deskSurfaceRightSlotId]
         : null;
+    final windowShelfDecorFurnitureId = placedFurnitureProvider.isLoaded
+        ? placedFurnitureProvider.placedFurnitureIds[RoomPage
+              ._windowShelfDecorSlotId]
+        : null;
 
     var showLetter = false;
     if (appDateProvider.isLoaded && readLetterProvider.isLoaded) {
@@ -397,6 +420,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
               furnituresFuture: _furnituresFuture,
               deskSurfaceLeftFurnitureId: deskSurfaceLeftFurnitureId,
               deskSurfaceRightFurnitureId: deskSurfaceRightFurnitureId,
+              windowShelfDecorFurnitureId: windowShelfDecorFurnitureId,
               onTapBottle: _onTapBottle,
               onTapBookshelf: _onTapBookshelf,
               onTapLetter: _onTapLetter,
@@ -931,6 +955,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
     required this.furnituresFuture,
     required this.deskSurfaceLeftFurnitureId,
     required this.deskSurfaceRightFurnitureId,
+    required this.windowShelfDecorFurnitureId,
     required this.onTapBottle,
     required this.onTapBookshelf,
     required this.onTapLetter,
@@ -949,6 +974,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
   final Future<List<Furniture>> furnituresFuture;
   final String? deskSurfaceLeftFurnitureId;
   final String? deskSurfaceRightFurnitureId;
+  final String? windowShelfDecorFurnitureId;
   final VoidCallback onTapBottle;
   final VoidCallback onTapBookshelf;
   final VoidCallback onTapLetter;
@@ -1059,7 +1085,17 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   ),
                 ),
               ),
-              _DeskSurfaceFurniture(
+              _FurnitureImageLayer(
+                layerKey: const ValueKey('windowShelfDecorFurnitureLayer'),
+                furnituresFuture: furnituresFuture,
+                furnitureId: windowShelfDecorFurnitureId,
+                roomWidth: constraints.maxWidth,
+                alignment: RoomPage._windowShelfDecorFurnitureAlignment,
+                scale: RoomPage._windowShelfDecorFurnitureScale,
+                scaleCorrections: RoomPage._windowShelfDecorScaleCorrections,
+                supportedFurnitureIds: RoomPage._windowShelfDecorFurnitureIds,
+              ),
+              _FurnitureImageLayer(
                 layerKey: const ValueKey('deskSurfaceLeftFurnitureLayer'),
                 furnituresFuture: furnituresFuture,
                 furnitureId: deskSurfaceLeftFurnitureId,
@@ -1067,8 +1103,13 @@ class _RoomBackgroundLayers extends StatelessWidget {
                 alignment: RoomPage._deskSurfaceLeftFurnitureAlignment,
                 scale: RoomPage._deskSurfaceLeftFurnitureScale,
                 scaleCorrections: RoomPage._deskSurfaceLeftScaleCorrections,
+                supportedFurnitureIds: const {
+                  'wooden_mug',
+                  'ink_bottle',
+                  'wooden_fox_figure',
+                },
               ),
-              _DeskSurfaceFurniture(
+              _FurnitureImageLayer(
                 layerKey: const ValueKey('deskSurfaceRightFurnitureLayer'),
                 furnituresFuture: furnituresFuture,
                 furnitureId: deskSurfaceRightFurnitureId,
@@ -1076,6 +1117,11 @@ class _RoomBackgroundLayers extends StatelessWidget {
                 alignment: RoomPage._deskSurfaceRightFurnitureAlignment,
                 scale: RoomPage._deskSurfaceRightFurnitureScale,
                 scaleCorrections: RoomPage._deskSurfaceRightScaleCorrections,
+                supportedFurnitureIds: const {
+                  'wooden_mug',
+                  'ink_bottle',
+                  'wooden_fox_figure',
+                },
               ),
               Align(
                 alignment: RoomPage._bottleAlignment,
@@ -1288,8 +1334,8 @@ class _TutorialRoomGuide extends StatelessWidget {
   }
 }
 
-class _DeskSurfaceFurniture extends StatelessWidget {
-  const _DeskSurfaceFurniture({
+class _FurnitureImageLayer extends StatelessWidget {
+  const _FurnitureImageLayer({
     required this.layerKey,
     required this.furnituresFuture,
     required this.furnitureId,
@@ -1297,13 +1343,9 @@ class _DeskSurfaceFurniture extends StatelessWidget {
     required this.alignment,
     required this.scale,
     required this.scaleCorrections,
+    required this.supportedFurnitureIds,
   });
 
-  static const Set<String> _supportedFurnitureIds = {
-    'wooden_mug',
-    'ink_bottle',
-    'wooden_fox_figure',
-  };
   final Key layerKey;
   final Future<List<Furniture>> furnituresFuture;
   final String? furnitureId;
@@ -1311,11 +1353,12 @@ class _DeskSurfaceFurniture extends StatelessWidget {
   final Alignment alignment;
   final double scale;
   final Map<String, double> scaleCorrections;
+  final Set<String> supportedFurnitureIds;
 
   @override
   Widget build(BuildContext context) {
     final selectedId = furnitureId;
-    if (selectedId == null || !_supportedFurnitureIds.contains(selectedId)) {
+    if (selectedId == null || !supportedFurnitureIds.contains(selectedId)) {
       return const SizedBox.shrink();
     }
 

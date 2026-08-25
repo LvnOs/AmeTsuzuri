@@ -18,6 +18,7 @@ import 'package:provider/provider.dart';
 
 const _deskSurfaceLeftSlotId = 'living_room_desk_surface_left';
 const _deskSurfaceRightSlotId = 'living_room_desk_surface_right';
+const _windowShelfDecorSlotId = 'living_room_window_shelf_decor';
 
 const _furnitureA = Furniture(
   id: 'furniture_a',
@@ -82,6 +83,33 @@ const _woodenFoxFigure = Furniture(
   imagePath: 'furniture/desk/wooden_fox_figure.png',
   initialAvailable: true,
 );
+const _smallHouseplant = Furniture(
+  id: 'small_houseplant',
+  name: '小さな観葉植物',
+  price: 30,
+  size: 'small',
+  slotIds: [_windowShelfDecorSlotId],
+  imagePath: 'furniture/window/small_houseplant.png',
+  initialAvailable: true,
+);
+const _woodenBirdFigure = Furniture(
+  id: 'wooden_bird_figure',
+  name: '木の小鳥',
+  price: 30,
+  size: 'small',
+  slotIds: [_windowShelfDecorSlotId],
+  imagePath: 'furniture/window/wooden_bird.png',
+  initialAvailable: true,
+);
+const _smallGlassOrnament = Furniture(
+  id: 'small_glass_ornament',
+  name: 'ガラス細工',
+  price: 30,
+  size: 'small',
+  slotIds: [_windowShelfDecorSlotId],
+  imagePath: 'furniture/window/glass_ornament.png',
+  initialAvailable: true,
+);
 const _missingImageFurniture = Furniture(
   id: 'missing_image',
   name: '画像のない家具',
@@ -111,6 +139,84 @@ const _multiSlotFurniture = Furniture(
 );
 
 void main() {
+  group('窓辺A家具', () {
+    for (final furniture in const [
+      _smallHouseplant,
+      _woodenBirdFigure,
+      _smallGlassOrnament,
+    ]) {
+      testWidgets('${furniture.name}を30滴で購入して窓辺Aだけへ配置できる', (tester) async {
+        final harness = await _pumpCatalog(
+          tester,
+          openAsRoute: true,
+          blockPurchase: false,
+          initialShizuku: 30,
+          purchasedFurnitureIds: const {},
+          furnitures: [furniture],
+        );
+
+        await _buyFurniture(tester, furniture.name);
+
+        expect(harness.catalogProvider.isPurchased(furniture.id), isTrue);
+        expect(harness.shizukuProvider.currentShizuku, 0);
+        expect(
+          find.byKey(
+            const ValueKey('placementOption-$_windowShelfDecorSlotId'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('placementOption-$_deskSurfaceLeftSlotId')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(
+            const ValueKey('placementOption-$_deskSurfaceRightSlotId'),
+          ),
+          findsNothing,
+        );
+
+        await tester.tap(
+          find.byKey(
+            const ValueKey('placementOption-$_windowShelfDecorSlotId'),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(harness.placedFurnitureProvider.placedFurnitureIds, {
+          _windowShelfDecorSlotId: furniture.id,
+        });
+        expect(find.byType(CatalogPage), findsNothing);
+      });
+    }
+
+    testWidgets('occupiedな窓辺Aは別家具で上書きし追い出した家具も購入済みを維持する', (tester) async {
+      final harness = await _pumpCatalog(
+        tester,
+        openAsRoute: true,
+        furnitures: const [_smallHouseplant, _woodenBirdFigure],
+        purchasedFurnitureIds: const {'small_houseplant', 'wooden_bird_figure'},
+        placedFurnitureIds: const {_windowShelfDecorSlotId: 'small_houseplant'},
+      );
+
+      await tester.tap(_furnitureTile(_woodenBirdFigure.name));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('placementOption-$_windowShelfDecorSlotId')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('置き換える'));
+      await tester.pumpAndSettle();
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _windowShelfDecorSlotId: 'wooden_bird_figure',
+      });
+      expect(harness.catalogProvider.isPurchased('small_houseplant'), isTrue);
+      expect(harness.catalogProvider.isPurchased('wooden_bird_figure'), isTrue);
+      expect(find.byType(CatalogPage), findsNothing);
+    });
+  });
+
   testWidgets('Providerロード中は進捗表示しロード後に家具一覧へ切り替わる', (tester) async {
     final harness = await _pumpCatalog(tester, loadCatalogProvider: false);
 
@@ -1242,6 +1348,7 @@ class _FakePlacementSlotRepository extends PlacementSlotRepository {
     name: switch (slotId) {
       _deskSurfaceLeftSlotId => '机（左）',
       _deskSurfaceRightSlotId => '机（右）',
+      _windowShelfDecorSlotId => '窓際（棚）',
       'slot_a' => '窓辺',
       'long_slot' => 'とても長い名前の配置場所',
       _ => 'テスト配置場所',

@@ -29,6 +29,100 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
+  group('窓辺A家具', () {
+    for (final entry in const {
+      'small_houseplant': 'furniture/window/small_houseplant.png',
+      'wooden_bird_figure': 'furniture/window/wooden_bird.png',
+      'small_glass_ornament': 'furniture/window/glass_ornament.png',
+    }.entries) {
+      testWidgets('${entry.key}を窓辺Aへ描画できる', (tester) async {
+        await _pumpRoom(
+          tester,
+          initialPlacedFurnitureIds: {_windowShelfDecorSlotId: entry.key},
+        );
+
+        expect(_windowShelfDecorFurnitureLayer, findsOneWidget);
+        final image = tester.widget<Image>(
+          find.byKey(ValueKey('roomFurnitureImage-${entry.key}')),
+        );
+        expect(
+          (image.image as AssetImage).assetName,
+          'assets/images/${entry.value}',
+        );
+      });
+    }
+
+    testWidgets('occupiedな窓辺Aを上書きすると新家具だけを描画する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialPurchasedFurnitureIds: const {
+          'small_houseplant',
+          'wooden_bird_figure',
+        },
+        initialPlacedFurnitureIds: const {
+          _windowShelfDecorSlotId: 'small_houseplant',
+        },
+      );
+
+      await harness.placedFurnitureProvider.place(
+        slotId: _windowShelfDecorSlotId,
+        furnitureId: 'wooden_bird_figure',
+        isPurchased: harness.catalogProvider.isPurchased('wooden_bird_figure'),
+        allowedSlotIds: const [_windowShelfDecorSlotId],
+      );
+      await tester.pump();
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _windowShelfDecorSlotId: 'wooden_bird_figure',
+      });
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-small_houseplant')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-wooden_bird_figure')),
+        findsOneWidget,
+      );
+      expect(harness.catalogProvider.isPurchased('small_houseplant'), isTrue);
+    });
+
+    testWidgets('机上家具と窓辺家具を同時に描画できる', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {
+          _deskSurfaceLeftSlotId: 'wooden_mug',
+          _windowShelfDecorSlotId: 'small_glass_ornament',
+        },
+      );
+
+      expect(_placedFurnitureLayer, findsOneWidget);
+      expect(_windowShelfDecorFurnitureLayer, findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-wooden_mug')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-small_glass_ornament')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('Provider初期化時にRepositoryから窓辺A配置を復元して描画する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {
+          _windowShelfDecorSlotId: 'small_houseplant',
+        },
+      );
+
+      expect(harness.placedFurnitureProvider.isLoaded, isTrue);
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _windowShelfDecorSlotId: 'small_houseplant',
+      });
+      expect(_windowShelfDecorFurnitureLayer, findsOneWidget);
+    });
+  });
+
   group('チュートリアル誘導対象の導出', () {
     String resolve({
       bool areProvidersLoaded = true,
@@ -2401,11 +2495,15 @@ void main() {
 
 const _deskSurfaceLeftSlotId = 'living_room_desk_surface_left';
 const _deskSurfaceRightSlotId = 'living_room_desk_surface_right';
+const _windowShelfDecorSlotId = 'living_room_window_shelf_decor';
 final _placedFurnitureLayer = find.byKey(
   const ValueKey('deskSurfaceLeftFurnitureLayer'),
 );
 final _placedFurnitureRightLayer = find.byKey(
   const ValueKey('deskSurfaceRightFurnitureLayer'),
+);
+final _windowShelfDecorFurnitureLayer = find.byKey(
+  const ValueKey('windowShelfDecorFurnitureLayer'),
 );
 
 Future<void> _pumpRouteTransition(WidgetTester tester) async {
@@ -2608,6 +2706,33 @@ const List<Furniture> _roomFurnitures = [
     size: 'small',
     slotIds: [_deskSurfaceLeftSlotId, _deskSurfaceRightSlotId],
     imagePath: 'furniture/desk/wooden_fox_figure.png',
+    initialAvailable: true,
+  ),
+  Furniture(
+    id: 'small_houseplant',
+    name: 'small houseplant',
+    price: 30,
+    size: 'small',
+    slotIds: [_windowShelfDecorSlotId],
+    imagePath: 'furniture/window/small_houseplant.png',
+    initialAvailable: true,
+  ),
+  Furniture(
+    id: 'wooden_bird_figure',
+    name: 'wooden bird',
+    price: 30,
+    size: 'small',
+    slotIds: [_windowShelfDecorSlotId],
+    imagePath: 'furniture/window/wooden_bird.png',
+    initialAvailable: true,
+  ),
+  Furniture(
+    id: 'small_glass_ornament',
+    name: 'glass ornament',
+    price: 30,
+    size: 'small',
+    slotIds: [_windowShelfDecorSlotId],
+    imagePath: 'furniture/window/glass_ornament.png',
     initialAvailable: true,
   ),
 ];

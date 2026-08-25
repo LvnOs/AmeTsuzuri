@@ -281,18 +281,23 @@ furniture:
     image: furniture/bookshelf/small_globe.png
     initial_available: false
 
-  - id: wooden_bird_figure
-    name: 木彫りの鳥
-    price: 50
-    size: medium
+  - id: small_houseplant
+    name: 小さな観葉植物
+    price: 30
+    size: small
     slots:
-      - living_room_bookshelf_top_left
-      - living_room_bookshelf_top_right
-      - living_room_bookshelf_bottom_left
-      - living_room_bookshelf_bottom_right
       - living_room_window_shelf_decor
-    image: furniture/decor/wooden_bird_figure.png
-    initial_available: false
+    image: furniture/window/small_houseplant.png
+    initial_available: true
+
+  - id: wooden_bird_figure
+    name: 木の小鳥
+    price: 30
+    size: small
+    slots:
+      - living_room_window_shelf_decor
+    image: furniture/window/wooden_bird.png
+    initial_available: true
 
   - id: music_box
     name: オルゴール
@@ -325,15 +330,13 @@ furniture:
     initial_available: false
 
   - id: small_glass_ornament
-    name: 小さなガラス細工
-    price: 50
-    size: medium
+    name: ガラス細工
+    price: 30
+    size: small
     slots:
       - living_room_window_shelf_decor
-      - living_room_bookshelf_top_left
-      - living_room_bookshelf_top_right
-    image: furniture/window/small_glass_ornament.png
-    initial_available: false
+    image: furniture/window/glass_ornament.png
+    initial_available: true
 
   - id: white_linen_curtains
     name: 白いリネンのカーテン
