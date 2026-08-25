@@ -113,7 +113,7 @@ class RoomPage extends StatefulWidget {
     0.70,
     0.02,
   );
-  static const double _deskSurfaceRightFurnitureScale = 0.22;
+  static const double _deskSurfaceRightFurnitureScale = 0.25;
   static const Map<String, double> _deskSurfaceRightScaleCorrections = {
     'wooden_mug': 1,
     'ink_bottle': 0.9,
