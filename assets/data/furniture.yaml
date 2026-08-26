@@ -329,6 +329,33 @@ furniture:
     image: furniture/window/sun_catcher.png
     initial_available: false
 
+  - id: wind_chime
+    name: 風鈴
+    price: 30
+    size: small
+    slots:
+      - living_room_window_hanging_decor
+    image: furniture/hanging/wind_chime.png
+    initial_available: true
+
+  - id: teru_teru_bozu
+    name: てるてる坊主
+    price: 30
+    size: small
+    slots:
+      - living_room_window_hanging_decor
+    image: furniture/hanging/teru_teru_bozu.png
+    initial_available: true
+
+  - id: moon_mobile
+    name: 月のモビール
+    price: 30
+    size: small
+    slots:
+      - living_room_window_hanging_decor
+    image: furniture/hanging/moon_mobile.png
+    initial_available: true
+
   - id: small_glass_ornament
     name: ガラス細工
     price: 30

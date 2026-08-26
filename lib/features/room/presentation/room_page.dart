@@ -139,6 +139,25 @@ class RoomPage extends StatefulWidget {
     'small_glass_ornament': 0.78,
   };
 
+  // Hanging furniture tuning for the 390 x 700 Room composition.
+  static const String _windowHangingDecorSlotId =
+      'living_room_window_hanging_decor';
+  static const Alignment _windowHangingDecorFurnitureAlignment = Alignment(
+    0.57,
+    -0.93,
+  );
+  static const double _windowHangingDecorFurnitureScale = 0.18;
+  static const Set<String> _windowHangingDecorFurnitureIds = {
+    'wind_chime',
+    'teru_teru_bozu',
+    'moon_mobile',
+  };
+  static const Map<String, double> _windowHangingDecorScaleCorrections = {
+    'wind_chime': 0.9,
+    'teru_teru_bozu': 0.88,
+    'moon_mobile': 0.92,
+  };
+
   // Arrival animation tuning. Defaults follow the existing post and letter.
   static const Duration _arrivalAnimationDuration = Duration(
     milliseconds: 4350,
@@ -368,6 +387,10 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
         ? placedFurnitureProvider.placedFurnitureIds[RoomPage
               ._windowShelfDecorSlotId]
         : null;
+    final windowHangingDecorFurnitureId = placedFurnitureProvider.isLoaded
+        ? placedFurnitureProvider.placedFurnitureIds[RoomPage
+              ._windowHangingDecorSlotId]
+        : null;
 
     var showLetter = false;
     if (appDateProvider.isLoaded && readLetterProvider.isLoaded) {
@@ -421,6 +444,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
               deskSurfaceLeftFurnitureId: deskSurfaceLeftFurnitureId,
               deskSurfaceRightFurnitureId: deskSurfaceRightFurnitureId,
               windowShelfDecorFurnitureId: windowShelfDecorFurnitureId,
+              windowHangingDecorFurnitureId: windowHangingDecorFurnitureId,
               onTapBottle: _onTapBottle,
               onTapBookshelf: _onTapBookshelf,
               onTapLetter: _onTapLetter,
@@ -956,6 +980,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
     required this.deskSurfaceLeftFurnitureId,
     required this.deskSurfaceRightFurnitureId,
     required this.windowShelfDecorFurnitureId,
+    required this.windowHangingDecorFurnitureId,
     required this.onTapBottle,
     required this.onTapBookshelf,
     required this.onTapLetter,
@@ -975,6 +1000,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
   final String? deskSurfaceLeftFurnitureId;
   final String? deskSurfaceRightFurnitureId;
   final String? windowShelfDecorFurnitureId;
+  final String? windowHangingDecorFurnitureId;
   final VoidCallback onTapBottle;
   final VoidCallback onTapBookshelf;
   final VoidCallback onTapLetter;
@@ -1017,6 +1043,16 @@ class _RoomBackgroundLayers extends StatelessWidget {
               Image.asset(
                 'assets/images/room/room_base.png',
                 fit: BoxFit.cover,
+              ),
+              _FurnitureImageLayer(
+                layerKey: const ValueKey('windowHangingDecorFurnitureLayer'),
+                furnituresFuture: furnituresFuture,
+                furnitureId: windowHangingDecorFurnitureId,
+                roomWidth: constraints.maxWidth,
+                alignment: RoomPage._windowHangingDecorFurnitureAlignment,
+                scale: RoomPage._windowHangingDecorFurnitureScale,
+                scaleCorrections: RoomPage._windowHangingDecorScaleCorrections,
+                supportedFurnitureIds: RoomPage._windowHangingDecorFurnitureIds,
               ),
               if (tutorialTarget != _TutorialTarget.none)
                 _TutorialTargetGlow(

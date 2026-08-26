@@ -29,6 +29,102 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
+  group('吊り飾り家具', () {
+    for (final entry in const {
+      'wind_chime': 'furniture/hanging/wind_chime.png',
+      'teru_teru_bozu': 'furniture/hanging/teru_teru_bozu.png',
+      'moon_mobile': 'furniture/hanging/moon_mobile.png',
+    }.entries) {
+      testWidgets('${entry.key}を吊り飾りslotへ描画できる', (tester) async {
+        await _pumpRoom(
+          tester,
+          initialPlacedFurnitureIds: {_windowHangingDecorSlotId: entry.key},
+        );
+
+        expect(_windowHangingDecorFurnitureLayer, findsOneWidget);
+        final image = tester.widget<Image>(
+          find.byKey(ValueKey('roomFurnitureImage-${entry.key}')),
+        );
+        expect(
+          (image.image as AssetImage).assetName,
+          'assets/images/${entry.value}',
+        );
+      });
+    }
+
+    testWidgets('occupiedな吊り飾りを上書きすると新家具だけを描画する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialPurchasedFurnitureIds: const {'wind_chime', 'moon_mobile'},
+        initialPlacedFurnitureIds: const {
+          _windowHangingDecorSlotId: 'wind_chime',
+        },
+      );
+
+      await harness.placedFurnitureProvider.place(
+        slotId: _windowHangingDecorSlotId,
+        furnitureId: 'moon_mobile',
+        isPurchased: harness.catalogProvider.isPurchased('moon_mobile'),
+        allowedSlotIds: const [_windowHangingDecorSlotId],
+      );
+      await tester.pump();
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _windowHangingDecorSlotId: 'moon_mobile',
+      });
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-wind_chime')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-moon_mobile')),
+        findsOneWidget,
+      );
+      expect(harness.catalogProvider.isPurchased('wind_chime'), isTrue);
+    });
+
+    testWidgets('窓辺A家具と吊り飾り家具を同時に描画できる', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {
+          _windowShelfDecorSlotId: 'small_houseplant',
+          _windowHangingDecorSlotId: 'wind_chime',
+        },
+      );
+
+      expect(_windowShelfDecorFurnitureLayer, findsOneWidget);
+      expect(_windowHangingDecorFurnitureLayer, findsOneWidget);
+    });
+
+    testWidgets('机上家具と吊り飾り家具を同時に描画できる', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {
+          _deskSurfaceLeftSlotId: 'wooden_mug',
+          _windowHangingDecorSlotId: 'teru_teru_bozu',
+        },
+      );
+
+      expect(_placedFurnitureLayer, findsOneWidget);
+      expect(_windowHangingDecorFurnitureLayer, findsOneWidget);
+    });
+
+    testWidgets('Provider初期化時にRepositoryから吊り飾り配置を復元して描画する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {
+          _windowHangingDecorSlotId: 'moon_mobile',
+        },
+      );
+
+      expect(harness.placedFurnitureProvider.isLoaded, isTrue);
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _windowHangingDecorSlotId: 'moon_mobile',
+      });
+      expect(_windowHangingDecorFurnitureLayer, findsOneWidget);
+    });
+  });
+
   group('窓辺A家具', () {
     for (final entry in const {
       'small_houseplant': 'furniture/window/small_houseplant.png',
@@ -2496,6 +2592,7 @@ void main() {
 const _deskSurfaceLeftSlotId = 'living_room_desk_surface_left';
 const _deskSurfaceRightSlotId = 'living_room_desk_surface_right';
 const _windowShelfDecorSlotId = 'living_room_window_shelf_decor';
+const _windowHangingDecorSlotId = 'living_room_window_hanging_decor';
 final _placedFurnitureLayer = find.byKey(
   const ValueKey('deskSurfaceLeftFurnitureLayer'),
 );
@@ -2504,6 +2601,9 @@ final _placedFurnitureRightLayer = find.byKey(
 );
 final _windowShelfDecorFurnitureLayer = find.byKey(
   const ValueKey('windowShelfDecorFurnitureLayer'),
+);
+final _windowHangingDecorFurnitureLayer = find.byKey(
+  const ValueKey('windowHangingDecorFurnitureLayer'),
 );
 
 Future<void> _pumpRouteTransition(WidgetTester tester) async {
@@ -2733,6 +2833,33 @@ const List<Furniture> _roomFurnitures = [
     size: 'small',
     slotIds: [_windowShelfDecorSlotId],
     imagePath: 'furniture/window/glass_ornament.png',
+    initialAvailable: true,
+  ),
+  Furniture(
+    id: 'wind_chime',
+    name: 'wind chime',
+    price: 30,
+    size: 'small',
+    slotIds: [_windowHangingDecorSlotId],
+    imagePath: 'furniture/hanging/wind_chime.png',
+    initialAvailable: true,
+  ),
+  Furniture(
+    id: 'teru_teru_bozu',
+    name: 'teru teru bozu',
+    price: 30,
+    size: 'small',
+    slotIds: [_windowHangingDecorSlotId],
+    imagePath: 'furniture/hanging/teru_teru_bozu.png',
+    initialAvailable: true,
+  ),
+  Furniture(
+    id: 'moon_mobile',
+    name: 'moon mobile',
+    price: 30,
+    size: 'small',
+    slotIds: [_windowHangingDecorSlotId],
+    imagePath: 'furniture/hanging/moon_mobile.png',
     initialAvailable: true,
   ),
 ];

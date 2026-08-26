@@ -19,6 +19,7 @@ import 'package:provider/provider.dart';
 const _deskSurfaceLeftSlotId = 'living_room_desk_surface_left';
 const _deskSurfaceRightSlotId = 'living_room_desk_surface_right';
 const _windowShelfDecorSlotId = 'living_room_window_shelf_decor';
+const _windowHangingDecorSlotId = 'living_room_window_hanging_decor';
 
 const _furnitureA = Furniture(
   id: 'furniture_a',
@@ -110,6 +111,33 @@ const _smallGlassOrnament = Furniture(
   imagePath: 'furniture/window/glass_ornament.png',
   initialAvailable: true,
 );
+const _windChime = Furniture(
+  id: 'wind_chime',
+  name: '風鈴',
+  price: 30,
+  size: 'small',
+  slotIds: [_windowHangingDecorSlotId],
+  imagePath: 'furniture/hanging/wind_chime.png',
+  initialAvailable: true,
+);
+const _teruTeruBozu = Furniture(
+  id: 'teru_teru_bozu',
+  name: 'てるてる坊主',
+  price: 30,
+  size: 'small',
+  slotIds: [_windowHangingDecorSlotId],
+  imagePath: 'furniture/hanging/teru_teru_bozu.png',
+  initialAvailable: true,
+);
+const _moonMobile = Furniture(
+  id: 'moon_mobile',
+  name: '月のモビール',
+  price: 30,
+  size: 'small',
+  slotIds: [_windowHangingDecorSlotId],
+  imagePath: 'furniture/hanging/moon_mobile.png',
+  initialAvailable: true,
+);
 const _missingImageFurniture = Furniture(
   id: 'missing_image',
   name: '画像のない家具',
@@ -139,6 +167,88 @@ const _multiSlotFurniture = Furniture(
 );
 
 void main() {
+  group('吊り飾り家具', () {
+    for (final furniture in const [_windChime, _teruTeruBozu, _moonMobile]) {
+      testWidgets('${furniture.name}を30滴で購入して吊り飾りだけへ配置できる', (tester) async {
+        final harness = await _pumpCatalog(
+          tester,
+          openAsRoute: true,
+          blockPurchase: false,
+          initialShizuku: 30,
+          purchasedFurnitureIds: const {},
+          furnitures: [furniture],
+        );
+
+        await _buyFurniture(tester, furniture.name);
+
+        expect(harness.catalogProvider.isPurchased(furniture.id), isTrue);
+        expect(harness.shizukuProvider.currentShizuku, 0);
+        expect(
+          find.byKey(
+            const ValueKey('placementOption-$_windowHangingDecorSlotId'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(
+            const ValueKey('placementOption-$_windowShelfDecorSlotId'),
+          ),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('placementOption-$_deskSurfaceLeftSlotId')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(
+            const ValueKey('placementOption-$_deskSurfaceRightSlotId'),
+          ),
+          findsNothing,
+        );
+
+        await tester.tap(
+          find.byKey(
+            const ValueKey('placementOption-$_windowHangingDecorSlotId'),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(harness.placedFurnitureProvider.placedFurnitureIds, {
+          _windowHangingDecorSlotId: furniture.id,
+        });
+        expect(find.byType(CatalogPage), findsNothing);
+      });
+    }
+
+    testWidgets('occupiedな吊り飾りは別家具で上書きし追い出した家具も購入済みを維持する', (tester) async {
+      final harness = await _pumpCatalog(
+        tester,
+        openAsRoute: true,
+        furnitures: const [_windChime, _moonMobile],
+        purchasedFurnitureIds: const {'wind_chime', 'moon_mobile'},
+        placedFurnitureIds: const {_windowHangingDecorSlotId: 'wind_chime'},
+      );
+
+      await tester.tap(_furnitureTile(_moonMobile.name));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey('placementOption-$_windowHangingDecorSlotId'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('置き換える'));
+      await tester.pumpAndSettle();
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _windowHangingDecorSlotId: 'moon_mobile',
+      });
+      expect(harness.catalogProvider.isPurchased('wind_chime'), isTrue);
+      expect(harness.catalogProvider.isPurchased('moon_mobile'), isTrue);
+      expect(find.byType(CatalogPage), findsNothing);
+    });
+  });
+
   group('窓辺A家具', () {
     for (final furniture in const [
       _smallHouseplant,
@@ -1349,6 +1459,7 @@ class _FakePlacementSlotRepository extends PlacementSlotRepository {
       _deskSurfaceLeftSlotId => '机（左）',
       _deskSurfaceRightSlotId => '机（右）',
       _windowShelfDecorSlotId => '窓際（棚）',
+      _windowHangingDecorSlotId => '窓際（吊り飾り）',
       'slot_a' => '窓辺',
       'long_slot' => 'とても長い名前の配置場所',
       _ => 'テスト配置場所',

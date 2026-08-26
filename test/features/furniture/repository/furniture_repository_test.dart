@@ -5,13 +5,19 @@ import 'package:flutter_test/flutter_test.dart';
 const _deskSurfaceLeftSlotId = 'living_room_desk_surface_left';
 const _deskSurfaceRightSlotId = 'living_room_desk_surface_right';
 const _windowShelfDecorSlotId = 'living_room_window_shelf_decor';
+const _windowHangingDecorSlotId = 'living_room_window_hanging_decor';
 const _deskFurnitureIds = {'wooden_mug', 'ink_bottle', 'wooden_fox_figure'};
 const _windowFurnitureIds = {
   'small_houseplant',
   'wooden_bird_figure',
   'small_glass_ornament',
 };
-const _publicFurnitureIds = {..._deskFurnitureIds, ..._windowFurnitureIds};
+const _hangingFurnitureIds = {'wind_chime', 'teru_teru_bozu', 'moon_mobile'};
+const _publicFurnitureIds = {
+  ..._deskFurnitureIds,
+  ..._windowFurnitureIds,
+  ..._hangingFurnitureIds,
+};
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -23,11 +29,11 @@ void main() {
       furnitures = await FurnitureRepository().getAll();
     });
 
-    test('全43件の家具定義を維持する', () {
-      expect(furnitures, hasLength(43));
+    test('全46件の家具定義を維持する', () {
+      expect(furnitures, hasLength(46));
     });
 
-    test('机上3家具と窓辺3家具だけが初期公開される', () {
+    test('机上・窓辺・吊り飾りの各3家具だけが初期公開される', () {
       final availableIds = furnitures
           .where((furniture) => furniture.initialAvailable)
           .map((furniture) => furniture.id)
@@ -68,6 +74,31 @@ void main() {
         expect(furniture.price, 30, reason: id);
         expect(furniture.initialAvailable, isTrue, reason: id);
         expect(furniture.slotIds, const [_windowShelfDecorSlotId], reason: id);
+        expect(furniture.imagePath, expectedImages[id], reason: id);
+      }
+    });
+
+    test('吊り飾り家具3種は30滴で吊り飾りだけに配置できる', () {
+      const expectedNames = {
+        'wind_chime': '風鈴',
+        'teru_teru_bozu': 'てるてる坊主',
+        'moon_mobile': '月のモビール',
+      };
+      const expectedImages = {
+        'wind_chime': 'furniture/hanging/wind_chime.png',
+        'teru_teru_bozu': 'furniture/hanging/teru_teru_bozu.png',
+        'moon_mobile': 'furniture/hanging/moon_mobile.png',
+      };
+
+      for (final id in _hangingFurnitureIds) {
+        final furniture = furnitures.singleWhere((item) => item.id == id);
+
+        expect(furniture.name, expectedNames[id], reason: id);
+        expect(furniture.price, 30, reason: id);
+        expect(furniture.initialAvailable, isTrue, reason: id);
+        expect(furniture.slotIds, const [
+          _windowHangingDecorSlotId,
+        ], reason: id);
         expect(furniture.imagePath, expectedImages[id], reason: id);
       }
     });
