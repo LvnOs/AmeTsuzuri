@@ -447,13 +447,13 @@ furniture:
     initial_available: true
 
   - id: rectangular_rug
-    name: 四角いラグ
-    price: 100
+    name: 淡いチェックの四角ラグ
+    price: 70
     size: large
     slots:
       - living_room_floor_rug
-    image: furniture/rug/rectangular_rug.png
-    initial_available: false
+    image: furniture/rug/check_rug.png
+    initial_available: true
 
   - id: patchwork_rug
     name: パッチワークラグ

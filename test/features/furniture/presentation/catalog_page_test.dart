@@ -148,6 +148,15 @@ const _roundRug = Furniture(
   imagePath: 'furniture/rug/round_rug.png',
   initialAvailable: true,
 );
+const _rectangularRug = Furniture(
+  id: 'rectangular_rug',
+  name: '淡いチェックの四角ラグ',
+  price: 70,
+  size: 'large',
+  slotIds: [_floorRugSlotId],
+  imagePath: 'furniture/rug/check_rug.png',
+  initialAvailable: true,
+);
 const _missingImageFurniture = Furniture(
   id: 'missing_image',
   name: '画像のない家具',
@@ -239,6 +248,90 @@ void main() {
       expect(harness.catalogProvider.isPurchased('round_rug'), isTrue);
       expect(find.byType(CatalogPage), findsOneWidget);
     });
+
+    testWidgets('チェック柄ラグを70滴で購入してラグslotだけへ配置できる', (tester) async {
+      final harness = await _pumpCatalog(
+        tester,
+        openAsRoute: true,
+        blockPurchase: false,
+        initialShizuku: 70,
+        purchasedFurnitureIds: const {},
+        furnitures: const [_rectangularRug],
+      );
+
+      await _buyFurniture(tester, _rectangularRug.name);
+
+      expect(harness.catalogProvider.isPurchased('rectangular_rug'), isTrue);
+      expect(harness.shizukuProvider.currentShizuku, 0);
+      expect(
+        find.byKey(const ValueKey('placementOption-$_floorRugSlotId')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const ValueKey('placementOption-$_windowHangingDecorSlotId'),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('placementOption-$_windowShelfDecorSlotId')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('placementOption-$_deskSurfaceLeftSlotId')),
+        findsNothing,
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('placementOption-$_floorRugSlotId')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _floorRugSlotId: 'rectangular_rug',
+      });
+      expect(find.byType(CatalogPage), findsNothing);
+    });
+
+    for (final replacement in const [
+      (from: _roundRug, to: _rectangularRug),
+      (from: _rectangularRug, to: _roundRug),
+    ]) {
+      testWidgets(
+        '${replacement.from.id}から${replacement.to.id}へ上書きし購入状態を維持する',
+        (tester) async {
+          final harness = await _pumpCatalog(
+            tester,
+            openAsRoute: true,
+            furnitures: [replacement.from, replacement.to],
+            purchasedFurnitureIds: {replacement.from.id, replacement.to.id},
+            placedFurnitureIds: {_floorRugSlotId: replacement.from.id},
+          );
+
+          await tester.tap(_furnitureTile(replacement.to.name));
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.byKey(const ValueKey('placementOption-$_floorRugSlotId')),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('置き換える'));
+          await tester.pumpAndSettle();
+
+          expect(harness.placedFurnitureProvider.placedFurnitureIds, {
+            _floorRugSlotId: replacement.to.id,
+          });
+          expect(
+            harness.catalogProvider.isPurchased(replacement.from.id),
+            isTrue,
+          );
+          expect(
+            harness.catalogProvider.isPurchased(replacement.to.id),
+            isTrue,
+          );
+          expect(find.byType(CatalogPage), findsNothing);
+        },
+      );
+    }
   });
 
   group('吊り飾り家具', () {

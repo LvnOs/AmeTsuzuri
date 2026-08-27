@@ -127,6 +127,136 @@ void main() {
         findsOneWidget,
       );
     });
+
+    testWidgets('チェック柄ラグ配置時は固定ラグと丸ラグを同時表示しない', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {_floorRugSlotId: 'rectangular_rug'},
+      );
+      await tester.pump();
+
+      expect(_checkRugImage, findsOneWidget);
+      expect(_fixedRugImage, findsNothing);
+      expect(_roundRugImage, findsNothing);
+      expect(
+        find.image(
+          const AssetImage('assets/images/furniture/rug/check_rug.png'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.image(const AssetImage('assets/images/room/rug.png')),
+        findsNothing,
+      );
+      expect(
+        find.image(
+          const AssetImage('assets/images/furniture/rug/round_rug.png'),
+        ),
+        findsNothing,
+      );
+    });
+
+    for (final replacement in const [
+      (from: 'round_rug', to: 'rectangular_rug'),
+      (from: 'rectangular_rug', to: 'round_rug'),
+    ]) {
+      testWidgets('${replacement.from}から${replacement.to}へ上書きして新ラグだけを表示する', (
+        tester,
+      ) async {
+        final harness = await _pumpRoom(
+          tester,
+          initialPurchasedFurnitureIds: const {'round_rug', 'rectangular_rug'},
+          initialPlacedFurnitureIds: {_floorRugSlotId: replacement.from},
+        );
+
+        await harness.placedFurnitureProvider.place(
+          slotId: _floorRugSlotId,
+          furnitureId: replacement.to,
+          isPurchased: harness.catalogProvider.isPurchased(replacement.to),
+          allowedSlotIds: const [_floorRugSlotId],
+        );
+        await tester.pump();
+
+        expect(harness.placedFurnitureProvider.placedFurnitureIds, {
+          _floorRugSlotId: replacement.to,
+        });
+        expect(harness.catalogProvider.isPurchased(replacement.from), isTrue);
+        expect(harness.catalogProvider.isPurchased(replacement.to), isTrue);
+        expect(
+          find.byKey(ValueKey('roomFurnitureImage-${replacement.to}')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(ValueKey('roomFurnitureImage-${replacement.from}')),
+          findsNothing,
+        );
+        expect(_fixedRugImage, findsNothing);
+      });
+    }
+
+    testWidgets('チェック柄ラグを取り外すと固定ラグへ戻る', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {_floorRugSlotId: 'rectangular_rug'},
+      );
+
+      await harness.placedFurnitureProvider.remove('rectangular_rug');
+      await tester.pump();
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, isEmpty);
+      expect(_fixedRugImage, findsOneWidget);
+      expect(_checkRugImage, findsNothing);
+    });
+
+    testWidgets('Provider初期化時にチェック柄ラグ配置を復元する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {_floorRugSlotId: 'rectangular_rug'},
+      );
+      await tester.pump();
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _floorRugSlotId: 'rectangular_rug',
+      });
+      expect(_checkRugImage, findsOneWidget);
+      expect(_fixedRugImage, findsNothing);
+      expect(_roundRugImage, findsNothing);
+    });
+
+    testWidgets('チェック柄ラグのreset相当で固定ラグへ戻る', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialPurchasedFurnitureIds: const {'rectangular_rug'},
+        initialPlacedFurnitureIds: const {_floorRugSlotId: 'rectangular_rug'},
+      );
+
+      await harness.placedFurnitureProvider.reset();
+      await harness.catalogProvider.reset();
+      await tester.pump();
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, isEmpty);
+      expect(harness.catalogProvider.purchasedFurnitureIds, isEmpty);
+      expect(_fixedRugImage, findsOneWidget);
+      expect(_checkRugImage, findsNothing);
+    });
+
+    testWidgets('チェック柄ラグと机上・窓辺・吊り飾り家具を共存表示できる', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {
+          _floorRugSlotId: 'rectangular_rug',
+          _deskSurfaceLeftSlotId: 'wooden_mug',
+          _windowShelfDecorSlotId: 'small_houseplant',
+          _windowHangingDecorSlotId: 'wind_chime',
+        },
+      );
+      await tester.pump();
+
+      expect(_checkRugImage, findsOneWidget);
+      expect(_placedFurnitureLayer, findsOneWidget);
+      expect(_windowShelfDecorFurnitureLayer, findsOneWidget);
+      expect(_windowHangingDecorFurnitureLayer, findsOneWidget);
+    });
   });
 
   group('吊り飾り家具', () {
@@ -2699,6 +2829,9 @@ final _fixedRugImage = find.byKey(const ValueKey('roomFixedRugImage'));
 final _roundRugImage = find.byKey(
   const ValueKey('roomFurnitureImage-round_rug'),
 );
+final _checkRugImage = find.byKey(
+  const ValueKey('roomFurnitureImage-rectangular_rug'),
+);
 final _placedFurnitureLayer = find.byKey(
   const ValueKey('deskSurfaceLeftFurnitureLayer'),
 );
@@ -2975,6 +3108,15 @@ const List<Furniture> _roomFurnitures = [
     size: 'large',
     slotIds: [_floorRugSlotId],
     imagePath: 'furniture/rug/round_rug.png',
+    initialAvailable: true,
+  ),
+  Furniture(
+    id: 'rectangular_rug',
+    name: 'pale check rectangular rug',
+    price: 70,
+    size: 'large',
+    slotIds: [_floorRugSlotId],
+    imagePath: 'furniture/rug/check_rug.png',
     initialAvailable: true,
   ),
 ];

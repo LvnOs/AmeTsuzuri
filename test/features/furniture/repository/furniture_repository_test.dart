@@ -19,6 +19,7 @@ const _publicFurnitureIds = {
   ..._windowFurnitureIds,
   ..._hangingFurnitureIds,
   'round_rug',
+  'rectangular_rug',
 };
 
 void main() {
@@ -35,7 +36,7 @@ void main() {
       expect(furnitures, hasLength(46));
     });
 
-    test('机上・窓辺・吊り飾り各3家具と丸ラグだけが初期公開される', () {
+    test('机上・窓辺・吊り飾り各3家具とラグ2種だけが初期公開される', () {
       final availableIds = furnitures
           .where((furniture) => furniture.initialAvailable)
           .map((furniture) => furniture.id)
@@ -114,6 +115,19 @@ void main() {
       expect(rug.initialAvailable, isTrue);
       expect(rug.slotIds, const [_floorRugSlotId]);
       expect(rug.imagePath, 'furniture/rug/round_rug.png');
+    });
+
+    test('淡いチェックの四角ラグは70滴でラグslotだけに配置できる', () {
+      final rug = furnitures.singleWhere(
+        (item) => item.id == 'rectangular_rug',
+      );
+
+      expect(rug.name, '淡いチェックの四角ラグ');
+      expect(rug.price, 70);
+      expect(rug.size, 'large');
+      expect(rug.initialAvailable, isTrue);
+      expect(rug.slotIds, const [_floorRugSlotId]);
+      expect(rug.imagePath, 'furniture/rug/check_rug.png');
     });
 
     test('MVP対象外の代表家具は非公開だがマスターに残る', () {
