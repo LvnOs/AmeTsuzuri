@@ -438,13 +438,13 @@ furniture:
     initial_available: false
 
   - id: round_rug
-    name: 丸いラグ
-    price: 100
+    name: 無地の丸ラグ
+    price: 70
     size: large
     slots:
       - living_room_floor_rug
     image: furniture/rug/round_rug.png
-    initial_available: false
+    initial_available: true
 
   - id: rectangular_rug
     name: 四角いラグ

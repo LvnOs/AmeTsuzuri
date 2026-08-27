@@ -287,9 +287,10 @@ class RoomPage extends StatefulWidget {
   static const double _chairScale = 0.47;
 
   // Rug composition tuning. Width and height are independently adjustable.
-  static const Alignment _rugAlignment = Alignment(0.53, 0.935);
-  static const double _rugWidthScale = 0.898;
-  static const double _rugHeightScale = 0.80;
+  static const Alignment _rugAlignment = Alignment(0.25, 1.035);
+  static const double _rugWidthScale = 0.800;
+  static const double _rugHeightScale = 0.75;
+  static const String _floorRugSlotId = 'living_room_floor_rug';
 
   @visibleForTesting
   static String resolveTutorialTargetForTesting({
@@ -391,6 +392,9 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
         ? placedFurnitureProvider.placedFurnitureIds[RoomPage
               ._windowHangingDecorSlotId]
         : null;
+    final floorRugFurnitureId = placedFurnitureProvider.isLoaded
+        ? placedFurnitureProvider.placedFurnitureIds[RoomPage._floorRugSlotId]
+        : null;
 
     var showLetter = false;
     if (appDateProvider.isLoaded && readLetterProvider.isLoaded) {
@@ -445,6 +449,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
               deskSurfaceRightFurnitureId: deskSurfaceRightFurnitureId,
               windowShelfDecorFurnitureId: windowShelfDecorFurnitureId,
               windowHangingDecorFurnitureId: windowHangingDecorFurnitureId,
+              floorRugFurnitureId: floorRugFurnitureId,
               onTapBottle: _onTapBottle,
               onTapBookshelf: _onTapBookshelf,
               onTapLetter: _onTapLetter,
@@ -981,6 +986,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
     required this.deskSurfaceRightFurnitureId,
     required this.windowShelfDecorFurnitureId,
     required this.windowHangingDecorFurnitureId,
+    required this.floorRugFurnitureId,
     required this.onTapBottle,
     required this.onTapBookshelf,
     required this.onTapLetter,
@@ -1001,6 +1007,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
   final String? deskSurfaceRightFurnitureId;
   final String? windowShelfDecorFurnitureId;
   final String? windowHangingDecorFurnitureId;
+  final String? floorRugFurnitureId;
   final VoidCallback onTapBottle;
   final VoidCallback onTapBookshelf;
   final VoidCallback onTapLetter;
@@ -1094,18 +1101,10 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   animation: tutorialGlowAnimation,
                   roomWidth: constraints.maxWidth,
                 ),
-              Align(
-                alignment: RoomPage._rugAlignment,
-                child: Transform.scale(
-                  scaleY: RoomPage._rugHeightScale,
-                  child: SizedBox(
-                    width: constraints.maxWidth * RoomPage._rugWidthScale,
-                    child: Image.asset(
-                      'assets/images/room/rug.png',
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ),
+              _RugLayer(
+                furnituresFuture: furnituresFuture,
+                furnitureId: floorRugFurnitureId,
+                roomWidth: constraints.maxWidth,
               ),
               Align(
                 alignment: RoomPage._curtainAlignment,
@@ -1363,6 +1362,75 @@ class _TutorialRoomGuide extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RugLayer extends StatelessWidget {
+  const _RugLayer({
+    required this.furnituresFuture,
+    required this.furnitureId,
+    required this.roomWidth,
+  });
+
+  static const String _fixedRugAssetPath = 'assets/images/room/rug.png';
+
+  final Future<List<Furniture>> furnituresFuture;
+  final String? furnitureId;
+  final double roomWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedId = furnitureId;
+    if (selectedId == null) {
+      return _buildRug(_fixedRugAssetPath);
+    }
+
+    return FutureBuilder<List<Furniture>>(
+      future: furnituresFuture,
+      builder: (context, snapshot) {
+        Furniture? selectedFurniture;
+        for (final furniture in snapshot.data ?? const <Furniture>[]) {
+          if (furniture.id == selectedId) {
+            selectedFurniture = furniture;
+            break;
+          }
+        }
+
+        final imagePath = selectedFurniture == null
+            ? _fixedRugAssetPath
+            : 'assets/images/${selectedFurniture.imagePath}';
+        return _buildRug(imagePath, furnitureId: selectedFurniture?.id);
+      },
+    );
+  }
+
+  Widget _buildRug(String imagePath, {String? furnitureId}) {
+    return Align(
+      key: const ValueKey('roomRugLayer'),
+      alignment: RoomPage._rugAlignment,
+      child: Transform.scale(
+        scaleY: RoomPage._rugHeightScale,
+        child: SizedBox(
+          width: roomWidth * RoomPage._rugWidthScale,
+          child: Image.asset(
+            imagePath,
+            key: ValueKey(
+              furnitureId == null
+                  ? 'roomFixedRugImage'
+                  : 'roomFurnitureImage-$furnitureId',
+            ),
+            fit: BoxFit.contain,
+            errorBuilder: furnitureId == null
+                ? null
+                : (context, error, stackTrace) => Image.asset(
+                    _fixedRugAssetPath,
+                    key: const ValueKey('roomFixedRugImage'),
+                    fit: BoxFit.contain,
+                  ),
           ),
         ),
       ),

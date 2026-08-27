@@ -20,6 +20,7 @@ const _deskSurfaceLeftSlotId = 'living_room_desk_surface_left';
 const _deskSurfaceRightSlotId = 'living_room_desk_surface_right';
 const _windowShelfDecorSlotId = 'living_room_window_shelf_decor';
 const _windowHangingDecorSlotId = 'living_room_window_hanging_decor';
+const _floorRugSlotId = 'living_room_floor_rug';
 
 const _furnitureA = Furniture(
   id: 'furniture_a',
@@ -138,6 +139,15 @@ const _moonMobile = Furniture(
   imagePath: 'furniture/hanging/moon_mobile.png',
   initialAvailable: true,
 );
+const _roundRug = Furniture(
+  id: 'round_rug',
+  name: '無地の丸ラグ',
+  price: 70,
+  size: 'large',
+  slotIds: [_floorRugSlotId],
+  imagePath: 'furniture/rug/round_rug.png',
+  initialAvailable: true,
+);
 const _missingImageFurniture = Furniture(
   id: 'missing_image',
   name: '画像のない家具',
@@ -167,6 +177,70 @@ const _multiSlotFurniture = Furniture(
 );
 
 void main() {
+  group('丸ラグ家具', () {
+    testWidgets('70滴で購入してラグslotだけへ配置できる', (tester) async {
+      final harness = await _pumpCatalog(
+        tester,
+        openAsRoute: true,
+        blockPurchase: false,
+        initialShizuku: 70,
+        purchasedFurnitureIds: const {},
+        furnitures: const [_roundRug],
+      );
+
+      await _buyFurniture(tester, _roundRug.name);
+
+      expect(harness.catalogProvider.isPurchased('round_rug'), isTrue);
+      expect(harness.shizukuProvider.currentShizuku, 0);
+      expect(
+        find.byKey(const ValueKey('placementOption-$_floorRugSlotId')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const ValueKey('placementOption-$_windowHangingDecorSlotId'),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('placementOption-$_windowShelfDecorSlotId')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('placementOption-$_deskSurfaceLeftSlotId')),
+        findsNothing,
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('placementOption-$_floorRugSlotId')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _floorRugSlotId: 'round_rug',
+      });
+      expect(find.byType(CatalogPage), findsNothing);
+    });
+
+    testWidgets('配置済み丸ラグを取り外せる', (tester) async {
+      final harness = await _pumpCatalog(
+        tester,
+        furnitures: const [_roundRug],
+        purchasedFurnitureIds: const {'round_rug'},
+        placedFurnitureIds: const {_floorRugSlotId: 'round_rug'},
+      );
+
+      await tester.tap(_furnitureTile(_roundRug.name));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('取り外す'));
+      await tester.pumpAndSettle();
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, isEmpty);
+      expect(harness.catalogProvider.isPurchased('round_rug'), isTrue);
+      expect(find.byType(CatalogPage), findsOneWidget);
+    });
+  });
+
   group('吊り飾り家具', () {
     for (final furniture in const [_windChime, _teruTeruBozu, _moonMobile]) {
       testWidgets('${furniture.name}を30滴で購入して吊り飾りだけへ配置できる', (tester) async {
@@ -1460,6 +1534,7 @@ class _FakePlacementSlotRepository extends PlacementSlotRepository {
       _deskSurfaceRightSlotId => '机（右）',
       _windowShelfDecorSlotId => '窓際（棚）',
       _windowHangingDecorSlotId => '窓際（吊り飾り）',
+      _floorRugSlotId => 'ラグ',
       'slot_a' => '窓辺',
       'long_slot' => 'とても長い名前の配置場所',
       _ => 'テスト配置場所',

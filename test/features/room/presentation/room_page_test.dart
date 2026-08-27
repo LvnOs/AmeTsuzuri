@@ -29,6 +29,106 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
+  group('丸ラグ家具', () {
+    testWidgets('未配置では従来の固定ラグだけを表示する', (tester) async {
+      await _pumpRoom(tester);
+
+      expect(_roomRugLayer, findsOneWidget);
+      expect(_fixedRugImage, findsOneWidget);
+      expect(_roundRugImage, findsNothing);
+      expect(
+        find.image(const AssetImage('assets/images/room/rug.png')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('配置済みでは丸ラグへ差し替え固定ラグを同時表示しない', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {_floorRugSlotId: 'round_rug'},
+      );
+      await tester.pump();
+
+      expect(_roomRugLayer, findsOneWidget);
+      expect(_roundRugImage, findsOneWidget);
+      expect(_fixedRugImage, findsNothing);
+      expect(
+        find.image(
+          const AssetImage('assets/images/furniture/rug/round_rug.png'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.image(const AssetImage('assets/images/room/rug.png')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('丸ラグを取り外すと固定ラグへ戻る', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {_floorRugSlotId: 'round_rug'},
+      );
+
+      await harness.placedFurnitureProvider.remove('round_rug');
+      await tester.pump();
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, isEmpty);
+      expect(_fixedRugImage, findsOneWidget);
+      expect(_roundRugImage, findsNothing);
+    });
+
+    testWidgets('Provider初期化時にRepositoryから丸ラグ配置を復元する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {_floorRugSlotId: 'round_rug'},
+      );
+      await tester.pump();
+
+      expect(harness.placedFurnitureProvider.isLoaded, isTrue);
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _floorRugSlotId: 'round_rug',
+      });
+      expect(_roundRugImage, findsOneWidget);
+      expect(_fixedRugImage, findsNothing);
+    });
+
+    testWidgets('Prototype reset相当で購入・配置を消すと固定ラグへ戻る', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialPurchasedFurnitureIds: const {'round_rug'},
+        initialPlacedFurnitureIds: const {_floorRugSlotId: 'round_rug'},
+      );
+
+      await harness.placedFurnitureProvider.reset();
+      await harness.catalogProvider.reset();
+      await tester.pump();
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, isEmpty);
+      expect(harness.catalogProvider.purchasedFurnitureIds, isEmpty);
+      expect(_fixedRugImage, findsOneWidget);
+      expect(_roundRugImage, findsNothing);
+    });
+
+    testWidgets('丸ラグと机上家具・既存の椅子を同時表示できる', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {
+          _floorRugSlotId: 'round_rug',
+          _deskSurfaceLeftSlotId: 'wooden_mug',
+        },
+      );
+      await tester.pump();
+
+      expect(_roundRugImage, findsOneWidget);
+      expect(_placedFurnitureLayer, findsOneWidget);
+      expect(
+        find.image(const AssetImage('assets/images/room/chair.png')),
+        findsOneWidget,
+      );
+    });
+  });
+
   group('吊り飾り家具', () {
     for (final entry in const {
       'wind_chime': 'furniture/hanging/wind_chime.png',
@@ -2593,6 +2693,12 @@ const _deskSurfaceLeftSlotId = 'living_room_desk_surface_left';
 const _deskSurfaceRightSlotId = 'living_room_desk_surface_right';
 const _windowShelfDecorSlotId = 'living_room_window_shelf_decor';
 const _windowHangingDecorSlotId = 'living_room_window_hanging_decor';
+const _floorRugSlotId = 'living_room_floor_rug';
+final _roomRugLayer = find.byKey(const ValueKey('roomRugLayer'));
+final _fixedRugImage = find.byKey(const ValueKey('roomFixedRugImage'));
+final _roundRugImage = find.byKey(
+  const ValueKey('roomFurnitureImage-round_rug'),
+);
 final _placedFurnitureLayer = find.byKey(
   const ValueKey('deskSurfaceLeftFurnitureLayer'),
 );
@@ -2862,6 +2968,15 @@ const List<Furniture> _roomFurnitures = [
     imagePath: 'furniture/hanging/moon_mobile.png',
     initialAvailable: true,
   ),
+  Furniture(
+    id: 'round_rug',
+    name: 'plain round rug',
+    price: 70,
+    size: 'large',
+    slotIds: [_floorRugSlotId],
+    imagePath: 'furniture/rug/round_rug.png',
+    initialAvailable: true,
+  ),
 ];
 
 class _FakeWeatherRepository extends WeatherRepository {
@@ -3097,6 +3212,11 @@ class _FakePlacedFurnitureRepository extends PlacedFurnitureRepository {
     Map<String, String> placedFurnitureIds,
   ) async {
     state = Map.of(placedFurnitureIds);
+  }
+
+  @override
+  Future<void> clear() async {
+    state = {};
   }
 }
 

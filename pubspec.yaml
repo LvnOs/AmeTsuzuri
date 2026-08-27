@@ -67,6 +67,7 @@ flutter:
     - assets/images/furniture/desk/
     - assets/images/furniture/window/
     - assets/images/furniture/hanging/
+    - assets/images/furniture/rug/
     - assets/data/
     - assets/letters/
   # An image asset can refer to one or more resolution-specific "variants", see
