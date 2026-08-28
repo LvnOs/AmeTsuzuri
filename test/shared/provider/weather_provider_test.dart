@@ -33,19 +33,26 @@ void main() {
     expect(provider.loadedDate, DateTime(2026, 8, 20));
   });
 
-  test('同じProviderで別の日付を再ロードできる', () async {
+  test('同じProviderでrainからsunnyを経てrainへ再ロードできる', () async {
     final provider = WeatherProvider(
       _FakeWeatherRepository({
         DateTime(2026, 8, 7): WeatherType.rain,
-        DateTime(2026, 8, 8): WeatherType.rain,
+        DateTime(2026, 8, 8): WeatherType.sunny,
+        DateTime(2026, 8, 9): WeatherType.rain,
       }),
     );
 
     await provider.loadForDate(DateTime(2026, 8, 7));
+    expect(provider.currentWeather, WeatherType.rain);
+
     await provider.loadForDate(DateTime(2026, 8, 8));
+    expect(provider.currentWeather, WeatherType.sunny);
+
+    await provider.loadForDate(DateTime(2026, 8, 9));
 
     expect(provider.isLoaded, isTrue);
     expect(provider.currentWeather, WeatherType.rain);
+    expect(provider.loadedDate, DateTime(2026, 8, 9));
   });
 
   test('定義済み日付から未定義日付へ移ると古い天候を消す', () async {

@@ -21,3 +21,23 @@ weather:
     weather: rain
   - date: "2026-08-16"
     weather: rain
+  - date: "2026-09-01"
+    weather: rain
+  - date: "2026-09-02"
+    weather: sunny
+  - date: "2026-09-03"
+    weather: rain
+  - date: "2026-09-04"
+    weather: rain
+  - date: "2026-09-05"
+    weather: sunny
+  - date: "2026-09-06"
+    weather: rain
+  - date: "2026-09-07"
+    weather: sunny
+  - date: "2026-09-08"
+    weather: rain
+  - date: "2026-09-09"
+    weather: rain
+  - date: "2026-09-10"
+    weather: sunny

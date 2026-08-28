@@ -4,11 +4,58 @@ import 'package:ame_tsuzuri/shared/model/weather_type.dart';
 import 'package:ame_tsuzuri/shared/repository/weather_repository.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yaml/yaml.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('本番固定天候はプロトタイプ期間の全日がrain', () async {
+  test('本番固定天候は9月1日から10日までFIX配列を重複なく保持する', () async {
+    const expected = <String, WeatherType>{
+      '2026-09-01': WeatherType.rain,
+      '2026-09-02': WeatherType.sunny,
+      '2026-09-03': WeatherType.rain,
+      '2026-09-04': WeatherType.rain,
+      '2026-09-05': WeatherType.sunny,
+      '2026-09-06': WeatherType.rain,
+      '2026-09-07': WeatherType.sunny,
+      '2026-09-08': WeatherType.rain,
+      '2026-09-09': WeatherType.rain,
+      '2026-09-10': WeatherType.sunny,
+    };
+    final yamlString = await rootBundle.loadString('assets/data/weather.yaml');
+    final yaml = loadYaml(yamlString) as YamlMap;
+    final septemberEntries = (yaml['weather'] as YamlList)
+        .where((entry) => (entry['date'] as String).startsWith('2026-09-'))
+        .toList();
+    final dates = septemberEntries
+        .map((entry) => entry['date'] as String)
+        .toList();
+
+    expect(septemberEntries, hasLength(10));
+    expect(dates.toSet(), hasLength(10));
+    expect(dates, expected.keys.toList());
+
+    final repository = WeatherRepository();
+    final actual = <WeatherType>[];
+    for (final entry in expected.entries) {
+      final weather = await repository.getByDate(DateTime.parse(entry.key));
+      expect(weather, entry.value, reason: entry.key);
+      actual.add(weather!);
+    }
+
+    expect(
+      actual.where((weather) => weather == WeatherType.rain),
+      hasLength(6),
+    );
+    expect(
+      actual.where((weather) => weather == WeatherType.sunny),
+      hasLength(4),
+    );
+    expect(actual.toSet(), {WeatherType.rain, WeatherType.sunny});
+    expect(await repository.getByDate(DateTime(2026, 9, 11)), isNull);
+  });
+
+  test('本番固定天候は8月プロトタイプ期間の全日がrain', () async {
     final repository = WeatherRepository();
 
     for (var day = 7; day <= 16; day++) {
