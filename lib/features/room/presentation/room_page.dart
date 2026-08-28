@@ -330,6 +330,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
   bool _isNavigatingFromRoom = false;
   bool _isArrivalAnimating = false;
   bool _isPrototypeOperationRunning = false;
+  SeasonType? _outdoorSeasonOverride;
   late final AnimationController _arrivalController;
   late final AnimationController _tutorialGlowController;
   late final AnimationController _tutorialMoveController;
@@ -438,7 +439,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
           child: AspectRatio(
             aspectRatio: RoomPage._designWidth / RoomPage._designHeight,
             child: _RoomBackgroundLayers(
-              season: appDateProvider.currentSeason,
+              season: _outdoorSeasonOverride ?? appDateProvider.currentSeason,
               hasDeliveredLetter: showLetter,
               isArrivalAnimating: _isArrivalAnimating,
               arrivalAnimation: _arrivalController,
@@ -457,12 +458,17 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
               onTapLetter: _onTapLetter,
               isPrototypeOperationRunning: _isPrototypeOperationRunning,
               onMoveToNextDay: _moveToNextDay,
+              onOutdoorSeasonChanged: _setOutdoorSeasonOverride,
               onResetPrototype: _confirmPrototypeReset,
             ),
           ),
         ),
       ),
     );
+  }
+
+  void _setOutdoorSeasonOverride(SeasonType? season) {
+    setState(() => _outdoorSeasonOverride = season);
   }
 
   void _scheduleTutorialGlowSync(_TutorialTarget target) {
@@ -995,6 +1001,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
     required this.onTapLetter,
     required this.isPrototypeOperationRunning,
     required this.onMoveToNextDay,
+    required this.onOutdoorSeasonChanged,
     required this.onResetPrototype,
   });
 
@@ -1017,6 +1024,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
   final VoidCallback onTapLetter;
   final bool isPrototypeOperationRunning;
   final VoidCallback onMoveToNextDay;
+  final ValueChanged<SeasonType?> onOutdoorSeasonChanged;
   final VoidCallback onResetPrototype;
 
   @override
@@ -1319,6 +1327,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
                 child: PrototypeControls(
                   isRunning: isPrototypeOperationRunning,
                   onNextDay: onMoveToNextDay,
+                  onOutdoorSeasonChanged: onOutdoorSeasonChanged,
                   onReset: onResetPrototype,
                 ),
               ),

@@ -1,17 +1,26 @@
+import 'package:ame_tsuzuri/shared/model/season_type.dart';
 import 'package:flutter/material.dart';
 
-enum PrototypeOperation { nextDay, reset }
+enum PrototypeOperation {
+  nextDay,
+  outdoorAuto,
+  outdoorSummer,
+  outdoorAutumn,
+  reset,
+}
 
 class PrototypeControls extends StatelessWidget {
   const PrototypeControls({
     super.key,
     required this.isRunning,
     required this.onNextDay,
+    required this.onOutdoorSeasonChanged,
     required this.onReset,
   });
 
   final bool isRunning;
   final VoidCallback onNextDay;
+  final ValueChanged<SeasonType?> onOutdoorSeasonChanged;
   final VoidCallback onReset;
 
   @override
@@ -25,6 +34,15 @@ class PrototypeControls extends StatelessWidget {
           case PrototypeOperation.nextDay:
             onNextDay();
             return;
+          case PrototypeOperation.outdoorAuto:
+            onOutdoorSeasonChanged(null);
+            return;
+          case PrototypeOperation.outdoorSummer:
+            onOutdoorSeasonChanged(SeasonType.summer);
+            return;
+          case PrototypeOperation.outdoorAutumn:
+            onOutdoorSeasonChanged(SeasonType.autumn);
+            return;
           case PrototypeOperation.reset:
             onReset();
             return;
@@ -36,6 +54,23 @@ class PrototypeControls extends StatelessWidget {
           value: PrototypeOperation.nextDay,
           child: const Text('翌日へ進む'),
         ),
+        const PopupMenuDivider(),
+        PopupMenuItem<PrototypeOperation>(
+          key: const ValueKey('prototypeOutdoorAuto'),
+          value: PrototypeOperation.outdoorAuto,
+          child: const Text('背景：自動'),
+        ),
+        PopupMenuItem<PrototypeOperation>(
+          key: const ValueKey('prototypeOutdoorSummer'),
+          value: PrototypeOperation.outdoorSummer,
+          child: const Text('背景：夏'),
+        ),
+        PopupMenuItem<PrototypeOperation>(
+          key: const ValueKey('prototypeOutdoorAutumn'),
+          value: PrototypeOperation.outdoorAutumn,
+          child: const Text('背景：秋'),
+        ),
+        const PopupMenuDivider(),
         PopupMenuItem<PrototypeOperation>(
           key: const ValueKey('prototypeReset'),
           value: PrototypeOperation.reset,

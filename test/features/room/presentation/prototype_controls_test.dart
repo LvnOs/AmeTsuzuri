@@ -25,6 +25,64 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  testWidgets('8月に秋背景overrideを選んでも日付を変更しない', (tester) async {
+    final harness = await _pumpPrototypeRoom(tester);
+    final prefs = await SharedPreferences.getInstance();
+    final savedDate = prefs.getString('prototypeDate');
+
+    await _selectPrototypeOperation(tester, 'prototypeOutdoorAutumn');
+
+    expect(harness.date.today, DateTime(2026, 8, 7));
+    expect(harness.date.currentSeason, SeasonType.summer);
+    expect(prefs.getString('prototypeDate'), savedDate);
+    expect(
+      find.image(const AssetImage('assets/images/room/outdoor_autumn.png')),
+      findsOneWidget,
+    );
+    expect(
+      find.image(const AssetImage('assets/images/room/outdoor_summer.png')),
+      findsNothing,
+    );
+    expect(
+      find.image(const AssetImage('assets/images/room/room_base.png')),
+      findsOneWidget,
+    );
+
+    await _selectPrototypeOperation(tester, 'prototypeOutdoorAuto');
+
+    expect(
+      find.image(const AssetImage('assets/images/room/outdoor_summer.png')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('9月に夏背景overrideを選んでも日付を変更しない', (tester) async {
+    final harness = await _pumpPrototypeRoom(
+      tester,
+      date: DateTime(2026, 9, 1),
+    );
+    final prefs = await SharedPreferences.getInstance();
+    final savedDate = prefs.getString('prototypeDate');
+
+    await _selectPrototypeOperation(tester, 'prototypeOutdoorSummer');
+
+    expect(harness.date.today, DateTime(2026, 9, 1));
+    expect(harness.date.currentSeason, SeasonType.autumn);
+    expect(prefs.getString('prototypeDate'), savedDate);
+    expect(
+      find.image(const AssetImage('assets/images/room/outdoor_summer.png')),
+      findsOneWidget,
+    );
+    expect(
+      find.image(const AssetImage('assets/images/room/outdoor_autumn.png')),
+      findsNothing,
+    );
+    expect(
+      find.image(const AssetImage('assets/images/room/room_base.png')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('翌日へ進むとゲーム状態を維持して翌日の手紙を配達する', (tester) async {
     final harness = await _pumpPrototypeRoom(tester);
 
@@ -148,6 +206,17 @@ void main() {
     expect(harness.date.today, DateTime(2026, 8, 7));
     expect(find.byType(RoomPage), findsOneWidget);
   });
+}
+
+Future<void> _selectPrototypeOperation(
+  WidgetTester tester,
+  String operationKey,
+) async {
+  await tester.tap(find.byKey(const ValueKey('prototypeControls')));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 500));
+  await tester.tap(find.byKey(ValueKey(operationKey)));
+  await tester.pump();
 }
 
 Future<_PrototypeHarness> _pumpPrototypeRoom(
