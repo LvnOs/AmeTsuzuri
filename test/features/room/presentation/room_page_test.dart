@@ -29,6 +29,42 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
+  group('seasonal outdoor background', () {
+    testWidgets('8月は夏背景とroom_baseを表示する', (tester) async {
+      await _pumpRoom(tester, date: DateTime(2026, 8, 7));
+
+      expect(
+        find.image(const AssetImage('assets/images/room/outdoor_summer.png')),
+        findsOneWidget,
+      );
+      expect(
+        find.image(const AssetImage('assets/images/room/outdoor_autumn.png')),
+        findsNothing,
+      );
+      expect(
+        find.image(const AssetImage('assets/images/room/room_base.png')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('9月は秋背景とroom_baseを表示する', (tester) async {
+      await _pumpRoom(tester, date: DateTime(2026, 9, 1));
+
+      expect(
+        find.image(const AssetImage('assets/images/room/outdoor_autumn.png')),
+        findsOneWidget,
+      );
+      expect(
+        find.image(const AssetImage('assets/images/room/outdoor_summer.png')),
+        findsNothing,
+      );
+      expect(
+        find.image(const AssetImage('assets/images/room/room_base.png')),
+        findsOneWidget,
+      );
+    });
+  });
+
   group('丸ラグ家具', () {
     testWidgets('未配置では従来の固定ラグだけを表示する', (tester) async {
       await _pumpRoom(tester);

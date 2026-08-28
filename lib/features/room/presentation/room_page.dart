@@ -14,6 +14,7 @@ import 'package:ame_tsuzuri/features/room/presentation/prototype_reset_page.dart
 import 'package:ame_tsuzuri/features/furniture/provider/placed_furniture_provider.dart';
 import 'package:ame_tsuzuri/features/furniture/model/furniture.dart';
 import 'package:ame_tsuzuri/features/furniture/repository/furniture_repository.dart';
+import 'package:ame_tsuzuri/shared/model/season_type.dart';
 import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
 import 'package:ame_tsuzuri/shared/provider/weather_provider.dart';
 import 'package:flutter/material.dart';
@@ -437,6 +438,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
           child: AspectRatio(
             aspectRatio: RoomPage._designWidth / RoomPage._designHeight,
             child: _RoomBackgroundLayers(
+              season: appDateProvider.currentSeason,
               hasDeliveredLetter: showLetter,
               isArrivalAnimating: _isArrivalAnimating,
               arrivalAnimation: _arrivalController,
@@ -974,6 +976,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
 
 class _RoomBackgroundLayers extends StatelessWidget {
   const _RoomBackgroundLayers({
+    required this.season,
     required this.hasDeliveredLetter,
     required this.isArrivalAnimating,
     required this.arrivalAnimation,
@@ -995,6 +998,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
     required this.onResetPrototype,
   });
 
+  final SeasonType season;
   final bool hasDeliveredLetter;
   final bool isArrivalAnimating;
   final Animation<double> arrivalAnimation;
@@ -1017,6 +1021,14 @@ class _RoomBackgroundLayers extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final outdoorAssetPath = switch (season) {
+      SeasonType.autumn => 'assets/images/room/outdoor_autumn.png',
+      SeasonType.spring ||
+      SeasonType.summer ||
+      SeasonType.winter ||
+      SeasonType.any => 'assets/images/room/outdoor_summer.png',
+    };
+
     return LayoutBuilder(
       builder: (context, constraints) {
         return ClipRect(
@@ -1027,7 +1039,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
                 scale: RoomPage._outdoorScale,
                 alignment: RoomPage._outdoorAlignment,
                 child: Image.asset(
-                  'assets/images/room/outdoor_summer.png',
+                  outdoorAssetPath,
                   fit: BoxFit.cover,
                   alignment: RoomPage._outdoorAlignment,
                 ),
