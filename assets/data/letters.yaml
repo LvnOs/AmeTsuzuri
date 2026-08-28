@@ -130,3 +130,123 @@ letters:
       - 雨上がり
       - 自然
     body_file: letters/2026-08-16.md
+
+  - id: letter_20260817
+    title: 落ち葉
+    season: autumn
+    weather: rain
+    tutorial: false
+    tags:
+      - 秋
+      - 落ち葉
+      - 雨
+      - 水たまり
+    body_file: letters/2026-08-17.md
+
+  - id: letter_20260818
+    title: 渡り鳥
+    season: autumn
+    weather: rain
+    tutorial: false
+    tags:
+      - 秋
+      - 鳥
+      - 空
+      - 雨上がり
+    body_file: letters/2026-08-18.md
+
+  - id: letter_20260819
+    title: 金木犀
+    season: autumn
+    weather: rain
+    tutorial: false
+    tags:
+      - 秋
+      - 花
+      - 香り
+      - 雨上がり
+    body_file: letters/2026-08-19.md
+
+  - id: letter_20260820
+    title: 長靴
+    season: autumn
+    weather: rain
+    tutorial: false
+    tags:
+      - 秋
+      - 雨
+      - 水たまり
+      - 暮らし
+    body_file: letters/2026-08-20.md
+
+  - id: letter_20260821
+    title: すすき
+    season: autumn
+    weather: rain
+    tutorial: false
+    tags:
+      - 秋
+      - 植物
+      - 野原
+      - 雨
+    body_file: letters/2026-08-21.md
+
+  - id: letter_20260822
+    title: 蜘蛛の巣
+    season: autumn
+    weather: rain
+    tutorial: false
+    tags:
+      - 秋
+      - 生き物
+      - 雨
+      - 雫
+    body_file: letters/2026-08-22.md
+
+  - id: letter_20260823
+    title: 銀杏
+    season: autumn
+    weather: rain
+    tutorial: false
+    tags:
+      - 秋
+      - 街
+      - 街路樹
+      - 雨
+    body_file: letters/2026-08-23.md
+
+  - id: letter_20260824
+    title: 秋の夕暮れ
+    season: autumn
+    weather: rain
+    tutorial: false
+    tags:
+      - 秋
+      - 空
+      - 夕暮れ
+      - 雨上がり
+    body_file: letters/2026-08-24.md
+
+  - id: letter_20260825
+    title: どんぐり
+    season: autumn
+    weather: rain
+    tutorial: false
+    tags:
+      - 秋
+      - 木の実
+      - 雨上がり
+      - 散歩
+    body_file: letters/2026-08-25.md
+
+  - id: letter_20260826
+    title: 秋雨
+    season: autumn
+    weather: rain
+    tutorial: false
+    tags:
+      - 秋
+      - 雨
+      - 雨音
+      - 季節
+    body_file: letters/2026-08-26.md
