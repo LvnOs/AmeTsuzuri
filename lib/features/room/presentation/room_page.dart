@@ -290,6 +290,12 @@ class RoomPage extends StatefulWidget {
   // Chair composition tuning. Scale is relative to the room canvas width.
   static const Alignment _chairAlignment = Alignment(0, 0.72);
   static const double _chairScale = 0.47;
+  static const String _chairSlotId = 'living_room_chair';
+  static const Set<String> _chairFurnitureIds = {
+    'wooden_chair',
+    'cushioned_chair',
+    'rocking_chair',
+  };
 
   // Rug composition tuning. Width and height are independently adjustable.
   static const Alignment _rugAlignment = Alignment(0.25, 1.035);
@@ -403,6 +409,9 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     final floorRugFurnitureId = placedFurnitureProvider.isLoaded
         ? placedFurnitureProvider.placedFurnitureIds[RoomPage._floorRugSlotId]
         : null;
+    final chairFurnitureId = placedFurnitureProvider.isLoaded
+        ? placedFurnitureProvider.placedFurnitureIds[RoomPage._chairSlotId]
+        : null;
 
     var showLetter = false;
     if (appDateProvider.isLoaded) {
@@ -467,6 +476,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
               windowShelfDecorFurnitureId: windowShelfDecorFurnitureId,
               windowHangingDecorFurnitureId: windowHangingDecorFurnitureId,
               floorRugFurnitureId: floorRugFurnitureId,
+              chairFurnitureId: chairFurnitureId,
               onTapBottle: _onTapBottle,
               onTapBookshelf: _onTapBookshelf,
               onTapLetter: _onTapLetter,
@@ -494,9 +504,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     final messenger = ScaffoldMessenger.of(context);
     messenger
       ..removeCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(content: Text('ポストは、雨の中で静かに佇んでいます。')),
-      );
+      ..showSnackBar(const SnackBar(content: Text('ポストは、雨の中で静かに佇んでいます。')));
   }
 
   void _scheduleWeatherLoad(DateTime date) {
@@ -1046,6 +1054,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
     required this.windowShelfDecorFurnitureId,
     required this.windowHangingDecorFurnitureId,
     required this.floorRugFurnitureId,
+    required this.chairFurnitureId,
     required this.onTapBottle,
     required this.onTapBookshelf,
     required this.onTapLetter,
@@ -1071,6 +1080,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
   final String? windowShelfDecorFurnitureId;
   final String? windowHangingDecorFurnitureId;
   final String? floorRugFurnitureId;
+  final String? chairFurnitureId;
   final VoidCallback onTapBottle;
   final VoidCallback onTapBookshelf;
   final VoidCallback onTapLetter;
@@ -1311,15 +1321,10 @@ class _RoomBackgroundLayers extends StatelessWidget {
                     ),
                   ),
                 ),
-              Align(
-                alignment: RoomPage._chairAlignment,
-                child: SizedBox(
-                  width: constraints.maxWidth * RoomPage._chairScale,
-                  child: Image.asset(
-                    'assets/images/room/chair.png',
-                    fit: BoxFit.contain,
-                  ),
-                ),
+              _ChairLayer(
+                furnituresFuture: furnituresFuture,
+                furnitureId: chairFurnitureId,
+                roomWidth: constraints.maxWidth,
               ),
               Positioned(
                 left: 0,
@@ -1452,6 +1457,74 @@ class _TutorialRoomGuide extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ChairLayer extends StatelessWidget {
+  const _ChairLayer({
+    required this.furnituresFuture,
+    required this.furnitureId,
+    required this.roomWidth,
+  });
+
+  static const String _fixedChairAssetPath = 'assets/images/room/chair.png';
+
+  final Future<List<Furniture>> furnituresFuture;
+  final String? furnitureId;
+  final double roomWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedId = furnitureId;
+    if (selectedId == null ||
+        !RoomPage._chairFurnitureIds.contains(selectedId)) {
+      return _buildChair(_fixedChairAssetPath);
+    }
+
+    return FutureBuilder<List<Furniture>>(
+      future: furnituresFuture,
+      builder: (context, snapshot) {
+        Furniture? selectedFurniture;
+        for (final furniture in snapshot.data ?? const <Furniture>[]) {
+          if (furniture.id == selectedId &&
+              furniture.slotIds.contains(RoomPage._chairSlotId)) {
+            selectedFurniture = furniture;
+            break;
+          }
+        }
+
+        final imagePath = selectedFurniture == null
+            ? _fixedChairAssetPath
+            : 'assets/images/${selectedFurniture.imagePath}';
+        return _buildChair(imagePath, furnitureId: selectedFurniture?.id);
+      },
+    );
+  }
+
+  Widget _buildChair(String imagePath, {String? furnitureId}) {
+    return Align(
+      key: const ValueKey('roomChairLayer'),
+      alignment: RoomPage._chairAlignment,
+      child: SizedBox(
+        width: roomWidth * RoomPage._chairScale,
+        child: Image.asset(
+          imagePath,
+          key: ValueKey(
+            furnitureId == null
+                ? 'roomFixedChairImage'
+                : 'roomFurnitureImage-$furnitureId',
+          ),
+          fit: BoxFit.contain,
+          errorBuilder: furnitureId == null
+              ? null
+              : (context, error, stackTrace) => Image.asset(
+                  _fixedChairAssetPath,
+                  key: const ValueKey('roomFixedChairImage'),
+                  fit: BoxFit.contain,
+                ),
         ),
       ),
     );

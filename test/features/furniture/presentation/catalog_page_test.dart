@@ -21,6 +21,7 @@ const _deskSurfaceRightSlotId = 'living_room_desk_surface_right';
 const _windowShelfDecorSlotId = 'living_room_window_shelf_decor';
 const _windowHangingDecorSlotId = 'living_room_window_hanging_decor';
 const _floorRugSlotId = 'living_room_floor_rug';
+const _chairSlotId = 'living_room_chair';
 
 const _furnitureA = Furniture(
   id: 'furniture_a',
@@ -157,6 +158,15 @@ const _rectangularRug = Furniture(
   imagePath: 'furniture/rug/check_rug.png',
   initialAvailable: true,
 );
+const _woodenChair = Furniture(
+  id: 'wooden_chair',
+  name: '木製チェア',
+  price: 70,
+  size: 'large',
+  slotIds: [_chairSlotId],
+  imagePath: 'furniture/chair/wooden_chair.png',
+  initialAvailable: true,
+);
 const _missingImageFurniture = Furniture(
   id: 'missing_image',
   name: '画像のない家具',
@@ -186,6 +196,41 @@ const _multiSlotFurniture = Furniture(
 );
 
 void main() {
+  group('chair furniture', () {
+    testWidgets('70雫で購入してchair slotだけへ配置できる', (tester) async {
+      final harness = await _pumpCatalog(
+        tester,
+        openAsRoute: true,
+        blockPurchase: false,
+        initialShizuku: 70,
+        purchasedFurnitureIds: const {},
+        furnitures: const [_woodenChair],
+      );
+
+      await _buyFurniture(tester, _woodenChair.name);
+
+      expect(harness.catalogProvider.isPurchased(_woodenChair.id), isTrue);
+      expect(harness.shizukuProvider.currentShizuku, 0);
+      expect(
+        find.byKey(const ValueKey('placementOption-$_chairSlotId')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('placementOption-$_floorRugSlotId')),
+        findsNothing,
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('placementOption-$_chairSlotId')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _chairSlotId: 'wooden_chair',
+      });
+    });
+  });
+
   group('丸ラグ家具', () {
     testWidgets('70滴で購入してラグslotだけへ配置できる', (tester) async {
       final harness = await _pumpCatalog(

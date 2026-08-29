@@ -7,6 +7,7 @@ const _deskSurfaceRightSlotId = 'living_room_desk_surface_right';
 const _windowShelfDecorSlotId = 'living_room_window_shelf_decor';
 const _windowHangingDecorSlotId = 'living_room_window_hanging_decor';
 const _floorRugSlotId = 'living_room_floor_rug';
+const _chairSlotId = 'living_room_chair';
 const _deskFurnitureIds = {'wooden_mug', 'ink_bottle', 'wooden_fox_figure'};
 const _windowFurnitureIds = {
   'small_houseplant',
@@ -20,6 +21,9 @@ const _publicFurnitureIds = {
   ..._hangingFurnitureIds,
   'round_rug',
   'rectangular_rug',
+  'wooden_chair',
+  'cushioned_chair',
+  'rocking_chair',
 };
 
 void main() {
@@ -135,6 +139,28 @@ void main() {
 
       expect(teaCup.initialAvailable, isFalse);
       expect(teaCup.slotIds, isNotEmpty);
+    });
+    test('chair 3種は70雫でchair slotだけに配置できる', () {
+      const expected = {
+        'wooden_chair': ('木製チェア', 'furniture/chair/wooden_chair.png'),
+        'cushioned_chair': (
+          'クッション付きチェア',
+          'furniture/chair/cushioned_chair.png',
+        ),
+        'rocking_chair': ('ロッキングチェア', 'furniture/chair/rocking_chair.png'),
+      };
+
+      for (final entry in expected.entries) {
+        final furniture = furnitures.singleWhere(
+          (item) => item.id == entry.key,
+        );
+        expect(furniture.name, entry.value.$1, reason: entry.key);
+        expect(furniture.price, 70, reason: entry.key);
+        expect(furniture.size, 'large', reason: entry.key);
+        expect(furniture.initialAvailable, isTrue, reason: entry.key);
+        expect(furniture.slotIds, const [_chairSlotId], reason: entry.key);
+        expect(furniture.imagePath, entry.value.$2, reason: entry.key);
+      }
     });
   });
 }

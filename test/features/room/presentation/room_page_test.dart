@@ -30,6 +30,103 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
+  group('chair furniture', () {
+    testWidgets('未配置なら初期chairだけを表示する', (tester) async {
+      await _pumpRoom(tester);
+      expect(_fixedChairImage, findsOneWidget);
+      expect(find.byKey(const ValueKey('roomChairLayer')), findsOneWidget);
+    });
+
+    for (final entry in const {
+      'wooden_chair': 'furniture/chair/wooden_chair.png',
+      'cushioned_chair': 'furniture/chair/cushioned_chair.png',
+      'rocking_chair': 'furniture/chair/rocking_chair.png',
+    }.entries) {
+      testWidgets('${entry.key}を配置すると初期chairと二重表示しない', (tester) async {
+        await _pumpRoom(
+          tester,
+          initialPlacedFurnitureIds: {_chairSlotId: entry.key},
+        );
+        await tester.pump();
+
+        expect(_fixedChairImage, findsNothing);
+        expect(
+          find.byKey(ValueKey('roomFurnitureImage-${entry.key}')),
+          findsOneWidget,
+        );
+        expect(
+          find.image(AssetImage('assets/images/${entry.value}')),
+          findsOneWidget,
+        );
+      });
+    }
+
+    testWidgets('replaceすると新しいchairだけを表示する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialPurchasedFurnitureIds: const {'wooden_chair', 'cushioned_chair'},
+        initialPlacedFurnitureIds: const {_chairSlotId: 'wooden_chair'},
+      );
+      final result = await harness.placedFurnitureProvider.place(
+        slotId: _chairSlotId,
+        furnitureId: 'cushioned_chair',
+        isPurchased: true,
+        allowedSlotIds: const [_chairSlotId],
+      );
+      await tester.pump();
+
+      expect(result, PlaceFurnitureResult.success);
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _chairSlotId: 'cushioned_chair',
+      });
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-cushioned_chair')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-wooden_chair')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('removeすると初期chairへ戻る', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {_chairSlotId: 'wooden_chair'},
+      );
+      await harness.placedFurnitureProvider.remove('wooden_chair');
+      await tester.pump();
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, isEmpty);
+      expect(_fixedChairImage, findsOneWidget);
+    });
+
+    testWidgets('resetすると初期chairへ戻る', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialPurchasedFurnitureIds: const {'rocking_chair'},
+        initialPlacedFurnitureIds: const {_chairSlotId: 'rocking_chair'},
+      );
+      await harness.placedFurnitureProvider.reset();
+      await harness.catalogProvider.reset();
+      await tester.pump();
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, isEmpty);
+      expect(_fixedChairImage, findsOneWidget);
+    });
+
+    testWidgets('旧save相当のchair keyなし状態は未配置として扱う', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {_floorRugSlotId: 'round_rug'},
+      );
+      await tester.pump();
+
+      expect(_fixedChairImage, findsOneWidget);
+      expect(_roundRugImage, findsOneWidget);
+    });
+  });
+
   group('seasonal outdoor background', () {
     testWidgets('8月は夏背景とroom_baseを表示する', (tester) async {
       await _pumpRoom(tester, date: DateTime(2026, 8, 7));
@@ -2986,6 +3083,7 @@ const _deskSurfaceRightSlotId = 'living_room_desk_surface_right';
 const _windowShelfDecorSlotId = 'living_room_window_shelf_decor';
 const _windowHangingDecorSlotId = 'living_room_window_hanging_decor';
 const _floorRugSlotId = 'living_room_floor_rug';
+const _chairSlotId = 'living_room_chair';
 final _roomRugLayer = find.byKey(const ValueKey('roomRugLayer'));
 final _fixedRugImage = find.byKey(const ValueKey('roomFixedRugImage'));
 final _roundRugImage = find.byKey(
@@ -2994,6 +3092,7 @@ final _roundRugImage = find.byKey(
 final _checkRugImage = find.byKey(
   const ValueKey('roomFurnitureImage-rectangular_rug'),
 );
+final _fixedChairImage = find.byKey(const ValueKey('roomFixedChairImage'));
 final _placedFurnitureLayer = find.byKey(
   const ValueKey('deskSurfaceLeftFurnitureLayer'),
 );
@@ -3287,6 +3386,33 @@ const List<Furniture> _roomFurnitures = [
     size: 'large',
     slotIds: [_floorRugSlotId],
     imagePath: 'furniture/rug/check_rug.png',
+    initialAvailable: true,
+  ),
+  Furniture(
+    id: 'wooden_chair',
+    name: 'wooden chair',
+    price: 70,
+    size: 'large',
+    slotIds: [_chairSlotId],
+    imagePath: 'furniture/chair/wooden_chair.png',
+    initialAvailable: true,
+  ),
+  Furniture(
+    id: 'cushioned_chair',
+    name: 'cushioned chair',
+    price: 70,
+    size: 'large',
+    slotIds: [_chairSlotId],
+    imagePath: 'furniture/chair/cushioned_chair.png',
+    initialAvailable: true,
+  ),
+  Furniture(
+    id: 'rocking_chair',
+    name: 'rocking chair',
+    price: 70,
+    size: 'large',
+    slotIds: [_chairSlotId],
+    imagePath: 'furniture/chair/rocking_chair.png',
     initialAvailable: true,
   ),
 ];

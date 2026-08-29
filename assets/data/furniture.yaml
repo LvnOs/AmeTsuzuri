@@ -475,27 +475,27 @@ furniture:
 
   - id: wooden_chair
     name: 木製チェア
-    price: 100
+    price: 70
     size: large
     slots:
       - living_room_chair
     image: furniture/chair/wooden_chair.png
-    initial_available: false
+    initial_available: true
 
   - id: cushioned_chair
     name: クッション付きチェア
-    price: 100
+    price: 70
     size: large
     slots:
       - living_room_chair
     image: furniture/chair/cushioned_chair.png
-    initial_available: false
+    initial_available: true
 
   - id: rocking_chair
     name: ロッキングチェア
-    price: 100
+    price: 70
     size: large
     slots:
       - living_room_chair
     image: furniture/chair/rocking_chair.png
-    initial_available: false
+    initial_available: true
