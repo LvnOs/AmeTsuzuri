@@ -73,6 +73,8 @@ class RoomPage extends StatefulWidget {
 
   static const Alignment _postAlignment = Alignment(_postX, _postY);
   static const double _postScale = 0.19;
+  static const double _postTapAreaWidthScale = 0.16;
+  static const double _postTapAreaHeightScale = 0.25;
 
   // Curtain composition tuning. Width is relative to the room canvas width.
   static const Alignment _curtainAlignment = Alignment(0, -0.83);
@@ -468,6 +470,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
               onTapBottle: _onTapBottle,
               onTapBookshelf: _onTapBookshelf,
               onTapLetter: _onTapLetter,
+              onTapPost: _onTapPost,
               isPrototypeOperationRunning: _isPrototypeOperationRunning,
               onMoveToNextDay: _moveToNextDay,
               onOutdoorSeasonChanged: _setOutdoorSeasonOverride,
@@ -481,6 +484,19 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
 
   void _setOutdoorSeasonOverride(SeasonType? season) {
     setState(() => _outdoorSeasonOverride = season);
+  }
+
+  void _onTapPost() {
+    if (_isArrivalAnimating) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..removeCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('ポストは、雨の中で静かに佇んでいます。')),
+      );
   }
 
   void _scheduleWeatherLoad(DateTime date) {
@@ -1033,6 +1049,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
     required this.onTapBottle,
     required this.onTapBookshelf,
     required this.onTapLetter,
+    required this.onTapPost,
     required this.isPrototypeOperationRunning,
     required this.onMoveToNextDay,
     required this.onOutdoorSeasonChanged,
@@ -1057,6 +1074,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
   final VoidCallback onTapBottle;
   final VoidCallback onTapBookshelf;
   final VoidCallback onTapLetter;
+  final VoidCallback onTapPost;
   final bool isPrototypeOperationRunning;
   final VoidCallback onMoveToNextDay;
   final ValueChanged<SeasonType?> onOutdoorSeasonChanged;
@@ -1313,6 +1331,20 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   behavior: HitTestBehavior.opaque,
                   onTap: onTapBookshelf,
                   child: const SizedBox.expand(),
+                ),
+              ),
+              Align(
+                alignment: RoomPage._postAlignment,
+                child: GestureDetector(
+                  key: const ValueKey('postTapArea'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onTapPost,
+                  child: SizedBox(
+                    width:
+                        constraints.maxWidth * RoomPage._postTapAreaWidthScale,
+                    height:
+                        constraints.maxWidth * RoomPage._postTapAreaHeightScale,
+                  ),
                 ),
               ),
               Align(

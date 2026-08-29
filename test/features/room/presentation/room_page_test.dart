@@ -1923,6 +1923,42 @@ void main() {
       expect(bottleSize.height, greaterThan(bottleSize.width));
     });
 
+    testWidgets('通常時のpostタップでコンテキストメッセージを表示する', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: const {},
+          deliveredLetters: const {'2026-08-07': 'letterA'},
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('postTapArea')));
+      await tester.pump();
+
+      expect(find.text('ポストは、雨の中で静かに佇んでいます。'), findsOneWidget);
+    });
+
+    testWidgets('postの連打で同じメッセージをQueueへ蓄積しない', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: const {},
+          deliveredLetters: const {'2026-08-07': 'letterA'},
+        ),
+      );
+
+      for (var i = 0; i < 5; i++) {
+        await tester.tap(find.byKey(const ValueKey('postTapArea')));
+        await tester.pump();
+      }
+
+      expect(find.text('ポストは、雨の中で静かに佇んでいます。'), findsOneWidget);
+
+      await _pumpPastFiniteAnimations(tester);
+
+      expect(find.text('ポストは、雨の中で静かに佇んでいます。'), findsNothing);
+    });
+
     testWidgets('瓶タップでCatalogPageを開く', (tester) async {
       await _pumpRoom(tester);
 
@@ -2363,6 +2399,26 @@ void main() {
       expect(find.byKey(const ValueKey('postArrivalGlow')), findsNothing);
       expect(find.byKey(const ValueKey('arrivalMovingLight')), findsNothing);
       expect(_opacityForKey(tester, 'roomLetterLayer'), 1);
+      expect(find.byKey(const ValueKey('letterTapArea')), findsOneWidget);
+    });
+
+    testWidgets('到着演出中のpostタップではメッセージを表示せず演出を継続する', (tester) async {
+      await _pumpRoom(tester);
+      await tester.pump(const Duration(milliseconds: 1000));
+
+      expect(find.byKey(const ValueKey('postArrivalGlow')), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('postTapArea')));
+      await tester.pump();
+
+      expect(find.text('ポストは、雨の中で静かに佇んでいます。'), findsNothing);
+      expect(find.byKey(const ValueKey('postArrivalGlow')), findsOneWidget);
+      expect(find.byKey(const ValueKey('letterTapArea')), findsNothing);
+
+      await tester.pump(const Duration(milliseconds: 3450));
+
+      expect(find.byKey(const ValueKey('postArrivalGlow')), findsNothing);
+      expect(find.byKey(const ValueKey('arrivalMovingLight')), findsNothing);
       expect(find.byKey(const ValueKey('letterTapArea')), findsOneWidget);
     });
 
