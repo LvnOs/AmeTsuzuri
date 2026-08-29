@@ -9,7 +9,7 @@ class RainOverlay extends StatefulWidget {
 
 class _RainOverlayState extends State<RainOverlay>
     with SingleTickerProviderStateMixin {
-  static const _animationDuration = Duration(seconds: 4);
+  static const _animationDuration = Duration(seconds: 3);
 
   late final AnimationController _controller;
 
