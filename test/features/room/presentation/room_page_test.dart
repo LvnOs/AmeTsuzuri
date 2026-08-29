@@ -18,6 +18,7 @@ import 'package:ame_tsuzuri/features/letters/repository/letter_repository.dart';
 import 'package:ame_tsuzuri/features/letters/repository/read_letter_repository.dart';
 import 'package:ame_tsuzuri/features/letters/repository/shizuku_repository.dart';
 import 'package:ame_tsuzuri/features/room/presentation/room_page.dart';
+import 'package:ame_tsuzuri/features/room/presentation/widgets/rain_overlay.dart';
 import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
 import 'package:ame_tsuzuri/shared/model/weather_type.dart';
 import 'package:ame_tsuzuri/shared/model/season_type.dart';
@@ -62,6 +63,72 @@ void main() {
         find.image(const AssetImage('assets/images/room/room_base.png')),
         findsOneWidget,
       );
+    });
+  });
+
+  group('Roomの雨表示', () {
+    testWidgets('rainなら窓外レイヤーへRainOverlayを表示する', (tester) async {
+      await _pumpRoom(tester, weather: WeatherType.rain);
+
+      expect(find.byType(RainOverlay), findsOneWidget);
+    });
+
+    testWidgets('sunnyならRainOverlayを表示しない', (tester) async {
+      await _pumpRoom(tester, weather: WeatherType.sunny);
+
+      expect(find.byType(RainOverlay), findsNothing);
+    });
+
+    testWidgets('Weather未登録ならRainOverlayを表示しない', (tester) async {
+      await _pumpRoom(tester, weather: null);
+
+      expect(find.byType(RainOverlay), findsNothing);
+    });
+
+    testWidgets('配達済みでもRoomの日付のWeatherをロードする', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: const {},
+          deliveredLetters: const {'2026-08-07': 'letterA'},
+        ),
+      );
+
+      expect(harness.letterRepository.getAllCallCount, 0);
+      expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
+      expect(find.byType(RainOverlay), findsOneWidget);
+    });
+
+    testWidgets('日付変更でrainからsunnyへ更新するとRainOverlayが消える', (tester) async {
+      final harness = await _pumpRoom(tester, weather: WeatherType.rain);
+      expect(find.byType(RainOverlay), findsOneWidget);
+
+      harness.weatherRepository.weather = WeatherType.sunny;
+      await harness.dateProvider.moveToNextDay();
+      await tester.pump();
+      await tester.pump();
+
+      expect(harness.weatherRepository.requestedDates, [
+        DateTime(2026, 8, 7),
+        DateTime(2026, 8, 8),
+      ]);
+      expect(find.byType(RainOverlay), findsNothing);
+    });
+
+    testWidgets('日付変更でsunnyからrainへ更新するとRainOverlayを表示する', (tester) async {
+      final harness = await _pumpRoom(tester, weather: WeatherType.sunny);
+      expect(find.byType(RainOverlay), findsNothing);
+
+      harness.weatherRepository.weather = WeatherType.rain;
+      await harness.dateProvider.moveToNextDay();
+      await tester.pump();
+      await tester.pump();
+
+      expect(harness.weatherRepository.requestedDates, [
+        DateTime(2026, 8, 7),
+        DateTime(2026, 8, 8),
+      ]);
+      expect(find.byType(RainOverlay), findsOneWidget);
     });
   });
 
@@ -1184,7 +1251,7 @@ void main() {
   group('今日の手紙の配達表示', () {
     testWidgets('未配達で候補があれば配達してletterレイヤーを表示する', (tester) async {
       final harness = await _pumpRoom(tester);
-      await tester.pumpAndSettle();
+      await _pumpPastFiniteAnimations(tester);
 
       expect(
         harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
@@ -1207,7 +1274,7 @@ void main() {
 
       expect(find.byKey(const ValueKey('roomLetterLayer')), findsOneWidget);
       expect(harness.letterRepository.getAllCallCount, 0);
-      expect(harness.weatherRepository.requestedDates, isEmpty);
+      expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
     });
 
     testWidgets('配達済み既読でも当日はletterレイヤーを表示する', (tester) async {
@@ -1225,7 +1292,7 @@ void main() {
 
     testWidgets('今日の候補がなければ配達せずletterレイヤーを表示しない', (tester) async {
       final harness = await _pumpRoom(tester, weather: WeatherType.sunny);
-      await tester.pumpAndSettle();
+      await _pumpPastFiniteAnimations(tester);
 
       expect(
         harness.readLetterProvider.hasDeliveredLetterOn(DateTime(2026, 8, 7)),
@@ -1243,14 +1310,14 @@ void main() {
           deliveredLetters: {'2026-08-06': 'letterA'},
         ),
       );
-      await tester.pumpAndSettle();
+      await _pumpPastFiniteAnimations(tester);
 
       expect(find.byKey(const ValueKey('roomLetterLayer')), findsNothing);
     });
 
     testWidgets('必要Providerのロード前は配達処理を開始しない', (tester) async {
       final harness = await _pumpRoom(tester, loadProviders: false);
-      await tester.pumpAndSettle();
+      await _pumpPastFiniteAnimations(tester);
 
       expect(harness.letterRepository.getAllCallCount, 0);
       expect(harness.weatherRepository.requestedDates, isEmpty);
@@ -1260,7 +1327,7 @@ void main() {
 
     testWidgets('配達保存失敗時は配達済みとして表示しない', (tester) async {
       final harness = await _pumpRoom(tester, failNextReadSave: true);
-      await tester.pumpAndSettle();
+      await _pumpPastFiniteAnimations(tester);
 
       expect(harness.readLetterProvider.deliveredLetters, isEmpty);
       expect(find.byKey(const ValueKey('roomLetterLayer')), findsNothing);
@@ -1268,7 +1335,7 @@ void main() {
 
     testWidgets('同日の再buildでは2通目を選択しない', (tester) async {
       final harness = await _pumpRoom(tester);
-      await tester.pumpAndSettle();
+      await _pumpPastFiniteAnimations(tester);
       expect(harness.letterRepository.getAllCallCount, 1);
 
       await tester.pump();
@@ -1293,7 +1360,7 @@ void main() {
       );
 
       await harness.dateProvider.moveToNextDay();
-      await tester.pumpAndSettle();
+      await _pumpPastFiniteAnimations(tester);
 
       expect(
         harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
@@ -1303,7 +1370,10 @@ void main() {
         harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 8)),
         'letterB',
       );
-      expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 8)]);
+      expect(harness.weatherRepository.requestedDates, [
+        DateTime(2026, 8, 7),
+        DateTime(2026, 8, 8),
+      ]);
     });
 
     testWidgets('通常配達の天候ロードが一度失敗すると750ms後に一度だけ再試行する', (tester) async {
@@ -1378,7 +1448,7 @@ void main() {
   group('今日の手紙を開く', () {
     testWidgets('未配達時はletterTapAreaが存在しない', (tester) async {
       await _pumpRoom(tester, weather: WeatherType.sunny);
-      await tester.pumpAndSettle();
+      await _pumpPastFiniteAnimations(tester);
 
       expect(find.byKey(const ValueKey('letterTapArea')), findsNothing);
     });
@@ -1405,10 +1475,10 @@ void main() {
         DateTime(2026, 8, 7),
       );
       expect(harness.letterRepository.getAllCallCount, 1);
-      expect(harness.weatherRepository.requestedDates, isEmpty);
+      expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
 
       await tester.pageBack();
-      await tester.pumpAndSettle();
+      await _pumpPastFiniteAnimations(tester);
       expect(find.byKey(const ValueKey('roomLetterLayer')), findsOneWidget);
       expect(find.byKey(const ValueKey('letterTapArea')), findsOneWidget);
     });
@@ -1429,7 +1499,7 @@ void main() {
       await _tapLetter(tester);
       expect(find.text('letterB'), findsWidgets);
       await tester.pageBack();
-      await tester.pumpAndSettle();
+      await _pumpPastFiniteAnimations(tester);
       await _tapLetter(tester);
 
       expect(find.text('letterB'), findsWidgets);
@@ -1456,7 +1526,7 @@ void main() {
       expect(harness.letterRepository.getAllCallCount, 1);
 
       harness.letterRepository.completeLoad();
-      await tester.pumpAndSettle();
+      await _pumpPastFiniteAnimations(tester);
 
       expect(find.byType(LetterPage), findsOneWidget);
       expect(harness.shizukuRepository.saveCallCount, 1);
@@ -1493,7 +1563,7 @@ void main() {
       expect(harness.letterRepository.getAllCallCount, 0);
 
       harness.shizukuRepository.completeLoad();
-      await tester.pumpAndSettle();
+      await _pumpPastFiniteAnimations(tester);
 
       expect(find.byType(LetterPage), findsOneWidget);
       expect(harness.shizukuRepository.saveCallCount, 1);
@@ -1521,7 +1591,7 @@ void main() {
       expect(harness.readLetterRepository.saveCallCount, 0);
 
       await tester.tap(find.byKey(const ValueKey('letterTapArea')));
-      await tester.pumpAndSettle();
+      await _pumpPastFiniteAnimations(tester);
 
       expect(harness.shizukuRepository.loadCallCount, 2);
       expect(find.byType(LetterPage), findsOneWidget);
@@ -1544,7 +1614,7 @@ void main() {
       await harness.dateProvider.setDebugDate(DateTime(2026, 8, 8));
       await tester.pump();
       harness.shizukuRepository.completeLoad();
-      await tester.pumpAndSettle();
+      await _pumpPastFiniteAnimations(tester);
 
       expect(find.byType(LetterPage), findsNothing);
       expect(harness.shizukuRepository.saveCallCount, 0);
@@ -1570,7 +1640,7 @@ void main() {
       );
       await harness.readLetterProvider.load();
       harness.shizukuRepository.completeLoad();
-      await tester.pumpAndSettle();
+      await _pumpPastFiniteAnimations(tester);
 
       expect(find.byType(LetterPage), findsNothing);
       expect(harness.shizukuRepository.saveCallCount, 0);
@@ -1591,7 +1661,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('letterTapArea')));
       await tester.pump();
       harness.shizukuRepository.completeLoad();
-      await tester.pumpAndSettle();
+      await _pumpPastFiniteAnimations(tester);
 
       expect(find.byType(LetterPage), findsOneWidget);
       expect(harness.shizukuRepository.saveCallCount, 0);
@@ -1656,7 +1726,7 @@ void main() {
       );
 
       await tester.tap(find.byKey(const ValueKey('letterTapArea')));
-      await tester.pumpAndSettle();
+      await _pumpPastFiniteAnimations(tester);
 
       expect(tester.takeException(), isNull);
       expect(find.byType(LetterPage), findsNothing);
@@ -1680,7 +1750,7 @@ void main() {
       harness.letterRepository.failNextLoad = true;
 
       await tester.tap(find.byKey(const ValueKey('letterTapArea')));
-      await tester.pumpAndSettle();
+      await _pumpPastFiniteAnimations(tester);
 
       expect(find.byType(LetterPage), findsNothing);
       expect(harness.shizukuRepository.saveCallCount, 0);
@@ -1710,7 +1780,7 @@ void main() {
       await _tapLetter(tester);
 
       expect(find.text('letterB'), findsWidgets);
-      expect(harness.weatherRepository.requestedDates, isEmpty);
+      expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
       expect(
         harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
         'letterB',
@@ -2113,7 +2183,7 @@ void main() {
         harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
         'tutorial_001',
       );
-      expect(harness.weatherRepository.requestedDates, isEmpty);
+      expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
     });
 
     testWidgets('季節と天候が一致しなくてもtutorial_001を配達する', (tester) async {
@@ -2133,7 +2203,7 @@ void main() {
         harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
         'tutorial_001',
       );
-      expect(harness.weatherRepository.requestedDates, isEmpty);
+      expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
     });
 
     testWidgets('配達済み未読ならrebuildでも通常手紙へ変えない', (tester) async {
@@ -2443,7 +2513,7 @@ void main() {
         isPurchased: true,
         allowedSlotIds: const [_deskSurfaceLeftSlotId, _deskSurfaceRightSlotId],
       );
-      await tester.pumpAndSettle();
+      await _pumpPastFiniteAnimations(tester);
 
       expect(_placedFurnitureLayer, findsNothing);
       expect(_placedFurnitureRightLayer, findsOneWidget);
@@ -2461,7 +2531,7 @@ void main() {
         isPurchased: true,
         allowedSlotIds: const [_deskSurfaceLeftSlotId, _deskSurfaceRightSlotId],
       );
-      await tester.pumpAndSettle();
+      await _pumpPastFiniteAnimations(tester);
 
       expect(_placedFurnitureLayer, findsOneWidget);
       expect(_placedFurnitureRightLayer, findsNothing);
@@ -2598,7 +2668,7 @@ void main() {
     expect(find.byType(CatalogPage), findsOneWidget);
 
     Navigator.of(tester.element(find.byType(CatalogPage))).pop(true);
-    await tester.pumpAndSettle();
+    await _pumpPastFiniteAnimations(tester);
 
     expect(find.byType(RoomPage), findsOneWidget);
     expect(find.byType(CatalogPage), findsNothing);
@@ -2886,6 +2956,14 @@ Future<void> _pumpRouteTransition(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 1));
 }
 
+Future<void> _pumpPastFiniteAnimations(WidgetTester tester) async {
+  // RainOverlay repeats for as long as a rainy Room is mounted, so
+  // pumpAndSettle cannot be used to wait for the Room's finite animations.
+  for (var i = 0; i < 6; i++) {
+    await tester.pump(const Duration(seconds: 1));
+  }
+}
+
 Future<void> pumpUntilLetterPage(WidgetTester tester) async {
   for (var i = 0; i < 20 && find.byType(LetterPage).evaluate().isEmpty; i++) {
     await tester.pump(const Duration(milliseconds: 50));
@@ -2894,7 +2972,7 @@ Future<void> pumpUntilLetterPage(WidgetTester tester) async {
 
 Future<void> _tapLetter(WidgetTester tester) async {
   await tester.tap(find.byKey(const ValueKey('letterTapArea')));
-  await tester.pumpAndSettle();
+  await _pumpPastFiniteAnimations(tester);
 }
 
 double _opacityForKey(WidgetTester tester, String key) {
@@ -3006,7 +3084,7 @@ Future<_RoomHarness> _pumpRoom(
 
   if (dismissInitialGuide && find.text('はじめる').evaluate().isNotEmpty) {
     await tester.tap(find.text('はじめる'));
-    await tester.pumpAndSettle();
+    await _pumpPastFiniteAnimations(tester);
   }
 
   return _RoomHarness(

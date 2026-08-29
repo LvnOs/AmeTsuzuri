@@ -11,10 +11,12 @@ import 'package:ame_tsuzuri/features/furniture/presentation/catalog_page.dart';
 import 'package:ame_tsuzuri/features/furniture/provider/catalog_provider.dart';
 import 'package:ame_tsuzuri/features/room/presentation/prototype_controls.dart';
 import 'package:ame_tsuzuri/features/room/presentation/prototype_reset_page.dart';
+import 'package:ame_tsuzuri/features/room/presentation/widgets/rain_overlay.dart';
 import 'package:ame_tsuzuri/features/furniture/provider/placed_furniture_provider.dart';
 import 'package:ame_tsuzuri/features/furniture/model/furniture.dart';
 import 'package:ame_tsuzuri/features/furniture/repository/furniture_repository.dart';
 import 'package:ame_tsuzuri/shared/model/season_type.dart';
+import 'package:ame_tsuzuri/shared/model/weather_type.dart';
 import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
 import 'package:ame_tsuzuri/shared/provider/weather_provider.dart';
 import 'package:flutter/material.dart';
@@ -326,6 +328,8 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
   final LetterDeliveryService _letterDeliveryService =
       const LetterDeliveryService();
   DateTime? _attemptedDeliveryDate;
+  DateTime? _requestedWeatherDate;
+  Future<void>? _requestedWeatherLoad;
   bool _isOpeningLetter = false;
   bool _isNavigatingFromRoom = false;
   bool _isArrivalAnimating = false;
@@ -376,7 +380,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     final readLetterProvider = context.watch<ReadLetterProvider>();
     final catalogProvider = context.watch<CatalogProvider>();
     final placedFurnitureProvider = context.watch<PlacedFurnitureProvider>();
-    context.watch<WeatherProvider>();
+    final weatherProvider = context.watch<WeatherProvider>();
 
     final deskSurfaceLeftFurnitureId = placedFurnitureProvider.isLoaded
         ? placedFurnitureProvider.placedFurnitureIds[RoomPage
@@ -399,6 +403,9 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
         : null;
 
     var showLetter = false;
+    if (appDateProvider.isLoaded) {
+      _scheduleWeatherLoad(_dateOnly(appDateProvider.today));
+    }
     if (appDateProvider.isLoaded && readLetterProvider.isLoaded) {
       final today = _dateOnly(appDateProvider.today);
       showLetter = readLetterProvider.hasDeliveredLetterOn(today);
@@ -440,6 +447,11 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
             aspectRatio: RoomPage._designWidth / RoomPage._designHeight,
             child: _RoomBackgroundLayers(
               season: _outdoorSeasonOverride ?? appDateProvider.currentSeason,
+              showRain:
+                  appDateProvider.isLoaded &&
+                  weatherProvider.loadedDate ==
+                      _dateOnly(appDateProvider.today) &&
+                  weatherProvider.currentWeather == WeatherType.rain,
               hasDeliveredLetter: showLetter,
               isArrivalAnimating: _isArrivalAnimating,
               arrivalAnimation: _arrivalController,
@@ -469,6 +481,24 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
 
   void _setOutdoorSeasonOverride(SeasonType? season) {
     setState(() => _outdoorSeasonOverride = season);
+  }
+
+  void _scheduleWeatherLoad(DateTime date) {
+    if (_requestedWeatherDate == date) {
+      return;
+    }
+
+    _requestedWeatherDate = date;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _requestedWeatherDate != date) {
+        return;
+      }
+      final load = context.read<WeatherProvider>().loadForDate(date);
+      _requestedWeatherLoad = load;
+      load.catchError((_) {
+        // A later Room rebuild or the delivery retry can try this date again.
+      });
+    });
   }
 
   void _scheduleTutorialGlowSync(_TutorialTarget target) {
@@ -610,7 +640,10 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     for (var attempt = 0; attempt < 2; attempt++) {
       try {
         if (weatherProvider.loadedDate != date) {
-          await weatherProvider.loadForDate(date);
+          final scheduledLoad = attempt == 0 && _requestedWeatherDate == date
+              ? _requestedWeatherLoad
+              : null;
+          await (scheduledLoad ?? weatherProvider.loadForDate(date));
         }
         return true;
       } catch (_) {
@@ -983,6 +1016,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
 class _RoomBackgroundLayers extends StatelessWidget {
   const _RoomBackgroundLayers({
     required this.season,
+    required this.showRain,
     required this.hasDeliveredLetter,
     required this.isArrivalAnimating,
     required this.arrivalAnimation,
@@ -1006,6 +1040,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
   });
 
   final SeasonType season;
+  final bool showRain;
   final bool hasDeliveredLetter;
   final bool isArrivalAnimating;
   final Animation<double> arrivalAnimation;
@@ -1052,6 +1087,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   alignment: RoomPage._outdoorAlignment,
                 ),
               ),
+              if (showRain) const RainOverlay(),
               Align(
                 alignment: RoomPage._postAlignment,
                 child: SizedBox(
