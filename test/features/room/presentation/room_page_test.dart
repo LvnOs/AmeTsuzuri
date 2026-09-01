@@ -17,7 +17,9 @@ import 'package:ame_tsuzuri/features/letters/provider/shizuku_provider.dart';
 import 'package:ame_tsuzuri/features/letters/repository/letter_repository.dart';
 import 'package:ame_tsuzuri/features/letters/repository/read_letter_repository.dart';
 import 'package:ame_tsuzuri/features/letters/repository/shizuku_repository.dart';
+import 'package:ame_tsuzuri/features/room/presentation/prototype_controls.dart';
 import 'package:ame_tsuzuri/features/room/presentation/room_page.dart';
+import 'package:ame_tsuzuri/features/room/presentation/widgets/autumn_leaf_effect.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/rain_overlay.dart';
 import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
 import 'package:ame_tsuzuri/shared/model/weather_type.dart';
@@ -161,9 +163,94 @@ void main() {
         findsOneWidget,
       );
     });
+
+    testWidgets('autumnだけAutumnLeafEffectを表示する', (tester) async {
+      for (final entry in <DateTime, bool>{
+        DateTime(2026, 4, 1): false,
+        DateTime(2026, 8, 1): false,
+        DateTime(2026, 9, 1): true,
+        DateTime(2026, 12, 1): false,
+      }.entries) {
+        await _pumpRoom(tester, date: entry.key);
+
+        expect(
+          find.byType(AutumnLeafEffect),
+          entry.value ? findsOneWidget : findsNothing,
+          reason: '${entry.key.month}月の表示',
+        );
+      }
+    });
+
+    testWidgets('prototype overrideでautumnへ切り替えると初回待機から生成する', (tester) async {
+      await _pumpRoom(tester, date: DateTime(2026, 8, 1));
+      expect(find.byType(AutumnLeafEffect), findsNothing);
+
+      tester
+          .widget<PrototypeControls>(find.byType(PrototypeControls))
+          .onOutdoorSeasonChanged(SeasonType.autumn);
+      await tester.pump();
+
+      expect(find.byType(AutumnLeafEffect), findsOneWidget);
+      expect(find.byKey(const ValueKey('autumnLeafImage')), findsNothing);
+    });
+
+    testWidgets('RainOverlay、落ち葉、post、room_baseの順で描画する', (tester) async {
+      await _pumpRoom(
+        tester,
+        date: DateTime(2026, 9, 1),
+        weather: WeatherType.rain,
+      );
+
+      final roomStack = tester.widget<Stack>(
+        find
+            .ancestor(
+              of: find.byType(AutumnLeafEffect),
+              matching: find.byType(Stack),
+            )
+            .first,
+      );
+      final rainIndex = roomStack.children.indexWhere(
+        (child) => child is RainOverlay,
+      );
+      final leafIndex = roomStack.children.indexWhere(
+        (child) => child is AutumnLeafEffect,
+      );
+      final postIndex = roomStack.children.indexWhere(
+        (child) => _containsAsset(child, 'assets/images/room/post.png'),
+      );
+      final roomBaseIndex = roomStack.children.indexWhere(
+        (child) => _containsAsset(child, 'assets/images/room/room_base.png'),
+      );
+
+      expect(rainIndex, lessThan(leafIndex));
+      expect(leafIndex, lessThan(postIndex));
+      expect(postIndex, lessThan(roomBaseIndex));
+    });
   });
 
   group('Roomの雨表示', () {
+    testWidgets('rain + autumnでは雨と落ち葉を両方表示する', (tester) async {
+      await _pumpRoom(
+        tester,
+        date: DateTime(2026, 9, 1),
+        weather: WeatherType.rain,
+      );
+
+      expect(find.byType(RainOverlay), findsOneWidget);
+      expect(find.byType(AutumnLeafEffect), findsOneWidget);
+    });
+
+    testWidgets('sunny + autumnでは落ち葉だけを表示する', (tester) async {
+      await _pumpRoom(
+        tester,
+        date: DateTime(2026, 9, 1),
+        weather: WeatherType.sunny,
+      );
+
+      expect(find.byType(RainOverlay), findsNothing);
+      expect(find.byType(AutumnLeafEffect), findsOneWidget);
+    });
+
     testWidgets('rainなら窓外レイヤーへRainOverlayを表示する', (tester) async {
       await _pumpRoom(tester, weather: WeatherType.rain);
 
@@ -3076,6 +3163,19 @@ void main() {
     expect(find.byKey(const ValueKey('tutorialBookshelfGlow')), findsNothing);
     expect(tester.takeException(), isNull);
   });
+}
+
+bool _containsAsset(Widget widget, String assetPath) {
+  if (widget is Image && widget.image is AssetImage) {
+    return (widget.image as AssetImage).assetName == assetPath;
+  }
+  if (widget is Align && widget.child != null) {
+    return _containsAsset(widget.child!, assetPath);
+  }
+  if (widget is SizedBox && widget.child != null) {
+    return _containsAsset(widget.child!, assetPath);
+  }
+  return false;
 }
 
 const _deskSurfaceLeftSlotId = 'living_room_desk_surface_left';

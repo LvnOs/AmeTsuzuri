@@ -11,6 +11,7 @@ import 'package:ame_tsuzuri/features/furniture/presentation/catalog_page.dart';
 import 'package:ame_tsuzuri/features/furniture/provider/catalog_provider.dart';
 import 'package:ame_tsuzuri/features/room/presentation/prototype_controls.dart';
 import 'package:ame_tsuzuri/features/room/presentation/prototype_reset_page.dart';
+import 'package:ame_tsuzuri/features/room/presentation/widgets/autumn_leaf_effect.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/rain_overlay.dart';
 import 'package:ame_tsuzuri/features/furniture/provider/placed_furniture_provider.dart';
 import 'package:ame_tsuzuri/features/furniture/model/furniture.dart';
@@ -1116,6 +1117,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
                 ),
               ),
               if (showRain) const RainOverlay(),
+              if (season == SeasonType.autumn) const AutumnLeafEffect(),
               Align(
                 alignment: RoomPage._postAlignment,
                 child: SizedBox(
