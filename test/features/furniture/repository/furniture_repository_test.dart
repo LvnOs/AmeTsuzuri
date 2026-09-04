@@ -8,6 +8,7 @@ const _windowShelfDecorSlotId = 'living_room_window_shelf_decor';
 const _windowHangingDecorSlotId = 'living_room_window_hanging_decor';
 const _floorRugSlotId = 'living_room_floor_rug';
 const _chairSlotId = 'living_room_chair';
+const _windowVaseSlotId = 'living_room_window_vase';
 const _deskFurnitureIds = {'wooden_mug', 'ink_bottle', 'wooden_fox_figure'};
 const _windowFurnitureIds = {
   'small_houseplant',
@@ -15,10 +16,16 @@ const _windowFurnitureIds = {
   'small_glass_ornament',
 };
 const _hangingFurnitureIds = {'wind_chime', 'teru_teru_bozu', 'moon_mobile'};
+const _flowerFurnitureIds = {
+  'small_white_flower',
+  'blue_violet_flower',
+  'pale_yellow_flower',
+};
 const _publicFurnitureIds = {
   ..._deskFurnitureIds,
   ..._windowFurnitureIds,
   ..._hangingFurnitureIds,
+  ..._flowerFurnitureIds,
   'round_rug',
   'rectangular_rug',
   'wooden_chair',
@@ -36,11 +43,11 @@ void main() {
       furnitures = await FurnitureRepository().getAll();
     });
 
-    test('全46件の家具定義を維持する', () {
-      expect(furnitures, hasLength(46));
+    test('全49件の家具定義を維持する', () {
+      expect(furnitures, hasLength(49));
     });
 
-    test('机上・窓辺・吊り飾り各3家具とラグ2種だけが初期公開される', () {
+    test('既存公開家具と花3種だけが初期公開される', () {
       final availableIds = furnitures
           .where((furniture) => furniture.initialAvailable)
           .map((furniture) => furniture.id)
@@ -107,6 +114,35 @@ void main() {
           _windowHangingDecorSlotId,
         ], reason: id);
         expect(furniture.imagePath, expectedImages[id], reason: id);
+      }
+    });
+
+    test('花3種は10滴で一輪挿しだけに配置できる', () {
+      const expected = {
+        'small_white_flower': (
+          '白い小花',
+          'furniture/window/small_white_flower.png',
+        ),
+        'blue_violet_flower': (
+          '青紫の花',
+          'furniture/window/blue_violet_flower.png',
+        ),
+        'pale_yellow_flower': (
+          '淡い黄色の花',
+          'furniture/window/pale_yellow_flower.png',
+        ),
+      };
+
+      for (final entry in expected.entries) {
+        final furniture = furnitures.singleWhere(
+          (item) => item.id == entry.key,
+        );
+        expect(furniture.name, entry.value.$1, reason: entry.key);
+        expect(furniture.price, 10, reason: entry.key);
+        expect(furniture.size, 'small', reason: entry.key);
+        expect(furniture.initialAvailable, isTrue, reason: entry.key);
+        expect(furniture.slotIds, const [_windowVaseSlotId], reason: entry.key);
+        expect(furniture.imagePath, entry.value.$2, reason: entry.key);
       }
     });
 

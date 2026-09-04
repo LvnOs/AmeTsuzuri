@@ -22,6 +22,7 @@ const _windowShelfDecorSlotId = 'living_room_window_shelf_decor';
 const _windowHangingDecorSlotId = 'living_room_window_hanging_decor';
 const _floorRugSlotId = 'living_room_floor_rug';
 const _chairSlotId = 'living_room_chair';
+const _windowVaseSlotId = 'living_room_window_vase';
 
 const _furnitureA = Furniture(
   id: 'furniture_a',
@@ -167,6 +168,34 @@ const _woodenChair = Furniture(
   imagePath: 'furniture/chair/wooden_chair.png',
   initialAvailable: true,
 );
+const _smallWhiteFlower = Furniture(
+  id: 'small_white_flower',
+  name: '白い小花',
+  price: 10,
+  size: 'small',
+  slotIds: [_windowVaseSlotId],
+  imagePath: 'furniture/window/small_white_flower.png',
+  initialAvailable: true,
+);
+const _blueVioletFlower = Furniture(
+  id: 'blue_violet_flower',
+  name: '青紫の花',
+  price: 10,
+  size: 'small',
+  slotIds: [_windowVaseSlotId],
+  imagePath: 'furniture/window/blue_violet_flower.png',
+  initialAvailable: true,
+);
+const _paleYellowFlower = Furniture(
+  id: 'pale_yellow_flower',
+  name: '淡い黄色の花',
+  price: 10,
+  size: 'small',
+  slotIds: [_windowVaseSlotId],
+  imagePath: 'furniture/window/pale_yellow_flower.png',
+  initialAvailable: true,
+);
+const _flowers = [_smallWhiteFlower, _blueVioletFlower, _paleYellowFlower];
 const _missingImageFurniture = Furniture(
   id: 'missing_image',
   name: '画像のない家具',
@@ -196,6 +225,126 @@ const _multiSlotFurniture = Furniture(
 );
 
 void main() {
+  group('一輪挿しの花', () {
+    testWidgets('3種類を10滴商品として表示する', (tester) async {
+      await _pumpCatalog(tester, furnitures: _flowers);
+
+      for (final flower in _flowers) {
+        expect(_furnitureTile(flower.name), findsOneWidget);
+      }
+      expect(find.text('10滴で迎える'), findsNWidgets(3));
+    });
+
+    for (final flower in _flowers) {
+      testWidgets('${flower.name}を残高10滴で購入して一輪挿しへ配置できる', (tester) async {
+        final harness = await _pumpCatalog(
+          tester,
+          openAsRoute: true,
+          blockPurchase: false,
+          initialShizuku: 10,
+          purchasedFurnitureIds: const {},
+          furnitures: [flower],
+        );
+
+        await _buyFurniture(tester, flower.name);
+
+        expect(harness.catalogProvider.isPurchased(flower.id), isTrue);
+        expect(harness.shizukuProvider.currentShizuku, 0);
+        expect(
+          find.byKey(const ValueKey('placementOption-$_windowVaseSlotId')),
+          findsOneWidget,
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('placementOption-$_windowVaseSlotId')),
+        );
+        await tester.pumpAndSettle();
+        expect(harness.placedFurnitureProvider.placedFurnitureIds, {
+          _windowVaseSlotId: flower.id,
+        });
+      });
+    }
+
+    testWidgets('残高9滴では購入できない', (tester) async {
+      final harness = await _pumpCatalog(
+        tester,
+        blockPurchase: false,
+        initialShizuku: 9,
+        purchasedFurnitureIds: const {},
+        furnitures: const [_smallWhiteFlower],
+      );
+
+      await _buyFurniture(tester, _smallWhiteFlower.name);
+
+      expect(
+        harness.catalogProvider.isPurchased(_smallWhiteFlower.id),
+        isFalse,
+      );
+      expect(harness.shizukuProvider.currentShizuku, 9);
+      expect(find.text('雫が足りません'), findsOneWidget);
+    });
+
+    testWidgets('同じslotで花を交換し旧花の購入状態を維持して取り外せる', (tester) async {
+      final harness = await _pumpCatalog(
+        tester,
+        openAsRoute: true,
+        furnitures: const [_smallWhiteFlower, _blueVioletFlower],
+        purchasedFurnitureIds: const {
+          'small_white_flower',
+          'blue_violet_flower',
+        },
+        placedFurnitureIds: const {_windowVaseSlotId: 'small_white_flower'},
+      );
+
+      await tester.tap(_furnitureTile(_blueVioletFlower.name));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('placementOption-$_windowVaseSlotId')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('置き換える'));
+      await tester.pumpAndSettle();
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _windowVaseSlotId: 'blue_violet_flower',
+      });
+      expect(harness.catalogProvider.isPurchased('small_white_flower'), isTrue);
+
+      await tester.tap(find.byKey(const ValueKey('openCatalog')));
+      await tester.pumpAndSettle();
+      await tester.tap(_furnitureTile(_blueVioletFlower.name));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('取り外す'));
+      await tester.pumpAndSettle();
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, isEmpty);
+    });
+
+    testWidgets('tutorial初回でも花を購入・配置できる', (tester) async {
+      final harness = await _pumpCatalog(
+        tester,
+        openAsRoute: true,
+        showTutorialGuide: true,
+        blockPurchase: false,
+        initialShizuku: 30,
+        purchasedFurnitureIds: const {},
+        furnitures: const [_paleYellowFlower],
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('catalogTutorialGuideContinue')),
+      );
+      await tester.pumpAndSettle();
+      await _buyFurniture(tester, _paleYellowFlower.name);
+      await tester.tap(
+        find.byKey(const ValueKey('placementOption-$_windowVaseSlotId')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(harness.shizukuProvider.currentShizuku, 20);
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _windowVaseSlotId: 'pale_yellow_flower',
+      });
+    });
+  });
+
   group('chair furniture', () {
     testWidgets('70雫で購入してchair slotだけへ配置できる', (tester) async {
       final harness = await _pumpCatalog(
@@ -1673,6 +1822,7 @@ class _FakePlacementSlotRepository extends PlacementSlotRepository {
       _windowShelfDecorSlotId => '窓際（棚）',
       _windowHangingDecorSlotId => '窓際（吊り飾り）',
       _floorRugSlotId => 'ラグ',
+      _windowVaseSlotId => '窓際（一輪挿し）',
       'slot_a' => '窓辺',
       'long_slot' => 'とても長い名前の配置場所',
       _ => 'テスト配置場所',

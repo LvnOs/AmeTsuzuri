@@ -93,6 +93,12 @@ class RoomPage extends StatefulWidget {
   // Flower composition tuning. Scale is relative to the room canvas width.
   static const Alignment _flowerAlignment = Alignment(0.34, -0.26);
   static const double _flowerScale = 0.13;
+  static const String _windowVaseSlotId = 'living_room_window_vase';
+  static const Set<String> _flowerFurnitureIds = {
+    'small_white_flower',
+    'blue_violet_flower',
+    'pale_yellow_flower',
+  };
 
   // Letter composition tuning. Scale is relative to the room canvas width.
   static const Alignment _letterAlignment = Alignment(0, 0.07);
@@ -407,6 +413,9 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
         ? placedFurnitureProvider.placedFurnitureIds[RoomPage
               ._windowHangingDecorSlotId]
         : null;
+    final flowerFurnitureId = placedFurnitureProvider.isLoaded
+        ? placedFurnitureProvider.placedFurnitureIds[RoomPage._windowVaseSlotId]
+        : null;
     final floorRugFurnitureId = placedFurnitureProvider.isLoaded
         ? placedFurnitureProvider.placedFurnitureIds[RoomPage._floorRugSlotId]
         : null;
@@ -476,6 +485,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
               deskSurfaceRightFurnitureId: deskSurfaceRightFurnitureId,
               windowShelfDecorFurnitureId: windowShelfDecorFurnitureId,
               windowHangingDecorFurnitureId: windowHangingDecorFurnitureId,
+              flowerFurnitureId: flowerFurnitureId,
               floorRugFurnitureId: floorRugFurnitureId,
               chairFurnitureId: chairFurnitureId,
               onTapBottle: _onTapBottle,
@@ -1054,6 +1064,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
     required this.deskSurfaceRightFurnitureId,
     required this.windowShelfDecorFurnitureId,
     required this.windowHangingDecorFurnitureId,
+    required this.flowerFurnitureId,
     required this.floorRugFurnitureId,
     required this.chairFurnitureId,
     required this.onTapBottle,
@@ -1080,6 +1091,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
   final String? deskSurfaceRightFurnitureId;
   final String? windowShelfDecorFurnitureId;
   final String? windowHangingDecorFurnitureId;
+  final String? flowerFurnitureId;
   final String? floorRugFurnitureId;
   final String? chairFurnitureId;
   final VoidCallback onTapBottle;
@@ -1138,6 +1150,9 @@ class _RoomBackgroundLayers extends StatelessWidget {
                 fit: BoxFit.cover,
               ),
               _FurnitureImageLayer(
+                key: const ValueKey(
+                  'roomWindowHangingDecorAsyncFurnitureLayer',
+                ),
                 layerKey: const ValueKey('windowHangingDecorFurnitureLayer'),
                 furnituresFuture: furnituresFuture,
                 furnitureId: windowHangingDecorFurnitureId,
@@ -1147,47 +1162,53 @@ class _RoomBackgroundLayers extends StatelessWidget {
                 scaleCorrections: RoomPage._windowHangingDecorScaleCorrections,
                 supportedFurnitureIds: RoomPage._windowHangingDecorFurnitureIds,
               ),
-              if (tutorialTarget != _TutorialTarget.none)
-                _TutorialTargetGlow(
-                  key: ValueKey(
-                    'tutorial${switch (tutorialTarget) {
-                      _TutorialTarget.letter => 'Letter',
-                      _TutorialTarget.bottle => 'Bottle',
-                      _TutorialTarget.bookshelf => 'Bookshelf',
-                      _TutorialTarget.none => '',
-                    }}Glow',
-                  ),
-                  alignment: switch (tutorialTarget) {
-                    _TutorialTarget.letter => RoomPage._letterAlignment,
-                    _TutorialTarget.bottle =>
-                      RoomPage._tutorialBottleGlowAlignment,
-                    _TutorialTarget.bookshelf =>
-                      RoomPage._tutorialBookshelfGlowAlignment,
-                    _TutorialTarget.none => Alignment.center,
-                  },
-                  scale: switch (tutorialTarget) {
-                    _TutorialTarget.letter => RoomPage._tutorialLetterGlowScale,
-                    _TutorialTarget.bottle => RoomPage._tutorialBottleGlowScale,
-                    _TutorialTarget.bookshelf =>
-                      RoomPage._tutorialBookshelfGlowScale,
-                    _TutorialTarget.none => 0,
-                  },
-                  maximumOpacity: switch (tutorialTarget) {
-                    _TutorialTarget.letter =>
-                      RoomPage._tutorialLetterGlowMaximumOpacity,
-                    _TutorialTarget.bottle =>
-                      RoomPage._tutorialBottleGlowMaximumOpacity,
-                    _TutorialTarget.bookshelf =>
-                      RoomPage._tutorialBookshelfGlowMaximumOpacity,
-                    _TutorialTarget.none => 0,
-                  },
-                  colors: tutorialTarget == _TutorialTarget.bottle
-                      ? RoomPage._tutorialBottleGlowColors
-                      : null,
-                  animation: tutorialGlowAnimation,
-                  roomWidth: constraints.maxWidth,
-                ),
+              tutorialTarget == _TutorialTarget.none
+                  ? const SizedBox.shrink(
+                      key: ValueKey('tutorialTargetGlowSlot'),
+                    )
+                  : _TutorialTargetGlow(
+                      key: ValueKey(
+                        'tutorial${switch (tutorialTarget) {
+                          _TutorialTarget.letter => 'Letter',
+                          _TutorialTarget.bottle => 'Bottle',
+                          _TutorialTarget.bookshelf => 'Bookshelf',
+                          _TutorialTarget.none => '',
+                        }}Glow',
+                      ),
+                      alignment: switch (tutorialTarget) {
+                        _TutorialTarget.letter => RoomPage._letterAlignment,
+                        _TutorialTarget.bottle =>
+                          RoomPage._tutorialBottleGlowAlignment,
+                        _TutorialTarget.bookshelf =>
+                          RoomPage._tutorialBookshelfGlowAlignment,
+                        _TutorialTarget.none => Alignment.center,
+                      },
+                      scale: switch (tutorialTarget) {
+                        _TutorialTarget.letter =>
+                          RoomPage._tutorialLetterGlowScale,
+                        _TutorialTarget.bottle =>
+                          RoomPage._tutorialBottleGlowScale,
+                        _TutorialTarget.bookshelf =>
+                          RoomPage._tutorialBookshelfGlowScale,
+                        _TutorialTarget.none => 0,
+                      },
+                      maximumOpacity: switch (tutorialTarget) {
+                        _TutorialTarget.letter =>
+                          RoomPage._tutorialLetterGlowMaximumOpacity,
+                        _TutorialTarget.bottle =>
+                          RoomPage._tutorialBottleGlowMaximumOpacity,
+                        _TutorialTarget.bookshelf =>
+                          RoomPage._tutorialBookshelfGlowMaximumOpacity,
+                        _TutorialTarget.none => 0,
+                      },
+                      colors: tutorialTarget == _TutorialTarget.bottle
+                          ? RoomPage._tutorialBottleGlowColors
+                          : null,
+                      animation: tutorialGlowAnimation,
+                      roomWidth: constraints.maxWidth,
+                    ),
               _RugLayer(
+                key: const ValueKey('roomRugAsyncFurnitureLayer'),
                 furnituresFuture: furnituresFuture,
                 furnitureId: floorRugFurnitureId,
                 roomWidth: constraints.maxWidth,
@@ -1207,6 +1228,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
                 ),
               ),
               _FurnitureImageLayer(
+                key: const ValueKey('roomWindowShelfAsyncFurnitureLayer'),
                 layerKey: const ValueKey('windowShelfDecorFurnitureLayer'),
                 furnituresFuture: furnituresFuture,
                 furnitureId: windowShelfDecorFurnitureId,
@@ -1217,6 +1239,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
                 supportedFurnitureIds: RoomPage._windowShelfDecorFurnitureIds,
               ),
               _FurnitureImageLayer(
+                key: const ValueKey('roomDeskLeftAsyncFurnitureLayer'),
                 layerKey: const ValueKey('deskSurfaceLeftFurnitureLayer'),
                 furnituresFuture: furnituresFuture,
                 furnitureId: deskSurfaceLeftFurnitureId,
@@ -1231,6 +1254,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
                 },
               ),
               _FurnitureImageLayer(
+                key: const ValueKey('roomDeskRightAsyncFurnitureLayer'),
                 layerKey: const ValueKey('deskSurfaceRightFurnitureLayer'),
                 furnituresFuture: furnituresFuture,
                 furnitureId: deskSurfaceRightFurnitureId,
@@ -1254,15 +1278,11 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   ),
                 ),
               ),
-              Align(
-                alignment: RoomPage._flowerAlignment,
-                child: SizedBox(
-                  width: constraints.maxWidth * RoomPage._flowerScale,
-                  child: Image.asset(
-                    'assets/images/room/flower_initial.png',
-                    fit: BoxFit.contain,
-                  ),
-                ),
+              _FlowerLayer(
+                key: const ValueKey('roomFlowerAsyncFurnitureLayer'),
+                furnituresFuture: furnituresFuture,
+                furnitureId: flowerFurnitureId,
+                roomWidth: constraints.maxWidth,
               ),
               Align(
                 alignment: RoomPage._vaseAlignment,
@@ -1324,6 +1344,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   ),
                 ),
               _ChairLayer(
+                key: const ValueKey('roomChairAsyncFurnitureLayer'),
                 furnituresFuture: furnituresFuture,
                 furnitureId: chairFurnitureId,
                 roomWidth: constraints.maxWidth,
@@ -1465,8 +1486,79 @@ class _TutorialRoomGuide extends StatelessWidget {
   }
 }
 
+class _FlowerLayer extends StatelessWidget {
+  const _FlowerLayer({
+    super.key,
+    required this.furnituresFuture,
+    required this.furnitureId,
+    required this.roomWidth,
+  });
+
+  static const String _initialFlowerAssetPath =
+      'assets/images/room/flower_initial.png';
+
+  final Future<List<Furniture>> furnituresFuture;
+  final String? furnitureId;
+  final double roomWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedId = furnitureId;
+    if (selectedId == null ||
+        !RoomPage._flowerFurnitureIds.contains(selectedId)) {
+      return _buildFlower(_initialFlowerAssetPath);
+    }
+
+    return FutureBuilder<List<Furniture>>(
+      future: furnituresFuture,
+      builder: (context, snapshot) {
+        Furniture? selectedFurniture;
+        for (final furniture in snapshot.data ?? const <Furniture>[]) {
+          if (furniture.id == selectedId &&
+              furniture.slotIds.contains(RoomPage._windowVaseSlotId)) {
+            selectedFurniture = furniture;
+            break;
+          }
+        }
+
+        final imagePath = selectedFurniture == null
+            ? _initialFlowerAssetPath
+            : 'assets/images/${selectedFurniture.imagePath}';
+        return _buildFlower(imagePath, furnitureId: selectedFurniture?.id);
+      },
+    );
+  }
+
+  Widget _buildFlower(String imagePath, {String? furnitureId}) {
+    return Align(
+      key: const ValueKey('roomFlowerLayer'),
+      alignment: RoomPage._flowerAlignment,
+      child: SizedBox(
+        width: roomWidth * RoomPage._flowerScale,
+        child: Image.asset(
+          imagePath,
+          key: ValueKey(
+            furnitureId == null
+                ? 'roomInitialFlowerImage'
+                : 'roomFurnitureImage-$furnitureId',
+          ),
+          fit: BoxFit.contain,
+          errorBuilder: furnitureId == null
+              ? null
+              : (context, error, stackTrace) => Image.asset(
+                  _initialFlowerAssetPath,
+                  key: const ValueKey('roomInitialFlowerImage'),
+                  fit: BoxFit.contain,
+                ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ChairLayer extends StatelessWidget {
   const _ChairLayer({
+    super.key,
     required this.furnituresFuture,
     required this.furnitureId,
     required this.roomWidth,
@@ -1535,6 +1627,7 @@ class _ChairLayer extends StatelessWidget {
 
 class _RugLayer extends StatelessWidget {
   const _RugLayer({
+    super.key,
     required this.furnituresFuture,
     required this.furnitureId,
     required this.roomWidth,
@@ -1604,6 +1697,7 @@ class _RugLayer extends StatelessWidget {
 
 class _FurnitureImageLayer extends StatelessWidget {
   const _FurnitureImageLayer({
+    super.key,
     required this.layerKey,
     required this.furnituresFuture,
     required this.furnitureId,

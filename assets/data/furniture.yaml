@@ -320,6 +320,33 @@ furniture:
     image: furniture/window/single_flower_vase.png
     initial_available: false
 
+  - id: small_white_flower
+    name: 白い小花
+    price: 10
+    size: small
+    slots:
+      - living_room_window_vase
+    image: furniture/window/small_white_flower.png
+    initial_available: true
+
+  - id: blue_violet_flower
+    name: 青紫の花
+    price: 10
+    size: small
+    slots:
+      - living_room_window_vase
+    image: furniture/window/blue_violet_flower.png
+    initial_available: true
+
+  - id: pale_yellow_flower
+    name: 淡い黄色の花
+    price: 10
+    size: small
+    slots:
+      - living_room_window_vase
+    image: furniture/window/pale_yellow_flower.png
+    initial_available: true
+
   - id: sun_catcher
     name: サンキャッチャー
     price: 50

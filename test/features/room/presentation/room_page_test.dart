@@ -129,6 +129,141 @@ void main() {
     });
   });
 
+  group('一輪挿しの花', () {
+    testWidgets('未配置と旧save相当のslot keyなしでは初期花と花瓶を表示する', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {_floorRugSlotId: 'round_rug'},
+      );
+
+      expect(_initialFlowerImage, findsOneWidget);
+      expect(_fixedVaseImage, findsOneWidget);
+    });
+
+    for (final entry in const {
+      'small_white_flower': 'furniture/window/small_white_flower.png',
+      'blue_violet_flower': 'furniture/window/blue_violet_flower.png',
+      'pale_yellow_flower': 'furniture/window/pale_yellow_flower.png',
+    }.entries) {
+      testWidgets('${entry.key}配置時は対応する花だけと固定花瓶を表示する', (tester) async {
+        await _pumpRoom(
+          tester,
+          initialPlacedFurnitureIds: {_windowVaseSlotId: entry.key},
+        );
+        await tester.pump();
+
+        expect(_initialFlowerImage, findsNothing);
+        expect(
+          find.image(AssetImage('assets/images/${entry.value}')),
+          findsOneWidget,
+        );
+        expect(_fixedVaseImage, findsOneWidget);
+      });
+    }
+
+    testWidgets('同じslotで花を交換しremoveとresetで初期花へ戻る', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialPurchasedFurnitureIds: const {
+          'small_white_flower',
+          'blue_violet_flower',
+        },
+        initialPlacedFurnitureIds: const {
+          _windowVaseSlotId: 'small_white_flower',
+        },
+      );
+
+      await harness.placedFurnitureProvider.place(
+        slotId: _windowVaseSlotId,
+        furnitureId: 'blue_violet_flower',
+        isPurchased: true,
+        allowedSlotIds: const [_windowVaseSlotId],
+      );
+      await tester.pump();
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-blue_violet_flower')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-small_white_flower')),
+        findsNothing,
+      );
+
+      await harness.placedFurnitureProvider.remove('blue_violet_flower');
+      await tester.pump();
+      expect(_initialFlowerImage, findsOneWidget);
+
+      await harness.placedFurnitureProvider.place(
+        slotId: _windowVaseSlotId,
+        furnitureId: 'small_white_flower',
+        isPurchased: true,
+        allowedSlotIds: const [_windowVaseSlotId],
+      );
+      await harness.placedFurnitureProvider.reset();
+      await tester.pump();
+      expect(_initialFlowerImage, findsOneWidget);
+    });
+
+    testWidgets('未知のFurniture IDでは初期花へfallbackする', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {_windowVaseSlotId: 'unknown_flower'},
+      );
+
+      expect(_initialFlowerImage, findsOneWidget);
+      expect(_fixedVaseImage, findsOneWidget);
+    });
+
+    testWidgets('花Assetの読み込み失敗時も初期花へfallbackする', (tester) async {
+      const missingFlower = Furniture(
+        id: 'small_white_flower',
+        name: 'missing flower',
+        price: 10,
+        size: 'small',
+        slotIds: [_windowVaseSlotId],
+        imagePath: 'furniture/window/missing_flower.png',
+        initialAvailable: true,
+      );
+      await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {
+          _windowVaseSlotId: 'small_white_flower',
+        },
+        furnitures: const [missingFlower],
+      );
+      await tester.pump();
+
+      expect(_initialFlowerImage, findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('初期花と同じAlignment・width・BoxFitを個別補正なしで使う', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {
+          _windowVaseSlotId: 'pale_yellow_flower',
+        },
+      );
+      final imageFinder = find.byKey(
+        const ValueKey('roomFurnitureImage-pale_yellow_flower'),
+      );
+      final image = tester.widget<Image>(imageFinder);
+      final sizedBox = tester.widget<SizedBox>(
+        find.ancestor(of: imageFinder, matching: find.byType(SizedBox)).first,
+      );
+      final align = tester.widget<Align>(
+        find.byKey(const ValueKey('roomFlowerLayer')),
+      );
+      final roomWidth = tester
+          .getSize(find.byKey(const ValueKey('roomFlowerLayer')))
+          .width;
+
+      expect(image.fit, BoxFit.contain);
+      expect(sizedBox.width, closeTo(roomWidth * 0.13, 0.001));
+      expect(align.alignment, const Alignment(0.34, -0.26));
+    });
+  });
+
   group('seasonal outdoor background', () {
     testWidgets('8月は夏背景とroom_baseを表示する', (tester) async {
       await _pumpRoom(tester, date: DateTime(2026, 8, 7));
@@ -979,6 +1114,63 @@ void main() {
       expect(letterGlow, findsNothing);
       expect(bottleGlow, findsNothing);
       expect(bookshelfGlow, findsOneWidget);
+    });
+
+    testWidgets('bookshelf tutorialから瓶を開く直前も交換家具を維持する', (tester) async {
+      const placedFurnitureIds = {
+        _windowVaseSlotId: 'blue_violet_flower',
+        _floorRugSlotId: 'rectangular_rug',
+        _chairSlotId: 'cushioned_chair',
+        _deskSurfaceLeftSlotId: 'wooden_mug',
+        _windowShelfDecorSlotId: 'small_houseplant',
+      };
+      final harness = await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+          hasOpenedTutorialBottle: true,
+        ),
+        initialPurchasedFurnitureIds: placedFurnitureIds.values.toSet(),
+        initialPlacedFurnitureIds: placedFurnitureIds,
+      );
+
+      expect(bookshelfGlow, findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('bottleTapArea')));
+      await tester.pump();
+
+      expect(bookshelfGlow, findsNothing);
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-blue_violet_flower')),
+        findsOneWidget,
+      );
+      expect(_initialFlowerImage, findsNothing);
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-rectangular_rug')),
+        findsOneWidget,
+      );
+      expect(_fixedRugImage, findsNothing);
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-cushioned_chair')),
+        findsOneWidget,
+      );
+      expect(_fixedChairImage, findsNothing);
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-wooden_mug')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-small_houseplant')),
+        findsOneWidget,
+      );
+      expect(
+        harness.placedFurnitureProvider.placedFurnitureIds,
+        placedFurnitureIds,
+      );
+
+      await _pumpRouteTransition(tester);
+      expect(find.byType(CatalogPage), findsOneWidget);
     });
 
     testWidgets('tutorial完了済みならGlowを表示しない', (tester) async {
@@ -3184,6 +3376,7 @@ const _windowShelfDecorSlotId = 'living_room_window_shelf_decor';
 const _windowHangingDecorSlotId = 'living_room_window_hanging_decor';
 const _floorRugSlotId = 'living_room_floor_rug';
 const _chairSlotId = 'living_room_chair';
+const _windowVaseSlotId = 'living_room_window_vase';
 final _roomRugLayer = find.byKey(const ValueKey('roomRugLayer'));
 final _fixedRugImage = find.byKey(const ValueKey('roomFixedRugImage'));
 final _roundRugImage = find.byKey(
@@ -3204,6 +3397,12 @@ final _windowShelfDecorFurnitureLayer = find.byKey(
 );
 final _windowHangingDecorFurnitureLayer = find.byKey(
   const ValueKey('windowHangingDecorFurnitureLayer'),
+);
+final _initialFlowerImage = find.byKey(
+  const ValueKey('roomInitialFlowerImage'),
+);
+final _fixedVaseImage = find.image(
+  const AssetImage('assets/images/room/vase.png'),
 );
 
 Future<void> _pumpRouteTransition(WidgetTester tester) async {
@@ -3513,6 +3712,33 @@ const List<Furniture> _roomFurnitures = [
     size: 'large',
     slotIds: [_chairSlotId],
     imagePath: 'furniture/chair/rocking_chair.png',
+    initialAvailable: true,
+  ),
+  Furniture(
+    id: 'small_white_flower',
+    name: 'small white flower',
+    price: 10,
+    size: 'small',
+    slotIds: [_windowVaseSlotId],
+    imagePath: 'furniture/window/small_white_flower.png',
+    initialAvailable: true,
+  ),
+  Furniture(
+    id: 'blue_violet_flower',
+    name: 'blue violet flower',
+    price: 10,
+    size: 'small',
+    slotIds: [_windowVaseSlotId],
+    imagePath: 'furniture/window/blue_violet_flower.png',
+    initialAvailable: true,
+  ),
+  Furniture(
+    id: 'pale_yellow_flower',
+    name: 'pale yellow flower',
+    price: 10,
+    size: 'small',
+    slotIds: [_windowVaseSlotId],
+    imagePath: 'furniture/window/pale_yellow_flower.png',
     initialAvailable: true,
   ),
 ];
