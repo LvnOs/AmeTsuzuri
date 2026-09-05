@@ -17,6 +17,95 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
+  group('受取日の新しい順', () {
+    final letters = [
+      _letter('legacyA', '不明A'),
+      _letter('letter_20260930', '古い受取'),
+      _letter('legacyB', '不明B'),
+      _letter('letter_20260801', '新しい受取'),
+      _letter('letter_20260701', '同日後続'),
+    ];
+    final dates = <String, DateTime?>{
+      'letter_20260930': DateTime(2026, 8, 7),
+      'letter_20260801': DateTime(2026, 8, 9),
+      'letter_20260701': DateTime(2026, 8, 9),
+      'legacyA': null,
+      'legacyB': null,
+    };
+    for (final mode in ['dated', 'unknown', 'mixed']) {
+      testWidgets('$mode: 日付降順・同日元順・null後置を再生成後も維持する', (tester) async {
+        final selected = mode == 'dated'
+            ? letters.where((letter) => dates[letter.id] != null).toList()
+            : letters;
+        final received = {
+          for (final letter in selected)
+            letter.id: mode == 'unknown' ? null : dates[letter.id],
+        };
+        final expected = mode == 'unknown'
+            ? selected.map((letter) => letter.id).toList()
+            : [
+                'letter_20260801',
+                'letter_20260701',
+                'letter_20260930',
+                if (mode == 'mixed') ...['legacyA', 'legacyB'],
+              ];
+        final repository = _FakeLetterRepository(List.unmodifiable(selected));
+        for (var pass = 0; pass < 2; pass++) {
+          await _pumpBookshelf(
+            tester,
+            letterRepository: repository,
+            receivedLetters: received,
+          );
+          expect(_visibleLetterOrder(tester), expected);
+          final context = tester.element(find.byType(BookshelfPage));
+          await context.read<ReadLetterProvider>().load();
+          await tester.pumpAndSettle();
+          expect(_visibleLetterOrder(tester), expected);
+          expect(repository.letters, selected);
+          await tester.pumpWidget(const SizedBox.shrink());
+        }
+      });
+    }
+
+    testWidgets('詳細から戻っても順序・受取日・雫・瓶を変更しない', (tester) async {
+      await _pumpBookshelf(
+        tester,
+        letters: letters,
+        receivedLetters: dates,
+        rewardedCount: 31,
+      );
+      final context = tester.element(find.byType(BookshelfPage));
+      final read = context.read<ReadLetterProvider>();
+      final shizuku = context.read<ShizukuProvider>();
+      final beforeOrder = _visibleLetterOrder(tester);
+      final beforeDates = Map.of(read.receivedLetters);
+      final beforeDrops = shizuku.currentShizuku;
+      final beforeBottle = shizuku.bottleRecordCount;
+      await tester.tap(
+        find.byKey(const ValueKey('bookshelfLetterRow-letter_20260801')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(LetterPage), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(_visibleLetterOrder(tester), beforeOrder);
+      expect(read.receivedLetters, beforeDates);
+      expect(shizuku.currentShizuku, beforeDrops);
+      expect(shizuku.bottleRecordCount, beforeBottle);
+      expect(find.text('受取日不明'), findsNWidgets(2));
+    });
+
+    testWidgets('配達済みでも未読なら新着一覧に加えない', (tester) async {
+      await _pumpBookshelf(
+        tester,
+        letters: letters,
+        receivedLetters: {'legacyA': null},
+        deliveredLetters: {'2026-08-09': 'letter_20260801'},
+      );
+      expect(_visibleLetterOrder(tester), ['legacyA']);
+    });
+  });
+
   testWidgets('読了済みtutorial_001を一覧から通常LetterPageで再読できる', (tester) async {
     final readProvider = ReadLetterProvider(
       _FakeReadLetterRepository(
@@ -201,9 +290,7 @@ void main() {
     final rewardedIdsBefore = shizukuProvider.rewardedLetterIds;
     final fullBottleCountBefore = shizukuProvider.fullBottleCount;
 
-    await tester.tap(
-      find.byKey(const ValueKey('bookshelfLetterRow-letterA')),
-    );
+    await tester.tap(find.byKey(const ValueKey('bookshelfLetterRow-letterA')));
     await tester.pumpAndSettle();
 
     expect(find.byType(LetterPage), findsOneWidget);
@@ -259,10 +346,7 @@ void main() {
     });
 
     testWidgets('Repository失敗時は既存エラーを表示する', (tester) async {
-      await _pumpBookshelf(
-        tester,
-        letterRepository: _ErrorLetterRepository(),
-      );
+      await _pumpBookshelf(tester, letterRepository: _ErrorLetterRepository());
 
       expect(find.textContaining('手紙の読み込みに失敗しました'), findsOneWidget);
       expect(find.textContaining('test error'), findsOneWidget);
@@ -281,9 +365,7 @@ void main() {
         await _pumpBookshelf(
           tester,
           receivedLetters: {id: DateTime(2026, 8, 10)},
-          letters: [
-            _letter(id, 'とても長い題名を持つ雨の日に届いた一通の手紙について'),
-          ],
+          letters: [_letter(id, 'とても長い題名を持つ雨の日に届いた一通の手紙について')],
         );
 
         expect(find.byKey(const ValueKey('bookshelfPaper')), findsOneWidget);
@@ -328,7 +410,7 @@ void main() {
       final list = find.byKey(const ValueKey('bookshelfLetterList'));
       expect(list, findsOneWidget);
       await tester.scrollUntilVisible(
-        find.byKey(const ValueKey('bookshelfLetterRow-letter11')),
+        find.byKey(const ValueKey('bookshelfLetterRow-letter0')),
         250,
         scrollable: find.descendant(
           of: list,
@@ -336,7 +418,7 @@ void main() {
         ),
       );
       expect(
-        find.byKey(const ValueKey('bookshelfLetterRow-letter11')),
+        find.byKey(const ValueKey('bookshelfLetterRow-letter0')),
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);
@@ -349,11 +431,15 @@ Future<void> _pumpBookshelf(
   LetterRepository? letterRepository,
   List<Letter> letters = const [],
   Map<String, DateTime?> receivedLetters = const {},
+  Map<String, String> deliveredLetters = const {},
   int rewardedCount = 0,
 }) async {
   final readProvider = ReadLetterProvider(
     _FakeReadLetterRepository(
-      ReadLetterState(receivedLetters: receivedLetters),
+      ReadLetterState(
+        receivedLetters: receivedLetters,
+        deliveredLetters: deliveredLetters,
+      ),
     ),
   );
   final shizukuProvider = ShizukuProvider(
@@ -376,6 +462,17 @@ Future<void> _pumpBookshelf(
   );
   await tester.pump();
   await tester.pump();
+}
+
+List<String> _visibleLetterOrder(WidgetTester tester) {
+  return tester
+      .widgetList<InkWell>(find.byType(InkWell))
+      .map((widget) => widget.key)
+      .whereType<ValueKey<String>>()
+      .map((key) => key.value)
+      .where((key) => key.startsWith('bookshelfLetterRow-'))
+      .map((key) => key.substring('bookshelfLetterRow-'.length))
+      .toList();
 }
 
 Letter _letter(String id, String title) {

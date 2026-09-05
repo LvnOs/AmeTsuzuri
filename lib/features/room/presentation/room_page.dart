@@ -509,6 +509,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
 
   void _onTapPost() {
     if (_isArrivalAnimating) {
+      _completeArrivalAnimation();
       return;
     }
 
@@ -725,9 +726,17 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
   }
 
   void _onArrivalAnimationStatusChanged(AnimationStatus status) {
-    if (status == AnimationStatus.completed && mounted) {
-      setState(() => _isArrivalAnimating = false);
+    if (status == AnimationStatus.completed) {
+      _completeArrivalAnimation();
     }
+  }
+
+  void _completeArrivalAnimation() {
+    if (!mounted || !_isArrivalAnimating) return;
+
+    // Clear the flag before setting value: its status notification can reenter.
+    setState(() => _isArrivalAnimating = false);
+    _arrivalController.value = _arrivalController.upperBound;
   }
 
   Future<void> _onTapLetter() async {

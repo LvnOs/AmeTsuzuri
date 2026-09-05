@@ -2731,6 +2731,92 @@ void main() {
   });
 
   group('手紙の到着演出', () {
+    for (final milliseconds in [100, 1200, 3000, 4200, 4349, 4350]) {
+      testWidgets('${milliseconds}msでskipしても通常完了状態となり保存を増やさない', (tester) async {
+        final harness = await _pumpRoom(tester);
+        await tester.pump(Duration(milliseconds: milliseconds));
+        final received = Map.of(harness.readLetterProvider.receivedLetters);
+        final delivered = Map.of(harness.readLetterProvider.deliveredLetters);
+        final readSaves = harness.readLetterRepository.saveCallCount;
+        final rewardSaves = harness.shizukuRepository.saveCallCount;
+        final drops = harness.shizukuProvider.currentShizuku;
+        final bottle = harness.shizukuProvider.bottleRecordCount;
+        for (var i = 0; i < 3; i++) {
+          await tester.tap(find.byKey(const ValueKey('postTapArea')));
+        }
+        await tester.pump();
+        expect(_opacityForKey(tester, 'roomLetterLayer'), 1);
+        expect(find.byKey(const ValueKey('letterTapArea')), findsOneWidget);
+        expect(find.byKey(const ValueKey('postArrivalGlow')), findsNothing);
+        expect(find.byKey(const ValueKey('arrivalMovingLight')), findsNothing);
+        expect(find.byType(LetterPage), findsNothing);
+        await tester.pump(const Duration(seconds: 5));
+        expect(_opacityForKey(tester, 'roomLetterLayer'), 1);
+        expect(harness.readLetterProvider.receivedLetters, received);
+        expect(harness.readLetterProvider.deliveredLetters, delivered);
+        expect(harness.readLetterRepository.saveCallCount, readSaves);
+        expect(harness.shizukuRepository.saveCallCount, rewardSaves);
+        expect(harness.shizukuProvider.currentShizuku, drops);
+        expect(harness.shizukuProvider.bottleRecordCount, bottle);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    for (final tutorial in [false, true]) {
+      testWidgets('skip後の${tutorial ? 'tutorial' : '通常Letter'}は開封時だけ報酬を保存する', (
+        tester,
+      ) async {
+        final id = tutorial ? 'tutorial_001' : 'letterA';
+        final harness = await _pumpRoom(
+          tester,
+          letters: [_letter(id)],
+          initialShizukuState: const ShizukuState(
+            currentShizuku: 0,
+            rewardedLetterIds: {},
+          ),
+        );
+        await tester.tap(find.byKey(const ValueKey('postTapArea')));
+        await tester.pump();
+        await tester.pump();
+        if (tutorial) {
+          expect(
+            find.byKey(const ValueKey('tutorialLetterGlow')),
+            findsOneWidget,
+          );
+        }
+        expect(harness.shizukuProvider.rewardedLetterIds, isEmpty);
+        await _tapLetter(tester);
+        expect(find.byType(LetterPage), findsOneWidget);
+        expect(harness.shizukuProvider.currentShizuku, tutorial ? 30 : 10);
+        expect(harness.shizukuProvider.bottleRecordCount, 1);
+        expect(
+          harness.readLetterProvider.receivedDateFor(id),
+          DateTime(2026, 8, 7),
+        );
+        final readSaves = harness.readLetterRepository.saveCallCount;
+        await tester.pageBack();
+        await _pumpPastFiniteAnimations(tester);
+        if (tutorial) {
+          expect(
+            find.byKey(const ValueKey('tutorialBottleGlow')),
+            findsOneWidget,
+          );
+        }
+        await _tapLetter(tester);
+        expect(harness.shizukuRepository.saveCallCount, 1);
+        expect(harness.readLetterRepository.saveCallCount, readSaves);
+        expect(harness.shizukuProvider.bottleRecordCount, 1);
+      });
+    }
+
+    testWidgets('skip直後にRoomを破棄しても後続callbackの例外がない', (tester) async {
+      await _pumpRoom(tester);
+      await tester.tap(find.byKey(const ValueKey('postTapArea')));
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(seconds: 5));
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('既存の当日配達は演出なしで手紙とtapAreaを即表示する', (tester) async {
       await _pumpRoom(
         tester,
@@ -2778,7 +2864,7 @@ void main() {
       expect(find.byKey(const ValueKey('letterTapArea')), findsOneWidget);
     });
 
-    testWidgets('到着演出中のpostタップではメッセージを表示せず演出を継続する', (tester) async {
+    testWidgets('到着演出中のpostタップはSnackBarなしで完了し再tapは通常メッセージ', (tester) async {
       await _pumpRoom(tester);
       await tester.pump(const Duration(milliseconds: 1000));
 
@@ -2788,8 +2874,12 @@ void main() {
       await tester.pump();
 
       expect(find.text('ポストは、雨の中で静かに佇んでいます。'), findsNothing);
-      expect(find.byKey(const ValueKey('postArrivalGlow')), findsOneWidget);
-      expect(find.byKey(const ValueKey('letterTapArea')), findsNothing);
+      expect(find.byKey(const ValueKey('postArrivalGlow')), findsNothing);
+      expect(find.byKey(const ValueKey('letterTapArea')), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('postTapArea')));
+      await tester.pump();
+      expect(find.text('ポストは、雨の中で静かに佇んでいます。'), findsOneWidget);
 
       await tester.pump(const Duration(milliseconds: 3450));
 

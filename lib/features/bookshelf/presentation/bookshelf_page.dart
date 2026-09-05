@@ -108,6 +108,26 @@ class BookshelfPage extends StatelessWidget {
                               )
                               .toList();
 
+                          // Sort a display-only copy; delivery still uses YAML order.
+                          // Explicit indexes keep equal/unknown dates deterministic.
+                          final orderedLetters = readLetters.indexed.toList()
+                            ..sort((a, b) {
+                              final aDate = readLetterProvider.receivedDateFor(
+                                a.$2.id,
+                              );
+                              final bDate = readLetterProvider.receivedDateFor(
+                                b.$2.id,
+                              );
+                              if (aDate == null && bDate != null) return 1;
+                              if (aDate != null && bDate == null) return -1;
+                              final dateOrder = aDate == null || bDate == null
+                                  ? 0
+                                  : bDate.compareTo(aDate);
+                              return dateOrder != 0
+                                  ? dateOrder
+                                  : a.$1.compareTo(b.$1);
+                            });
+
                           if (readLetters.isEmpty) {
                             return const Center(
                               child: Text(
@@ -127,7 +147,7 @@ class BookshelfPage extends StatelessWidget {
                               color: _ruleColor,
                             ),
                             itemBuilder: (context, index) {
-                              final letter = readLetters[index];
+                              final letter = orderedLetters[index].$2;
 
                               return _BookshelfLetterRow(
                                 letterId: letter.id,
