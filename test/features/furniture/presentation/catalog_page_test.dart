@@ -225,6 +225,251 @@ const _multiSlotFurniture = Furniture(
 );
 
 void main() {
+  group('v0.3.8 配置説明', () {
+    testWidgets('公開17家具の場所名は本番slot定義と一致する', (tester) async {
+      final furnitures = (await FurnitureRepository().getAll())
+          .where((furniture) => furniture.initialAvailable)
+          .toList();
+      expect(furnitures, hasLength(17));
+      final repository = PlacementSlotRepository();
+      for (final furniture in furnitures) {
+        final names = <String>[];
+        for (final id in furniture.slotIds) {
+          names.add((await repository.getById(id))!.name);
+        }
+        await _pumpCatalog(
+          tester,
+          furnitures: [furniture],
+          placementSlotRepository: repository,
+        );
+        final text = tester.widget<Text>(
+          find.byKey(ValueKey('catalogPlacementNames-${furniture.id}')),
+        );
+        expect(text.data, '置き場所：${names.join('／')}');
+        expect(text.maxLines, isNull);
+        expect(text.overflow, isNot(TextOverflow.ellipsis));
+        await tester.pumpWidget(const SizedBox.shrink());
+      }
+    });
+
+    for (final entry in {
+      _smallWhiteFlower: '花瓶はそのままで、現在の花と入れ替わります。',
+      _woodenChair: '現在の椅子と入れ替わります。',
+      _roundRug: '現在のラグと入れ替わります。',
+      _woodenMug: '選んだ場所に家具がある場合は、入れ替えて置きます。',
+      _windChime: '選んだ場所に家具がある場合は、入れ替えて置きます。',
+      _smallHouseplant: '選んだ場所に家具がある場合は、入れ替えて置きます。',
+    }.entries) {
+      testWidgets('${entry.key.id}の購入前に配置先・交換・後日配置を伝える', (tester) async {
+        final furniture = entry.key;
+        final harness = await _pumpCatalog(tester, furnitures: [furniture]);
+        await tester.tap(_furnitureTile(furniture.name));
+        await tester.pumpAndSettle();
+        final description = tester
+            .widget<Text>(
+              find.byKey(const ValueKey('purchasePlacementDescription')),
+            )
+            .data!;
+        expect(description, contains(entry.value));
+        for (final id in furniture.slotIds) {
+          final slot = await _FakePlacementSlotRepository().getById(id);
+          expect(description, contains(slot!.name));
+        }
+        expect(find.text('配置はあとからでもできます。'), findsOneWidget);
+        expect(description, isNot(contains('追加型')));
+        expect(description, isNot(contains('交換型')));
+        await tester.tap(find.text('やめる'));
+        await tester.pumpAndSettle();
+        expect(harness.shizukuProvider.currentShizuku, 100);
+        expect(harness.catalogProvider.isPurchased(furniture.id), isFalse);
+      });
+    }
+
+    for (final furniture in [_smallWhiteFlower, _woodenChair, _roundRug]) {
+      testWidgets('${furniture.id}の初期Assetを空き扱いせず自分の配置も区別する', (tester) async {
+        final harness = await _pumpCatalog(
+          tester,
+          furnitures: [furniture],
+          purchasedFurnitureIds: {furniture.id},
+        );
+        await tester.tap(_furnitureTile(furniture.name));
+        await tester.pumpAndSettle();
+        final stateFinder = find.byKey(
+          ValueKey('placementState-${furniture.slotIds.single}'),
+        );
+        expect(tester.widget<Text>(stateFinder).data, contains('入れ替わります'));
+        expect(find.text('空いています'), findsNothing);
+        if (furniture == _smallWhiteFlower) {
+          expect(tester.widget<Text>(stateFinder).data, contains('花瓶はそのまま'));
+        }
+        await tester.tap(find.text('キャンセル'));
+        await tester.pumpAndSettle();
+        await harness.placedFurnitureProvider.place(
+          slotId: furniture.slotIds.single,
+          furnitureId: furniture.id,
+          isPurchased: true,
+          allowedSlotIds: furniture.slotIds,
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(_furnitureTile(furniture.name));
+        await tester.pumpAndSettle();
+        expect(tester.widget<Text>(stateFinder).data, '現在ここに配置中');
+        expect(find.textContaining('家具あり'), findsNothing);
+      });
+    }
+
+    testWidgets('空き・自分・別家具を区別し移動先の確認と所有状態を維持する', (tester) async {
+      final harness = await _pumpCatalog(
+        tester,
+        openAsRoute: true,
+        furnitures: const [_woodenMug, _inkBottle],
+        purchasedFurnitureIds: const {'wooden_mug', 'ink_bottle'},
+        placedFurnitureIds: const {_deskSurfaceLeftSlotId: 'wooden_mug'},
+      );
+      await tester.tap(_furnitureTile(_woodenMug.name));
+      await tester.pumpAndSettle();
+      expect(find.text('現在ここに配置中'), findsOneWidget);
+      expect(find.text('空いています'), findsOneWidget);
+      await tester.tap(find.text('キャンセル'));
+      await tester.pumpAndSettle();
+      await harness.placedFurnitureProvider.place(
+        slotId: _deskSurfaceRightSlotId,
+        furnitureId: 'ink_bottle',
+        isPurchased: true,
+        allowedSlotIds: _inkBottle.slotIds,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(_furnitureTile(_woodenMug.name));
+      await tester.pumpAndSettle();
+      expect(find.text('現在ここに配置中'), findsOneWidget);
+      expect(find.text('家具あり・入れ替え'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('placementOption-$_deskSurfaceRightSlotId')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('置き換える'), findsOneWidget);
+      await tester.tap(find.text('置き換える'));
+      await tester.pumpAndSettle();
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, {
+        _deskSurfaceRightSlotId: 'wooden_mug',
+      });
+      expect(harness.catalogProvider.isPurchased('ink_bottle'), isTrue);
+    });
+
+    testWidgets('場所名の失敗でも購入でき配置時は既存Repositoryから再取得する', (tester) async {
+      final repository = _FailOncePlacementSlotRepository();
+      final harness = await _pumpCatalog(
+        tester,
+        furnitures: const [_woodenMug],
+        placementSlotRepository: repository,
+        blockPurchase: false,
+      );
+      expect(
+        find.byKey(const ValueKey('catalogPlacementNames-wooden_mug')),
+        findsNothing,
+      );
+      await _buyFurniture(tester, _woodenMug.name);
+      expect(find.text('机（左）に置く'), findsOneWidget);
+      expect(harness.catalogProvider.isPurchased('wooden_mug'), isTrue);
+      await tester.tap(find.text('キャンセル'));
+      await tester.pumpAndSettle();
+      expect(harness.shizukuProvider.currentShizuku, 70);
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, isEmpty);
+    });
+
+    testWidgets('名前読み込み待ちでも購入確認を開け完了時に説明を更新する', (tester) async {
+      final repository = _DelayedPlacementSlotRepository();
+      final harness = await _pumpCatalog(
+        tester,
+        furnitures: const [_woodenMug, _inkBottle],
+        placementSlotRepository: repository,
+      );
+      await tester.tap(_furnitureTile(_woodenMug.name));
+      await tester.pumpAndSettle();
+      expect(find.text('迎える'), findsOneWidget);
+      repository.ready.complete();
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(const ValueKey('purchasePlacementDescription')),
+            )
+            .data,
+        contains('机（左）または机（右）'),
+      );
+      await tester.tap(find.text('やめる'));
+      await tester.pumpAndSettle();
+      await harness.placedFurnitureProvider.remove('wooden_mug');
+      await tester.pumpAndSettle();
+      expect(repository.calls, {
+        _deskSurfaceLeftSlotId: 1,
+        _deskSurfaceRightSlotId: 1,
+      });
+    });
+
+    for (final size in [const Size(320, 640), const Size(390, 700)]) {
+      for (final scale in [1.0, 1.5]) {
+        testWidgets('${size.width}px・文字倍率$scaleで一覧・購入・配置を操作できる', (
+          tester,
+        ) async {
+          tester.view.physicalSize = size;
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          await _pumpCatalog(
+            tester,
+            textScale: scale,
+            furnitures: const [
+              _woodenMug,
+              _windChime,
+              _longNameFurniture,
+              _smallWhiteFlower,
+            ],
+            purchasedFurnitureIds: const {'long_name_furniture', 'wind_chime'},
+            placedFurnitureIds: const {_windowHangingDecorSlotId: 'wind_chime'},
+            blockPurchase: false,
+          );
+          for (final furniture in [
+            _woodenMug,
+            _windChime,
+            _longNameFurniture,
+            _smallWhiteFlower,
+          ]) {
+            final row = find.byKey(
+              ValueKey('catalogFurnitureRow-${furniture.id}'),
+            );
+            await tester.scrollUntilVisible(
+              row,
+              120,
+              scrollable: find.descendant(
+                of: find.byKey(const ValueKey('catalogFurnitureList')),
+                matching: find.byType(Scrollable),
+              ),
+            );
+            final location = tester.widget<Text>(
+              find.byKey(ValueKey('catalogPlacementNames-${furniture.id}')),
+            );
+            expect(location.maxLines, isNull);
+            expect(tester.takeException(), isNull);
+          }
+          await tester.tap(_furnitureTile(_smallWhiteFlower.name));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          await tester.tap(find.text('迎える'));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('placementState-$_windowVaseSlotId')),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+          await tester.tap(find.text('キャンセル'));
+          await tester.pumpAndSettle();
+          expect(find.text('配置する'), findsWidgets);
+        });
+      }
+    }
+  });
+
   group('一輪挿しの花', () {
     testWidgets('3種類を10滴商品として表示する', (tester) async {
       await _pumpCatalog(tester, furnitures: _flowers);
@@ -1682,6 +1927,8 @@ Future<_CatalogHarness> _pumpCatalog(
   bool failNextShizukuSave = false,
   bool loadShizukuProvider = true,
   bool loadCatalogProvider = true,
+  PlacementSlotRepository? placementSlotRepository,
+  double textScale = 1,
   int initialShizuku = 100,
   Map<String, String> placedFurnitureIds = const {},
   Set<String> purchasedFurnitureIds = const {'furniture_c'},
@@ -1710,7 +1957,8 @@ Future<_CatalogHarness> _pumpCatalog(
   final catalogPage = CatalogPage(
     showTutorialGuide: showTutorialGuide,
     furnitureRepository: _FakeFurnitureRepository(furnitures),
-    placementSlotRepository: _FakePlacementSlotRepository(),
+    placementSlotRepository:
+        placementSlotRepository ?? _FakePlacementSlotRepository(),
   );
 
   await tester.pumpWidget(
@@ -1721,6 +1969,12 @@ Future<_CatalogHarness> _pumpCatalog(
         ChangeNotifierProvider.value(value: placedFurnitureProvider),
       ],
       child: MaterialApp(
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
         home: openAsRoute
             ? _CatalogRouteHost(catalogPage: catalogPage)
             : catalogPage,
@@ -1830,6 +2084,28 @@ class _FakePlacementSlotRepository extends PlacementSlotRepository {
     type: 'surface',
     maxItems: 1,
   );
+}
+
+class _FailOncePlacementSlotRepository extends _FakePlacementSlotRepository {
+  final Set<String> _requested = {};
+
+  @override
+  Future<PlacementSlot?> getById(String slotId) async {
+    if (_requested.add(slotId)) throw StateError('optional names unavailable');
+    return super.getById(slotId);
+  }
+}
+
+class _DelayedPlacementSlotRepository extends _FakePlacementSlotRepository {
+  final ready = Completer<void>();
+  final Map<String, int> calls = {};
+
+  @override
+  Future<PlacementSlot?> getById(String slotId) async {
+    calls.update(slotId, (value) => value + 1, ifAbsent: () => 1);
+    await ready.future;
+    return super.getById(slotId);
+  }
 }
 
 class _FakePurchasedFurnitureRepository extends PurchasedFurnitureRepository {

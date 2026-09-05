@@ -37,6 +37,8 @@ class _CatalogPageState extends State<CatalogPage> {
   late final PlacementSlotRepository _placementSlotRepository;
 
   late final Future<List<Furniture>> _furnituresFuture;
+  late final Future<void> _placementNamesFuture;
+  final Map<String, PlacementSlot> _placementSlots = {};
   bool _hasScheduledTutorialGuide = false;
 
   @override
@@ -47,7 +49,73 @@ class _CatalogPageState extends State<CatalogPage> {
     _placementSlotRepository =
         widget.placementSlotRepository ?? PlacementSlotRepository();
     _furnituresFuture = _furnitureRepository.getAll();
+    _placementNamesFuture = _loadPlacementNames();
     _scheduleTutorialGuide();
+  }
+
+  Future<void> _loadPlacementNames() async {
+    try {
+      final furnitures = await _furnituresFuture;
+      final slotIds = furnitures
+          .where((furniture) => furniture.initialAvailable)
+          .expand((furniture) => furniture.slotIds)
+          .toSet();
+      await Future.wait(
+        slotIds.map((id) async {
+          try {
+            final slot = await _placementSlotRepository.getById(id);
+            if (slot != null) _placementSlots[id] = slot;
+          } catch (_) {
+            // Optional descriptions must not block the existing catalog flow.
+          }
+        }),
+      );
+      if (mounted) setState(() {});
+    } catch (_) {
+      // Furniture loading errors are already displayed by the catalog.
+    }
+  }
+
+  List<String>? _placementNames(Furniture furniture) {
+    if (furniture.slotIds.isEmpty ||
+        furniture.slotIds.any((id) => !_placementSlots.containsKey(id))) {
+      return null;
+    }
+    return furniture.slotIds.map((id) => _placementSlots[id]!.name).toList();
+  }
+
+  // These three slots replace Room's fixed initial assets (v0.3.7).
+  // PlacementSlot.name remains the only source of placement names.
+  static String? _initialReplacementText(String slotId) => switch (slotId) {
+    'living_room_chair' => '現在の椅子と入れ替わります。',
+    'living_room_floor_rug' => '現在のラグと入れ替わります。',
+    'living_room_window_vase' => '花瓶はそのままで、現在の花と入れ替わります。',
+    _ => null,
+  };
+
+  String _purchasePlacementText(Furniture furniture) {
+    final names = _placementNames(furniture);
+    final replacement = furniture.slotIds.length == 1
+        ? _initialReplacementText(furniture.slotIds.single)
+        : null;
+    final location = names == null
+        ? ''
+        : '${names.join('または')}に${furniture.slotIds.singleOrNull == 'living_room_window_vase' ? '飾ります' : '置けます'}。\n';
+    return '$location${replacement ?? '選んだ場所に家具がある場合は、入れ替えて置きます。'}';
+  }
+
+  static String _placementStateText(
+    String slotId,
+    String furnitureId,
+    Map<String, String> placedFurnitureIds,
+  ) {
+    final occupant = placedFurnitureIds[slotId];
+    if (occupant == furnitureId) return '現在ここに配置中';
+    final replacement = _initialReplacementText(slotId);
+    if (occupant != null) {
+      return replacement == null ? '家具あり・入れ替え' : '家具あり・入れ替え\n$replacement';
+    }
+    return replacement ?? '空いています';
   }
 
   void _scheduleTutorialGuide() {
@@ -200,6 +268,7 @@ class _CatalogPageState extends State<CatalogPage> {
                               return _CatalogFurnitureRow(
                                 index: index,
                                 furniture: furniture,
+                                placementNames: _placementNames(furniture),
                                 isPurchased: isPurchased,
                                 isPlaced: isPlaced,
                                 isPurchasing: isPurchasing,
@@ -258,7 +327,24 @@ class _CatalogPageState extends State<CatalogPage> {
       builder: (dialogContext) {
         return AlertDialog(
           title: Text(furniture.name),
-          content: Text('${furniture.price}滴で迎えますか？'),
+          scrollable: true,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${furniture.price}滴で迎えますか？'),
+              const SizedBox(height: 16),
+              FutureBuilder<void>(
+                future: _placementNamesFuture,
+                builder: (context, snapshot) => Text(
+                  _purchasePlacementText(furniture),
+                  key: const ValueKey('purchasePlacementDescription'),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text('配置はあとからでもできます。'),
+            ],
+          ),
           actions: [
             TextButton(
               onPressed: () {
@@ -385,10 +471,26 @@ class _CatalogPageState extends State<CatalogPage> {
                             : Icons.chair_outlined,
                         size: 20,
                       ),
-                      label: Text(
-                        '${slot.name}に置く',
-                        textAlign: TextAlign.center,
-                        softWrap: true,
+                      label: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${slot.name}に置く',
+                            textAlign: TextAlign.center,
+                            softWrap: true,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _placementStateText(
+                              slot.id,
+                              furniture.id,
+                              placedFurnitureProvider.placedFurnitureIds,
+                            ),
+                            key: ValueKey('placementState-${slot.id}'),
+                            textAlign: TextAlign.center,
+                            style: Theme.of(dialogContext).textTheme.bodySmall,
+                          ),
+                        ],
                       ),
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size.fromHeight(48),
@@ -512,6 +614,7 @@ class _CatalogFurnitureRow extends StatelessWidget {
   const _CatalogFurnitureRow({
     required this.index,
     required this.furniture,
+    required this.placementNames,
     required this.isPurchased,
     required this.isPlaced,
     required this.isPurchasing,
@@ -520,6 +623,7 @@ class _CatalogFurnitureRow extends StatelessWidget {
 
   final int index;
   final Furniture furniture;
+  final List<String>? placementNames;
   final bool isPurchased;
   final bool isPlaced;
   final bool isPurchasing;
@@ -569,6 +673,19 @@ class _CatalogFurnitureRow extends StatelessWidget {
                       height: 1.3,
                     ),
                   ),
+                  if (placementNames != null) ...[
+                    const SizedBox(height: 5),
+                    Text(
+                      '置き場所：${placementNames!.join('／')}',
+                      key: ValueKey('catalogPlacementNames-${furniture.id}'),
+                      softWrap: true,
+                      style: const TextStyle(
+                        color: _CatalogPageState._secondaryInkColor,
+                        fontSize: 13,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 7),
                   Row(
                     children: [
