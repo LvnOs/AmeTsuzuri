@@ -1,55 +1,71 @@
-# Project Agent Instructions
+# Repository instructions
 
-This file applies to the entire repository.
+- ユーザーへの報告は、指定がなければ日本語で行う。
+- 既存の無関係な変更を保持し、依頼範囲外の機能・データ・リファクタリングを行わない。
+- 既存の実装パターンを優先し、プロトタイプ段階では過剰設計や不要な依存追加を避ける。
+- 完了報告には、変更ファイル、主な変更内容、実際に実行した検証コマンドを記載する。
 
-## Communication
+## Product principles
 
-- Communicate with the user in Japanese unless they request another language.
-- When reporting completed implementation work, state the changed files and the
-  verification commands that were actually run, including failures or omitted
-  checks. Do not describe an unexecuted check as successful.
-- If an unexpected stop, unexplained delay, process conflict, environment issue,
-  or unusual retry occurs while executing a task, append the following section at
-  the very end of the final report. Omit the section when none occurred.
-- Time spent waiting only for explicit user approval is not an unexpected stop.
+「雨つづり。」は、雨の日を少し楽しみにするための、静かな世界観を重視したアプリである。
 
-```text
-## 想定外の停止事項
+- 世界観を壊す一般的なアプリUIを安易に追加しない。
+- ただし、雰囲気のために操作性や理解しやすさを犠牲にしている場合は、その問題を明示する。
+- UI変更では「世界観」と「初見でも操作を理解できること」の両立を重視する。
+- 大規模な機能追加より、仮説を検証できる小さな変更を優先する。
+
+## Architecture
+
+Flutterアプリで、状態管理は `provider` の `ChangeNotifier`、永続化はRepository経由の `shared_preferences`、コンテンツ定義は `assets/data/*.yaml` と `assets/letters/*.md` を使用する。
+
+永続状態の形式を変更するときは、既存のバージョン管理・旧キーからの移行処理との互換性を維持する。
+
+## Product invariants
+
+- 1日につき配達される手紙は最大1通。
+- 初回はチュートリアル用の手紙を優先する。
+- 通常手紙は未読状態、季節、天気、YAML上の優先順位によって選択される。
+- 手紙報酬は同じ手紙について重複して獲得できない。
+- 瓶の進捗と現在の雫残高は別の概念として扱う。
+- チュートリアルは手紙、雫、家具購入・配置、本棚にまたがる横断フローであるため、関連機能を変更するときはフロー全体への影響を確認する。
+- 家具マスターには将来用の非公開家具が意図的に含まれるため、未使用やアセット不足だけを理由に削除しない。
+- YAMLやアセットを変更するときは、関連するMarkdown、画像パス、配置スロットID、`pubspec.yaml` のアセット登録との整合を確認する。
+
+具体的な配信条件、報酬値、保存形式、データスキーマなどは、AGENTS.mdの記述より現在の実装・テスト・`assets/data/*.yaml`を正とする。
+
+## Validation
+
+変更範囲に対応するテストを先に実行し、完了前には原則として以下を実行する。
+
+```
+flutter analyze
+flutter test
+```
+
+UI・アニメーション・非同期処理を変更した場合は、関連するWidgetテストへの影響も確認する。
+
+Flutter SDKは `C:\Develop\flutter` にあり、CLI検証ではワークスペース外のSDKキャッシュへの書き込み権限が必要になる場合がある。
+
+Flutter/Dartプロセス競合時は、用途を確認せずに関連プロセスを一括終了しない。
+
+## Unexpected blockers
+
+作業中に想定外の停止・長時間の待機・同じ失敗の反復が発生した場合、原因不明のまま同じ操作を繰り返さない。
+
+以下の場合は、作業を続ける前に状況を整理して報告する。
+
+- コマンドやプロセスが通常より明らかに長時間完了しない
+- 同じ操作・テスト・ブラウザ操作が繰り返し失敗する
+- 環境・権限・外部ツールの問題により、本来の作業を進められない
+- 追加調査が必要で、当初の依頼範囲を大きく超えそうな場合
+
+ユーザーからの明示的な承認を待っている時間は、想定外の停止には含めない。
+
+報告する場合は以下の形式を使用する。
+
+### 想定外の停止事項
 
 - 発生内容：
 - 影響：
 - 暫定対応：
 - 別途調査が必要な事項：
-```
-
-## Flutter and Dart Commands
-
-- The Flutter SDK is installed at `C:\Develop\flutter`, outside the normal
-  workspace-write sandbox. Flutter CLI startup can require writes under the SDK
-  cache even for commands such as `flutter --version`.
-- Run Flutter validation commands with the required external-write permission
-  from the outset when the execution environment requires it. A sandboxed
-  Flutter command that produces no output may be blocked on SDK cache access; do
-  not immediately treat it as a test or source-code failure.
-- Do not persist `FLUTTER_ALREADY_LOCKED=true` as a user or system environment
-  variable. Do not use it as the default workaround for startup problems.
-- The mere presence of `C:\Develop\flutter\bin\cache\lockfile` does not prove a
-  live lock conflict. Confirm the owning process or command line before acting.
-- VS Code may legitimately run the Flutter debug adapter, `flutter run`, the Dart
-  analysis server, frontend server, and DDS. Do not terminate all Dart or Flutter
-  processes indiscriminately. Identify and stop only a demonstrably stale or
-  conflicting process when necessary.
-- Direct Dart commands may also attempt to write analytics or cache data outside
-  the workspace. If that is blocked, use an approved execution context or a
-  task-scoped writable location; do not change global user settings without the
-  user's request.
-
-## Repository Safety
-
-- Preserve pre-existing and unrelated working-tree changes. Inspect the current
-  diff before editing overlapping files, and never discard user changes to make
-  tests pass.
-- Keep implementation scope aligned with the user's request. Do not broaden a
-  focused UI or behavior change into unrelated Weather, Letter, Room, tutorial,
-  asset, or data changes without explicit authorization.
-- Use `apply_patch` for hand-authored file changes.
