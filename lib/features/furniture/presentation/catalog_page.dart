@@ -90,6 +90,7 @@ class _CatalogPageState extends State<CatalogPage> {
     'living_room_chair' => '現在の椅子と入れ替わります。',
     'living_room_floor_rug' => '現在のラグと入れ替わります。',
     'living_room_window_vase' => '花瓶はそのままで、現在の花と入れ替わります。',
+    'living_room_window_curtain' => '現在のカーテンと入れ替わります。',
     _ => null,
   };
 

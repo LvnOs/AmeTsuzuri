@@ -8,6 +8,7 @@ const _windowShelfDecorSlotId = 'living_room_window_shelf_decor';
 const _windowHangingDecorSlotId = 'living_room_window_hanging_decor';
 const _floorRugSlotId = 'living_room_floor_rug';
 const _chairSlotId = 'living_room_chair';
+const _curtainSlotId = 'living_room_window_curtain';
 const _windowVaseSlotId = 'living_room_window_vase';
 const _deskFurnitureIds = {'wooden_mug', 'ink_bottle', 'wooden_fox_figure'};
 const _windowFurnitureIds = {
@@ -21,11 +22,18 @@ const _flowerFurnitureIds = {
   'blue_violet_flower',
   'pale_yellow_flower',
 };
+const _curtainFurnitureIds = {
+  'white_linen_curtains',
+  'beige_curtains',
+  'deep_green_curtains',
+  'rain_blue_curtains',
+};
 const _publicFurnitureIds = {
   ..._deskFurnitureIds,
   ..._windowFurnitureIds,
   ..._hangingFurnitureIds,
   ..._flowerFurnitureIds,
+  ..._curtainFurnitureIds,
   'round_rug',
   'rectangular_rug',
   'wooden_chair',
@@ -176,7 +184,37 @@ void main() {
       expect(teaCup.initialAvailable, isFalse);
       expect(teaCup.slotIds, isNotEmpty);
     });
-    test('chair 3種は70雫でchair slotだけに配置できる', () {
+    test('公開カーテン4種は70滴でカーテンslotだけに配置できる', () {
+      const expected = {
+        'white_linen_curtains': (
+          '白いリネンのカーテン',
+          'furniture/curtain/white_linen_curtains.png',
+        ),
+        'beige_curtains': ('ベージュのカーテン', 'furniture/curtain/beige_curtains.png'),
+        'deep_green_curtains': (
+          '深緑のカーテン',
+          'furniture/curtain/deep_green_curtains.png',
+        ),
+        'rain_blue_curtains': (
+          '雨色のカーテン',
+          'furniture/curtain/rain_blue_curtains.png',
+        ),
+      };
+
+      for (final entry in expected.entries) {
+        final furniture = furnitures.singleWhere(
+          (item) => item.id == entry.key,
+        );
+        expect(furniture.name, entry.value.$1, reason: entry.key);
+        expect(furniture.price, 70, reason: entry.key);
+        expect(furniture.size, 'large', reason: entry.key);
+        expect(furniture.initialAvailable, isTrue, reason: entry.key);
+        expect(furniture.slotIds, const [_curtainSlotId], reason: entry.key);
+        expect(furniture.imagePath, entry.value.$2, reason: entry.key);
+      }
+    });
+
+    test('chair 3種は50滴でchair slotだけに配置できる', () {
       const expected = {
         'wooden_chair': ('木製チェア', 'furniture/chair/wooden_chair.png'),
         'cushioned_chair': (
@@ -191,7 +229,7 @@ void main() {
           (item) => item.id == entry.key,
         );
         expect(furniture.name, entry.value.$1, reason: entry.key);
-        expect(furniture.price, 70, reason: entry.key);
+        expect(furniture.price, 50, reason: entry.key);
         expect(furniture.size, 'large', reason: entry.key);
         expect(furniture.initialAvailable, isTrue, reason: entry.key);
         expect(furniture.slotIds, const [_chairSlotId], reason: entry.key);

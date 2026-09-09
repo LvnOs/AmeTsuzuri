@@ -394,39 +394,39 @@ furniture:
 
   - id: white_linen_curtains
     name: 白いリネンのカーテン
-    price: 100
+    price: 70
     size: large
     slots:
       - living_room_window_curtain
     image: furniture/curtain/white_linen_curtains.png
-    initial_available: false
+    initial_available: true
 
   - id: beige_curtains
     name: ベージュのカーテン
-    price: 100
+    price: 70
     size: large
     slots:
       - living_room_window_curtain
     image: furniture/curtain/beige_curtains.png
-    initial_available: false
+    initial_available: true
 
   - id: deep_green_curtains
     name: 深緑のカーテン
-    price: 100
+    price: 70
     size: large
     slots:
       - living_room_window_curtain
     image: furniture/curtain/deep_green_curtains.png
-    initial_available: false
+    initial_available: true
 
   - id: rain_blue_curtains
     name: 雨色のカーテン
-    price: 100
+    price: 70
     size: large
     slots:
       - living_room_window_curtain
     image: furniture/curtain/rain_blue_curtains.png
-    initial_available: false
+    initial_available: true
 
   - id: wooden_stand_lamp
     name: 木製スタンドランプ
@@ -502,7 +502,7 @@ furniture:
 
   - id: wooden_chair
     name: 木製チェア
-    price: 70
+    price: 50
     size: large
     slots:
       - living_room_chair
@@ -511,7 +511,7 @@ furniture:
 
   - id: cushioned_chair
     name: クッション付きチェア
-    price: 70
+    price: 50
     size: large
     slots:
       - living_room_chair
@@ -520,7 +520,7 @@ furniture:
 
   - id: rocking_chair
     name: ロッキングチェア
-    price: 70
+    price: 50
     size: large
     slots:
       - living_room_chair

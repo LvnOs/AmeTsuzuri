@@ -22,6 +22,7 @@ const _windowShelfDecorSlotId = 'living_room_window_shelf_decor';
 const _windowHangingDecorSlotId = 'living_room_window_hanging_decor';
 const _floorRugSlotId = 'living_room_floor_rug';
 const _chairSlotId = 'living_room_chair';
+const _curtainSlotId = 'living_room_window_curtain';
 const _windowVaseSlotId = 'living_room_window_vase';
 
 const _furnitureA = Furniture(
@@ -162,10 +163,46 @@ const _rectangularRug = Furniture(
 const _woodenChair = Furniture(
   id: 'wooden_chair',
   name: '木製チェア',
-  price: 70,
+  price: 50,
   size: 'large',
   slotIds: [_chairSlotId],
   imagePath: 'furniture/chair/wooden_chair.png',
+  initialAvailable: true,
+);
+const _whiteLinenCurtains = Furniture(
+  id: 'white_linen_curtains',
+  name: '白いリネンのカーテン',
+  price: 70,
+  size: 'large',
+  slotIds: [_curtainSlotId],
+  imagePath: 'furniture/curtain/white_linen_curtains.png',
+  initialAvailable: true,
+);
+const _beigeCurtains = Furniture(
+  id: 'beige_curtains',
+  name: 'ベージュのカーテン',
+  price: 70,
+  size: 'large',
+  slotIds: [_curtainSlotId],
+  imagePath: 'furniture/curtain/beige_curtains.png',
+  initialAvailable: true,
+);
+const _deepGreenCurtains = Furniture(
+  id: 'deep_green_curtains',
+  name: '深緑のカーテン',
+  price: 70,
+  size: 'large',
+  slotIds: [_curtainSlotId],
+  imagePath: 'furniture/curtain/deep_green_curtains.png',
+  initialAvailable: true,
+);
+const _rainBlueCurtains = Furniture(
+  id: 'rain_blue_curtains',
+  name: '雨色のカーテン',
+  price: 70,
+  size: 'large',
+  slotIds: [_curtainSlotId],
+  imagePath: 'furniture/curtain/rain_blue_curtains.png',
   initialAvailable: true,
 );
 const _smallWhiteFlower = Furniture(
@@ -226,11 +263,11 @@ const _multiSlotFurniture = Furniture(
 
 void main() {
   group('v0.3.8 配置説明', () {
-    testWidgets('公開17家具の場所名は本番slot定義と一致する', (tester) async {
+    testWidgets('公開21家具の場所名は本番slot定義と一致する', (tester) async {
       final furnitures = (await FurnitureRepository().getAll())
           .where((furniture) => furniture.initialAvailable)
           .toList();
-      expect(furnitures, hasLength(17));
+      expect(furnitures, hasLength(21));
       final repository = PlacementSlotRepository();
       for (final furniture in furnitures) {
         final names = <String>[];
@@ -591,12 +628,12 @@ void main() {
   });
 
   group('chair furniture', () {
-    testWidgets('70雫で購入してchair slotだけへ配置できる', (tester) async {
+    testWidgets('50雫で購入してchair slotだけへ配置できる', (tester) async {
       final harness = await _pumpCatalog(
         tester,
         openAsRoute: true,
         blockPurchase: false,
-        initialShizuku: 70,
+        initialShizuku: 50,
         purchasedFurnitureIds: const {},
         furnitures: const [_woodenChair],
       );
@@ -621,6 +658,73 @@ void main() {
 
       expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
         _chairSlotId: 'wooden_chair',
+      });
+    });
+  });
+
+  group('curtain furniture', () {
+    testWidgets('4種を70滴・カーテンの置き場所付きで公開する', (tester) async {
+      await _pumpCatalog(
+        tester,
+        furnitures: const [
+          _whiteLinenCurtains,
+          _beigeCurtains,
+          _deepGreenCurtains,
+          _rainBlueCurtains,
+        ],
+      );
+
+      for (final furniture in const [
+        _whiteLinenCurtains,
+        _beigeCurtains,
+        _deepGreenCurtains,
+        _rainBlueCurtains,
+      ]) {
+        expect(_furnitureTile(furniture.name), findsOneWidget);
+      }
+
+      await tester.tap(_furnitureTile(_whiteLinenCurtains.name));
+      await tester.pumpAndSettle();
+      expect(find.text('70滴で迎えますか？'), findsOneWidget);
+      final description = tester
+          .widget<Text>(
+            find.byKey(const ValueKey('purchasePlacementDescription')),
+          )
+          .data!;
+      expect(description, contains('カーテンに置けます。'));
+      expect(description, contains('現在のカーテンと入れ替わります。'));
+    });
+
+    testWidgets('初期カーテンを空きと誤認させず、購入後に配置できる', (tester) async {
+      final harness = await _pumpCatalog(
+        tester,
+        openAsRoute: true,
+        blockPurchase: false,
+        initialShizuku: 70,
+        purchasedFurnitureIds: const {},
+        furnitures: const [_whiteLinenCurtains],
+      );
+
+      await _buyFurniture(tester, _whiteLinenCurtains.name);
+
+      expect(
+        harness.catalogProvider.isPurchased(_whiteLinenCurtains.id),
+        isTrue,
+      );
+      expect(harness.shizukuProvider.currentShizuku, 0);
+      expect(
+        find.byKey(const ValueKey('placementOption-$_curtainSlotId')),
+        findsOneWidget,
+      );
+      expect(find.text('現在のカーテンと入れ替わります。'), findsOneWidget);
+      expect(find.text('空いています'), findsNothing);
+
+      await tester.tap(
+        find.byKey(const ValueKey('placementOption-$_curtainSlotId')),
+      );
+      await tester.pumpAndSettle();
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _curtainSlotId: 'white_linen_curtains',
       });
     });
   });
@@ -2076,6 +2180,7 @@ class _FakePlacementSlotRepository extends PlacementSlotRepository {
       _windowShelfDecorSlotId => '窓際（棚）',
       _windowHangingDecorSlotId => '窓際（吊り飾り）',
       _floorRugSlotId => 'ラグ',
+      _curtainSlotId => 'カーテン',
       _windowVaseSlotId => '窓際（一輪挿し）',
       'slot_a' => '窓辺',
       'long_slot' => 'とても長い名前の配置場所',

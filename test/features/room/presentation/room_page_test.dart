@@ -129,6 +129,85 @@ void main() {
     });
   });
 
+  group('curtain furniture', () {
+    testWidgets('未配置なら初期カーテンだけを表示する', (tester) async {
+      await _pumpRoom(tester);
+
+      expect(_initialCurtainImage, findsOneWidget);
+      expect(find.byKey(const ValueKey('roomCurtainLayer')), findsOneWidget);
+    });
+
+    for (final entry in const {
+      'white_linen_curtains': 'furniture/curtain/white_linen_curtains.png',
+      'beige_curtains': 'furniture/curtain/beige_curtains.png',
+      'deep_green_curtains': 'furniture/curtain/deep_green_curtains.png',
+      'rain_blue_curtains': 'furniture/curtain/rain_blue_curtains.png',
+    }.entries) {
+      testWidgets('${entry.key}を配置すると初期カーテンと二重表示しない', (tester) async {
+        await _pumpRoom(
+          tester,
+          initialPlacedFurnitureIds: {_curtainSlotId: entry.key},
+        );
+        await tester.pump();
+
+        expect(_initialCurtainImage, findsNothing);
+        expect(
+          find.byKey(ValueKey('roomFurnitureImage-${entry.key}')),
+          findsOneWidget,
+        );
+        expect(
+          find.image(AssetImage('assets/images/${entry.value}')),
+          findsOneWidget,
+        );
+      });
+    }
+
+    testWidgets('交換、remove、reset後に初期カーテンへ戻る', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialPurchasedFurnitureIds: const {
+          'white_linen_curtains',
+          'beige_curtains',
+        },
+        initialPlacedFurnitureIds: const {
+          _curtainSlotId: 'white_linen_curtains',
+        },
+      );
+      final result = await harness.placedFurnitureProvider.place(
+        slotId: _curtainSlotId,
+        furnitureId: 'beige_curtains',
+        isPurchased: true,
+        allowedSlotIds: const [_curtainSlotId],
+      );
+      await tester.pump();
+
+      expect(result, PlaceFurnitureResult.success);
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _curtainSlotId: 'beige_curtains',
+      });
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-beige_curtains')),
+        findsOneWidget,
+      );
+
+      await harness.placedFurnitureProvider.remove('beige_curtains');
+      await tester.pump();
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, isEmpty);
+      expect(_initialCurtainImage, findsOneWidget);
+
+      await harness.placedFurnitureProvider.place(
+        slotId: _curtainSlotId,
+        furnitureId: 'white_linen_curtains',
+        isPurchased: true,
+        allowedSlotIds: const [_curtainSlotId],
+      );
+      await harness.placedFurnitureProvider.reset();
+      await tester.pump();
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, isEmpty);
+      expect(_initialCurtainImage, findsOneWidget);
+    });
+  });
+
   group('一輪挿しの花', () {
     testWidgets('未配置と旧save相当のslot keyなしでは初期花と花瓶を表示する', (tester) async {
       await _pumpRoom(
@@ -3466,6 +3545,7 @@ const _windowShelfDecorSlotId = 'living_room_window_shelf_decor';
 const _windowHangingDecorSlotId = 'living_room_window_hanging_decor';
 const _floorRugSlotId = 'living_room_floor_rug';
 const _chairSlotId = 'living_room_chair';
+const _curtainSlotId = 'living_room_window_curtain';
 const _windowVaseSlotId = 'living_room_window_vase';
 final _roomRugLayer = find.byKey(const ValueKey('roomRugLayer'));
 final _fixedRugImage = find.byKey(const ValueKey('roomFixedRugImage'));
@@ -3476,6 +3556,9 @@ final _checkRugImage = find.byKey(
   const ValueKey('roomFurnitureImage-rectangular_rug'),
 );
 final _fixedChairImage = find.byKey(const ValueKey('roomFixedChairImage'));
+final _initialCurtainImage = find.byKey(
+  const ValueKey('roomInitialCurtainImage'),
+);
 final _placedFurnitureLayer = find.byKey(
   const ValueKey('deskSurfaceLeftFurnitureLayer'),
 );
@@ -3780,7 +3863,7 @@ const List<Furniture> _roomFurnitures = [
   Furniture(
     id: 'wooden_chair',
     name: 'wooden chair',
-    price: 70,
+    price: 50,
     size: 'large',
     slotIds: [_chairSlotId],
     imagePath: 'furniture/chair/wooden_chair.png',
@@ -3789,7 +3872,7 @@ const List<Furniture> _roomFurnitures = [
   Furniture(
     id: 'cushioned_chair',
     name: 'cushioned chair',
-    price: 70,
+    price: 50,
     size: 'large',
     slotIds: [_chairSlotId],
     imagePath: 'furniture/chair/cushioned_chair.png',
@@ -3798,10 +3881,46 @@ const List<Furniture> _roomFurnitures = [
   Furniture(
     id: 'rocking_chair',
     name: 'rocking chair',
-    price: 70,
+    price: 50,
     size: 'large',
     slotIds: [_chairSlotId],
     imagePath: 'furniture/chair/rocking_chair.png',
+    initialAvailable: true,
+  ),
+  Furniture(
+    id: 'white_linen_curtains',
+    name: 'white linen curtains',
+    price: 70,
+    size: 'large',
+    slotIds: [_curtainSlotId],
+    imagePath: 'furniture/curtain/white_linen_curtains.png',
+    initialAvailable: true,
+  ),
+  Furniture(
+    id: 'beige_curtains',
+    name: 'beige curtains',
+    price: 70,
+    size: 'large',
+    slotIds: [_curtainSlotId],
+    imagePath: 'furniture/curtain/beige_curtains.png',
+    initialAvailable: true,
+  ),
+  Furniture(
+    id: 'deep_green_curtains',
+    name: 'deep green curtains',
+    price: 70,
+    size: 'large',
+    slotIds: [_curtainSlotId],
+    imagePath: 'furniture/curtain/deep_green_curtains.png',
+    initialAvailable: true,
+  ),
+  Furniture(
+    id: 'rain_blue_curtains',
+    name: 'rain blue curtains',
+    price: 70,
+    size: 'large',
+    slotIds: [_curtainSlotId],
+    imagePath: 'furniture/curtain/rain_blue_curtains.png',
     initialAvailable: true,
   ),
   Furniture(
