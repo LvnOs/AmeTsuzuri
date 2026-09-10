@@ -344,6 +344,23 @@ void main() {
   });
 
   group('seasonal outdoor background', () {
+    testWidgets('4月は春背景とroom_baseを表示する', (tester) async {
+      await _pumpRoom(tester, date: DateTime(2026, 4, 1));
+
+      expect(
+        find.image(const AssetImage('assets/images/room/outdoor_spring.png')),
+        findsOneWidget,
+      );
+      expect(
+        find.image(const AssetImage('assets/images/room/outdoor_summer.png')),
+        findsNothing,
+      );
+      expect(
+        find.image(const AssetImage('assets/images/room/room_base.png')),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('8月は夏背景とroom_baseを表示する', (tester) async {
       await _pumpRoom(tester, date: DateTime(2026, 8, 7));
 
@@ -366,6 +383,23 @@ void main() {
 
       expect(
         find.image(const AssetImage('assets/images/room/outdoor_autumn.png')),
+        findsOneWidget,
+      );
+      expect(
+        find.image(const AssetImage('assets/images/room/outdoor_summer.png')),
+        findsNothing,
+      );
+      expect(
+        find.image(const AssetImage('assets/images/room/room_base.png')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('12月は冬背景とroom_baseを表示する', (tester) async {
+      await _pumpRoom(tester, date: DateTime(2026, 12, 1));
+
+      expect(
+        find.image(const AssetImage('assets/images/room/outdoor_winter.png')),
         findsOneWidget,
       );
       expect(

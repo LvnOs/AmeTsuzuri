@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 enum PrototypeOperation {
   nextDay,
   outdoorAuto,
+  outdoorSpring,
   outdoorSummer,
   outdoorAutumn,
+  outdoorWinter,
   reset,
 }
 
@@ -37,11 +39,17 @@ class PrototypeControls extends StatelessWidget {
           case PrototypeOperation.outdoorAuto:
             onOutdoorSeasonChanged(null);
             return;
+          case PrototypeOperation.outdoorSpring:
+            onOutdoorSeasonChanged(SeasonType.spring);
+            return;
           case PrototypeOperation.outdoorSummer:
             onOutdoorSeasonChanged(SeasonType.summer);
             return;
           case PrototypeOperation.outdoorAutumn:
             onOutdoorSeasonChanged(SeasonType.autumn);
+            return;
+          case PrototypeOperation.outdoorWinter:
+            onOutdoorSeasonChanged(SeasonType.winter);
             return;
           case PrototypeOperation.reset:
             onReset();
@@ -61,6 +69,11 @@ class PrototypeControls extends StatelessWidget {
           child: const Text('背景：自動'),
         ),
         PopupMenuItem<PrototypeOperation>(
+          key: const ValueKey('prototypeOutdoorSpring'),
+          value: PrototypeOperation.outdoorSpring,
+          child: const Text('背景：春'),
+        ),
+        PopupMenuItem<PrototypeOperation>(
           key: const ValueKey('prototypeOutdoorSummer'),
           value: PrototypeOperation.outdoorSummer,
           child: const Text('背景：夏'),
@@ -69,6 +82,11 @@ class PrototypeControls extends StatelessWidget {
           key: const ValueKey('prototypeOutdoorAutumn'),
           value: PrototypeOperation.outdoorAutumn,
           child: const Text('背景：秋'),
+        ),
+        PopupMenuItem<PrototypeOperation>(
+          key: const ValueKey('prototypeOutdoorWinter'),
+          value: PrototypeOperation.outdoorWinter,
+          child: const Text('背景：冬'),
         ),
         const PopupMenuDivider(),
         PopupMenuItem<PrototypeOperation>(

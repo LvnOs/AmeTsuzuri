@@ -83,6 +83,27 @@ void main() {
     );
   });
 
+  testWidgets('spring / winter背景overrideは日付を変更しない', (tester) async {
+    final harness = await _pumpPrototypeRoom(tester);
+    final prefs = await SharedPreferences.getInstance();
+    final savedDate = prefs.getString('prototypeDate');
+
+    await _selectPrototypeOperation(tester, 'prototypeOutdoorSpring');
+    expect(
+      find.image(const AssetImage('assets/images/room/outdoor_spring.png')),
+      findsOneWidget,
+    );
+
+    await _selectPrototypeOperation(tester, 'prototypeOutdoorWinter');
+    expect(harness.date.today, DateTime(2026, 8, 7));
+    expect(harness.date.currentSeason, SeasonType.summer);
+    expect(prefs.getString('prototypeDate'), savedDate);
+    expect(
+      find.image(const AssetImage('assets/images/room/outdoor_winter.png')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('翌日へ進むとゲーム状態を維持して翌日の手紙を配達する', (tester) async {
     final harness = await _pumpPrototypeRoom(tester);
 

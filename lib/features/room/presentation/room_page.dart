@@ -1123,10 +1123,10 @@ class _RoomBackgroundLayers extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final outdoorAssetPath = switch (season) {
+      SeasonType.spring => 'assets/images/room/outdoor_spring.png',
+      SeasonType.summer => 'assets/images/room/outdoor_summer.png',
       SeasonType.autumn => 'assets/images/room/outdoor_autumn.png',
-      SeasonType.spring ||
-      SeasonType.summer ||
-      SeasonType.winter ||
+      SeasonType.winter => 'assets/images/room/outdoor_winter.png',
       SeasonType.any => 'assets/images/room/outdoor_summer.png',
     };
 
