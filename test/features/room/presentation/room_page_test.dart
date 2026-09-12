@@ -517,6 +517,36 @@ void main() {
       expect(find.byType(RainOverlay), findsNothing);
     });
 
+    testWidgets('tutorial未完了中のrainはnormalに固定する', (tester) async {
+      await _pumpRoom(tester, weather: WeatherType.rain);
+
+      expect(
+        find.byKey(const ValueKey('rain-overlay-intensity-normal')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('tutorial完了後のrain variationはrebuildしても固定する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        weather: WeatherType.rain,
+        initialReadState: ReadLetterState(
+          receivedLetters: const {},
+          tutorialCompleted: true,
+        ),
+      );
+      final selectedKey = RainIntensity.values
+          .map(
+            (intensity) => ValueKey('rain-overlay-intensity-${intensity.name}'),
+          )
+          .singleWhere((key) => find.byKey(key).evaluate().isNotEmpty);
+
+      await harness.readLetterProvider.markTutorialBottleOpened();
+      await tester.pump();
+
+      expect(find.byKey(selectedKey), findsOneWidget);
+    });
+
     testWidgets('配達済みでもRoomの日付のWeatherをロードする', (tester) async {
       final harness = await _pumpRoom(
         tester,

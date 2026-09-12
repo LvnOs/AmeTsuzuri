@@ -352,6 +352,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
   bool _isArrivalAnimating = false;
   bool _isPrototypeOperationRunning = false;
   SeasonType? _outdoorSeasonOverride;
+  RainIntensity? _rainIntensityOverride;
   late final AnimationController _arrivalController;
   late final AnimationController _tutorialGlowController;
   late final AnimationController _tutorialMoveController;
@@ -478,6 +479,8 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
                   weatherProvider.loadedDate ==
                       _dateOnly(appDateProvider.today) &&
                   weatherProvider.currentWeather == WeatherType.rain,
+              isTutorialCompleted: readLetterProvider.tutorialCompleted,
+              rainIntensityOverride: _rainIntensityOverride,
               hasDeliveredLetter: showLetter,
               isArrivalAnimating: _isArrivalAnimating,
               arrivalAnimation: _arrivalController,
@@ -501,6 +504,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
               isPrototypeOperationRunning: _isPrototypeOperationRunning,
               onMoveToNextDay: _moveToNextDay,
               onOutdoorSeasonChanged: _setOutdoorSeasonOverride,
+              onRainIntensityChanged: _setRainIntensityOverride,
               onResetPrototype: _confirmPrototypeReset,
             ),
           ),
@@ -511,6 +515,10 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
 
   void _setOutdoorSeasonOverride(SeasonType? season) {
     setState(() => _outdoorSeasonOverride = season);
+  }
+
+  void _setRainIntensityOverride(RainIntensity? intensity) {
+    setState(() => _rainIntensityOverride = intensity);
   }
 
   void _onTapPost() {
@@ -1067,6 +1075,8 @@ class _RoomBackgroundLayers extends StatelessWidget {
   const _RoomBackgroundLayers({
     required this.season,
     required this.showRain,
+    required this.isTutorialCompleted,
+    required this.rainIntensityOverride,
     required this.hasDeliveredLetter,
     required this.isArrivalAnimating,
     required this.arrivalAnimation,
@@ -1090,11 +1100,14 @@ class _RoomBackgroundLayers extends StatelessWidget {
     required this.isPrototypeOperationRunning,
     required this.onMoveToNextDay,
     required this.onOutdoorSeasonChanged,
+    required this.onRainIntensityChanged,
     required this.onResetPrototype,
   });
 
   final SeasonType season;
   final bool showRain;
+  final bool isTutorialCompleted;
+  final RainIntensity? rainIntensityOverride;
   final bool hasDeliveredLetter;
   final bool isArrivalAnimating;
   final Animation<double> arrivalAnimation;
@@ -1118,6 +1131,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
   final bool isPrototypeOperationRunning;
   final VoidCallback onMoveToNextDay;
   final ValueChanged<SeasonType?> onOutdoorSeasonChanged;
+  final ValueChanged<RainIntensity?> onRainIntensityChanged;
   final VoidCallback onResetPrototype;
 
   @override
@@ -1145,7 +1159,11 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   alignment: RoomPage._outdoorAlignment,
                 ),
               ),
-              if (showRain) const RainOverlay(),
+              if (showRain)
+                RainOverlay(
+                  isTutorialCompleted: isTutorialCompleted,
+                  intensityOverride: rainIntensityOverride,
+                ),
               if (season == SeasonType.autumn) const AutumnLeafEffect(),
               Align(
                 alignment: RoomPage._postAlignment,
@@ -1433,6 +1451,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   isRunning: isPrototypeOperationRunning,
                   onNextDay: onMoveToNextDay,
                   onOutdoorSeasonChanged: onOutdoorSeasonChanged,
+                  onRainIntensityChanged: onRainIntensityChanged,
                   onReset: onResetPrototype,
                 ),
               ),

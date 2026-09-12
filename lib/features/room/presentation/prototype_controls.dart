@@ -1,4 +1,5 @@
 import 'package:ame_tsuzuri/shared/model/season_type.dart';
+import 'package:ame_tsuzuri/features/room/presentation/widgets/rain_overlay.dart';
 import 'package:flutter/material.dart';
 
 enum PrototypeOperation {
@@ -8,6 +9,10 @@ enum PrototypeOperation {
   outdoorSummer,
   outdoorAutumn,
   outdoorWinter,
+  rainAuto,
+  rainLight,
+  rainNormal,
+  rainHeavy,
   reset,
 }
 
@@ -17,12 +22,14 @@ class PrototypeControls extends StatelessWidget {
     required this.isRunning,
     required this.onNextDay,
     required this.onOutdoorSeasonChanged,
+    required this.onRainIntensityChanged,
     required this.onReset,
   });
 
   final bool isRunning;
   final VoidCallback onNextDay;
   final ValueChanged<SeasonType?> onOutdoorSeasonChanged;
+  final ValueChanged<RainIntensity?> onRainIntensityChanged;
   final VoidCallback onReset;
 
   @override
@@ -50,6 +57,18 @@ class PrototypeControls extends StatelessWidget {
             return;
           case PrototypeOperation.outdoorWinter:
             onOutdoorSeasonChanged(SeasonType.winter);
+            return;
+          case PrototypeOperation.rainAuto:
+            onRainIntensityChanged(null);
+            return;
+          case PrototypeOperation.rainLight:
+            onRainIntensityChanged(RainIntensity.light);
+            return;
+          case PrototypeOperation.rainNormal:
+            onRainIntensityChanged(RainIntensity.normal);
+            return;
+          case PrototypeOperation.rainHeavy:
+            onRainIntensityChanged(RainIntensity.heavy);
             return;
           case PrototypeOperation.reset:
             onReset();
@@ -87,6 +106,27 @@ class PrototypeControls extends StatelessWidget {
           key: const ValueKey('prototypeOutdoorWinter'),
           value: PrototypeOperation.outdoorWinter,
           child: const Text('背景：冬'),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem<PrototypeOperation>(
+          key: const ValueKey('prototypeRainAuto'),
+          value: PrototypeOperation.rainAuto,
+          child: const Text('雨量：自動'),
+        ),
+        PopupMenuItem<PrototypeOperation>(
+          key: const ValueKey('prototypeRainLight'),
+          value: PrototypeOperation.rainLight,
+          child: const Text('雨量：小雨'),
+        ),
+        PopupMenuItem<PrototypeOperation>(
+          key: const ValueKey('prototypeRainNormal'),
+          value: PrototypeOperation.rainNormal,
+          child: const Text('雨量：通常'),
+        ),
+        PopupMenuItem<PrototypeOperation>(
+          key: const ValueKey('prototypeRainHeavy'),
+          value: PrototypeOperation.rainHeavy,
+          child: const Text('雨量：大雨'),
         ),
         const PopupMenuDivider(),
         PopupMenuItem<PrototypeOperation>(

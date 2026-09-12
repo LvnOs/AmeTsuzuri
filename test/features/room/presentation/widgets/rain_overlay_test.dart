@@ -33,6 +33,27 @@ void main() {
     expect(tester.binding.hasScheduledFrame, true);
   });
 
+  testWidgets('tutorial未完了中はnormal rainを使用する', (tester) async {
+    await _pumpRainOverlay(tester, isTutorialCompleted: false);
+
+    expect(
+      find.byKey(const ValueKey('rain-overlay-intensity-normal')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('light / normal / heavyを強制してbuildできる', (tester) async {
+    for (final intensity in RainIntensity.values) {
+      await _pumpRainOverlay(tester, intensityOverride: intensity);
+
+      expect(
+        find.byKey(ValueKey('rain-overlay-intensity-${intensity.name}')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), null);
+    }
+  });
+
   testWidgets('dispose後にTicker leakを起こさない', (tester) async {
     await _pumpRainOverlay(tester);
     await tester.pump(const Duration(seconds: 1));
@@ -45,14 +66,25 @@ void main() {
   });
 }
 
-Future<void> _pumpRainOverlay(WidgetTester tester) {
+Future<void> _pumpRainOverlay(
+  WidgetTester tester, {
+  bool isTutorialCompleted = true,
+  RainIntensity? intensityOverride,
+}) {
   return tester.pumpWidget(
-    const MaterialApp(
+    MaterialApp(
       home: Scaffold(
         body: Center(
           child: AspectRatio(
             aspectRatio: 390 / 700,
-            child: Stack(children: [RainOverlay()]),
+            child: Stack(
+              children: [
+                RainOverlay(
+                  isTutorialCompleted: isTutorialCompleted,
+                  intensityOverride: intensityOverride,
+                ),
+              ],
+            ),
           ),
         ),
       ),

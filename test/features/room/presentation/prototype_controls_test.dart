@@ -13,6 +13,8 @@ import 'package:ame_tsuzuri/features/letters/repository/letter_repository.dart';
 import 'package:ame_tsuzuri/features/letters/repository/read_letter_repository.dart';
 import 'package:ame_tsuzuri/features/letters/repository/shizuku_repository.dart';
 import 'package:ame_tsuzuri/features/room/presentation/room_page.dart';
+import 'package:ame_tsuzuri/features/room/presentation/prototype_controls.dart';
+import 'package:ame_tsuzuri/features/room/presentation/widgets/rain_overlay.dart';
 import 'package:ame_tsuzuri/shared/model/season_type.dart';
 import 'package:ame_tsuzuri/shared/model/weather_type.dart';
 import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
@@ -102,6 +104,22 @@ void main() {
       find.image(const AssetImage('assets/images/room/outdoor_winter.png')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('雨量overrideで小雨・通常・大雨を切り替えられる', (tester) async {
+    await _pumpPrototypeRoom(tester);
+
+    for (final intensity in RainIntensity.values) {
+      tester
+          .widget<PrototypeControls>(find.byType(PrototypeControls))
+          .onRainIntensityChanged(intensity);
+      await tester.pump();
+
+      expect(
+        find.byKey(ValueKey('rain-overlay-intensity-${intensity.name}')),
+        findsOneWidget,
+      );
+    }
   });
 
   testWidgets('翌日へ進むとゲーム状態を維持して翌日の手紙を配達する', (tester) async {
