@@ -12,6 +12,7 @@ import 'package:ame_tsuzuri/features/furniture/provider/catalog_provider.dart';
 import 'package:ame_tsuzuri/features/room/presentation/prototype_controls.dart';
 import 'package:ame_tsuzuri/features/room/presentation/prototype_reset_page.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/autumn_leaf_effect.dart';
+import 'package:ame_tsuzuri/features/room/presentation/widgets/interaction_hint_marker.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/rain_overlay.dart';
 import 'package:ame_tsuzuri/features/furniture/provider/placed_furniture_provider.dart';
 import 'package:ame_tsuzuri/features/furniture/model/furniture.dart';
@@ -104,6 +105,8 @@ class RoomPage extends StatefulWidget {
   static const Alignment _letterAlignment = Alignment(0, 0.07);
   static const double _letterScale = 0.22;
   static const double _letterAspectRatio = 460 / 307;
+  static const Alignment _letterHintMarkerAlignment = Alignment(0, -0.09);
+  static const Alignment _bottleHintMarkerAlignment = Alignment(0.54, -0.34);
 
   // Desk-left furniture tuning for the 390 x 700 Room composition.
   static const String _deskSurfaceLeftSlotId = 'living_room_desk_surface_left';
@@ -1369,6 +1372,19 @@ class _RoomBackgroundLayers extends StatelessWidget {
                       ),
                     ),
                   ),
+                ),
+              if (tutorialTarget == _TutorialTarget.letter ||
+                  tutorialTarget == _TutorialTarget.bottle)
+                Align(
+                  key: ValueKey(
+                    tutorialTarget == _TutorialTarget.letter
+                        ? 'tutorialLetterHintMarker'
+                        : 'tutorialBottleHintMarker',
+                  ),
+                  alignment: tutorialTarget == _TutorialTarget.letter
+                      ? RoomPage._letterHintMarkerAlignment
+                      : RoomPage._bottleHintMarkerAlignment,
+                  child: const InteractionHintMarker(),
                 ),
               _ChairLayer(
                 key: const ValueKey('roomChairAsyncFurnitureLayer'),

@@ -1597,6 +1597,103 @@ void main() {
     });
   });
 
+  group('チュートリアルの操作ヒントマーカー', () {
+    final letterMarker = find.byKey(const ValueKey('tutorialLetterHintMarker'));
+    final bottleMarker = find.byKey(const ValueKey('tutorialBottleHintMarker'));
+
+    testWidgets('未読tutorial Letterが操作可能ならLetter上にだけ表示する', (tester) async {
+      await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {},
+          deliveredLetters: const {'2026-08-07': 'tutorial_001'},
+        ),
+      );
+
+      expect(letterMarker, findsOneWidget);
+      expect(bottleMarker, findsNothing);
+    });
+
+    testWidgets('tutorial Letterの到着演出中は表示せず、完了後に表示する', (tester) async {
+      await _pumpRoom(tester, letters: [_letter('tutorial_001')]);
+
+      expect(letterMarker, findsNothing);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump();
+      expect(letterMarker, findsOneWidget);
+    });
+
+    testWidgets('既読で未確認の瓶が操作可能なら瓶上にだけ表示する', (tester) async {
+      await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+        ),
+      );
+
+      expect(letterMarker, findsNothing);
+      expect(bottleMarker, findsOneWidget);
+      expect(
+        find.descendant(of: bottleMarker, matching: find.byType(IgnorePointer)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('瓶をタップするとマーカーを消してCatalogへ遷移する', (tester) async {
+      await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('bottleTapArea')));
+      await tester.pump();
+
+      expect(bottleMarker, findsNothing);
+      await _pumpRouteTransition(tester);
+      expect(find.byType(CatalogPage), findsOneWidget);
+    });
+
+    testWidgets('tutorial完了後およびポストにはマーカーを表示しない', (tester) async {
+      await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+          hasOpenedTutorialBottle: true,
+          tutorialCompleted: true,
+        ),
+      );
+
+      expect(letterMarker, findsNothing);
+      expect(bottleMarker, findsNothing);
+      expect(find.byKey(const ValueKey('postHintMarker')), findsNothing);
+    });
+
+    testWidgets('390px幅でもLetter上のマーカーがRoom内に収まる', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 700));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {},
+          deliveredLetters: const {'2026-08-07': 'tutorial_001'},
+        ),
+      );
+
+      final markerRect = tester.getRect(letterMarker);
+      expect(markerRect.left, greaterThanOrEqualTo(0));
+      expect(markerRect.right, lessThanOrEqualTo(390));
+      expect(markerRect.top, greaterThanOrEqualTo(0));
+      expect(tester.takeException(), isNull);
+    });
+  });
+
   group('tutorial初読後の手紙から瓶への移動光', () {
     final movingLight = find.byKey(
       const ValueKey('tutorialLetterToBottleMovingLight'),
