@@ -107,6 +107,10 @@ class RoomPage extends StatefulWidget {
   static const double _letterAspectRatio = 460 / 307;
   static const Alignment _letterHintMarkerAlignment = Alignment(0, -0.09);
   static const Alignment _bottleHintMarkerAlignment = Alignment(0.54, -0.34);
+  static const Alignment _bookshelfHintMarkerAlignment = Alignment(
+    -0.92,
+    -0.18,
+  );
 
   // Desk-left furniture tuning for the 390 x 700 Room composition.
   static const String _deskSurfaceLeftSlotId = 'living_room_desk_surface_left';
@@ -1385,6 +1389,12 @@ class _RoomBackgroundLayers extends StatelessWidget {
                       ? RoomPage._letterHintMarkerAlignment
                       : RoomPage._bottleHintMarkerAlignment,
                   child: const InteractionHintMarker(),
+                ),
+              if (tutorialTarget == _TutorialTarget.bookshelf)
+                const Align(
+                  key: ValueKey('tutorialBookshelfHintMarker'),
+                  alignment: RoomPage._bookshelfHintMarkerAlignment,
+                  child: InteractionHintMarker(),
                 ),
               _ChairLayer(
                 key: const ValueKey('roomChairAsyncFurnitureLayer'),

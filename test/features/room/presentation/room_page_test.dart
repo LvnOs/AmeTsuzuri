@@ -1600,6 +1600,9 @@ void main() {
   group('チュートリアルの操作ヒントマーカー', () {
     final letterMarker = find.byKey(const ValueKey('tutorialLetterHintMarker'));
     final bottleMarker = find.byKey(const ValueKey('tutorialBottleHintMarker'));
+    final bookshelfMarker = find.byKey(
+      const ValueKey('tutorialBookshelfHintMarker'),
+    );
 
     testWidgets('未読tutorial Letterが操作可能ならLetter上にだけ表示する', (tester) async {
       await _pumpRoom(
@@ -1672,6 +1675,46 @@ void main() {
       expect(letterMarker, findsNothing);
       expect(bottleMarker, findsNothing);
       expect(find.byKey(const ValueKey('postHintMarker')), findsNothing);
+    });
+
+    testWidgets('家具配置済みの本棚段階では本棚上にだけ表示する', (tester) async {
+      await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+          hasOpenedTutorialBottle: true,
+        ),
+        initialPlacedFurnitureIds: const {_deskSurfaceLeftSlotId: 'wooden_mug'},
+      );
+
+      expect(bookshelfMarker, findsOneWidget);
+      expect(letterMarker, findsNothing);
+      expect(bottleMarker, findsNothing);
+    });
+
+    testWidgets('本棚を開くと本棚マーカーが消えtutorialが完了する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+          hasOpenedTutorialBottle: true,
+        ),
+        initialPlacedFurnitureIds: const {_deskSurfaceLeftSlotId: 'wooden_mug'},
+      );
+
+      await tester.tap(find.byKey(const ValueKey('bookshelfTapArea')));
+      await _pumpRouteTransition(tester);
+
+      expect(bookshelfMarker, findsNothing);
+      expect(find.text('届いた手紙は、ここからいつでも読み返せます。'), findsOneWidget);
+
+      await tester.tap(find.text('本棚を開く'));
+      await _pumpRouteTransition(tester);
+
+      expect(harness.readLetterProvider.tutorialCompleted, isTrue);
+      expect(find.byType(BookshelfPage), findsOneWidget);
     });
 
     testWidgets('390px幅でもLetter上のマーカーがRoom内に収まる', (tester) async {
