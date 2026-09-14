@@ -63,9 +63,7 @@ void main() {
     await _setSurfaceSize(tester, const Size(390, 700));
     await _pumpLetter(tester, body: '短い手紙です。');
 
-    final rulesSize = tester.getSize(
-      find.byKey(const ValueKey('letterRules')),
-    );
+    final rulesSize = tester.getSize(find.byKey(const ValueKey('letterRules')));
 
     expect(rulesSize.height, greaterThan(400));
     expect(tester.takeException(), isNull);
@@ -107,6 +105,43 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('雫獲得feedbackは便箋内の本文前に表示して2.8秒後に消える', (tester) async {
+    await _setSurfaceSize(tester, const Size(390, 700));
+    await _pumpLetter(
+      tester,
+      body: '報酬を受け取る手紙です。',
+      rewardAmount: 10,
+      settle: false,
+    );
+
+    final feedback = find.byKey(const ValueKey('dropRewardFeedback'));
+    expect(feedback, findsOneWidget);
+    expect(find.text('雫を10滴受け取りました'), findsOneWidget);
+    expect(
+      find.ancestor(
+        of: feedback,
+        matching: find.byKey(const ValueKey('letterPaper')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.ancestor(of: feedback, matching: find.byType(AppBar)),
+      findsNothing,
+    );
+    final rulesTopBeforeDismiss = tester
+        .getTopLeft(find.byKey(const ValueKey('letterRules')))
+        .dy;
+
+    await tester.pump(const Duration(milliseconds: 2800));
+
+    expect(feedback, findsNothing);
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('letterRules'))).dy,
+      rulesTopBeforeDismiss,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('長い手紙は便箋全体を縦方向にスクロールできる', (tester) async {
     await _setSurfaceSize(tester, const Size(320, 400));
     await _pumpLetter(tester, body: List.filled(80, '雨の音が聞こえます。').join('\n'));
@@ -129,9 +164,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('tutorial_001正式本文を390x700で最後までスクロールできる', (
-    tester,
-  ) async {
+  testWidgets('tutorial_001正式本文を390x700で最後までスクロールできる', (tester) async {
     final tutorialBody = await rootBundle.loadString(
       'assets/letters/tutorial_001.md',
     );
@@ -164,7 +197,12 @@ Future<void> _setSurfaceSize(WidgetTester tester, Size size) async {
   });
 }
 
-Future<void> _pumpLetter(WidgetTester tester, {required String body}) async {
+Future<void> _pumpLetter(
+  WidgetTester tester, {
+  required String body,
+  int? rewardAmount,
+  bool settle = true,
+}) async {
   await tester.pumpWidget(
     MaterialApp(
       home: Builder(
@@ -175,6 +213,7 @@ Future<void> _pumpLetter(WidgetTester tester, {required String body}) async {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (context) => LetterPage(
+                      rewardAmount: rewardAmount,
                       letter: Letter(
                         id: 'letter',
                         title: '雨の手紙',
@@ -194,5 +233,10 @@ Future<void> _pumpLetter(WidgetTester tester, {required String body}) async {
     ),
   );
   await tester.tap(find.text('手紙を開く'));
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+  }
 }

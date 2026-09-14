@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../model/letter.dart';
 
 class LetterPage extends StatelessWidget {
-  const LetterPage({super.key, required this.letter});
+  const LetterPage({super.key, required this.letter, this.rewardAmount});
 
   static const Color _pageBackgroundColor = Color(0xFFE5DDD0);
   static const Color _paperColor = Color(0xFFFFFAEC);
@@ -20,8 +20,11 @@ class LetterPage extends StatelessWidget {
   static const double _paperVerticalPadding = 32;
   static const double _titleLineHeight = 24 * 1.35;
   static const double _titleBodySpacing = 26;
+  static const double _rewardFeedbackTopSpacing = 12;
+  static const double _rewardFeedbackHeight = 32;
 
   final Letter letter;
+  final int? rewardAmount;
 
   @override
   Widget build(BuildContext context) {
@@ -42,14 +45,17 @@ class LetterPage extends StatelessWidget {
             const topPadding = 16.0;
             const bottomPadding = 32.0;
             final minimumPaperHeight =
-                (constraints.maxHeight - topPadding - bottomPadding).clamp(
-                  0.0,
-                  double.infinity,
-                ).toDouble();
+                (constraints.maxHeight - topPadding - bottomPadding)
+                    .clamp(0.0, double.infinity)
+                    .toDouble();
+            final rewardFeedbackHeight = rewardAmount == null
+                ? 0.0
+                : _rewardFeedbackTopSpacing + _rewardFeedbackHeight;
             final minimumRuledAreaHeight =
                 (minimumPaperHeight -
                         (_paperVerticalPadding * 2) -
                         _titleLineHeight -
+                        rewardFeedbackHeight -
                         _titleBodySpacing)
                     .clamp(0.0, double.infinity)
                     .toDouble();
@@ -98,6 +104,16 @@ class LetterPage extends StatelessWidget {
                             height: 1.35,
                           ),
                         ),
+                        if (rewardAmount != null) ...[
+                          const SizedBox(height: _rewardFeedbackTopSpacing),
+                          SizedBox(
+                            height: _rewardFeedbackHeight,
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: _DropRewardFeedback(amount: rewardAmount!),
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: _titleBodySpacing),
                         CustomPaint(
                           key: const ValueKey('letterRules'),
@@ -131,6 +147,109 @@ class LetterPage extends StatelessWidget {
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _DropRewardFeedback extends StatefulWidget {
+  const _DropRewardFeedback({required this.amount});
+
+  final int amount;
+
+  @override
+  State<_DropRewardFeedback> createState() => _DropRewardFeedbackState();
+}
+
+class _DropRewardFeedbackState extends State<_DropRewardFeedback>
+    with SingleTickerProviderStateMixin {
+  static const Duration _duration = Duration(milliseconds: 3500);
+
+  late final AnimationController _controller;
+  late final Animation<double> _opacity;
+  late final Animation<Offset> _offset;
+  bool _isVisible = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: _duration)
+      ..addStatusListener(_handleStatus)
+      ..forward();
+    _opacity = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(
+          begin: 0,
+          end: 1,
+        ).chain(CurveTween(curve: Curves.easeOut)),
+        weight: 10,
+      ),
+      TweenSequenceItem(tween: ConstantTween(1), weight: 65),
+      TweenSequenceItem(
+        tween: Tween<double>(
+          begin: 1,
+          end: 0,
+        ).chain(CurveTween(curve: Curves.easeIn)),
+        weight: 25,
+      ),
+    ]).animate(_controller);
+    _offset = Tween<Offset>(
+      begin: const Offset(0, 0.04),
+      end: const Offset(0, -0.04),
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+  }
+
+  void _handleStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed && mounted) {
+      setState(() => _isVisible = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller
+      ..removeStatusListener(_handleStatus)
+      ..dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_isVisible) {
+      return const SizedBox.shrink();
+    }
+
+    return FadeTransition(
+      opacity: _opacity,
+      child: SlideTransition(
+        position: _offset,
+        child: Semantics(
+          liveRegion: true,
+          label: '雫を${widget.amount}滴受け取りました',
+          child: ExcludeSemantics(
+            child: Row(
+              key: const ValueKey('dropRewardFeedback'),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.water_drop_outlined,
+                  size: 18,
+                  color: Color(0xFF5796AD),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '雫を${widget.amount}滴受け取りました',
+                  style: const TextStyle(
+                    color: Color(0xFF477F94),
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

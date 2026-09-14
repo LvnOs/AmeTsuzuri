@@ -2122,10 +2122,12 @@ void main() {
       );
 
       expect(find.byKey(const ValueKey('letterTapArea')), findsOneWidget);
-      await _tapLetter(tester);
+      await tester.tap(find.byKey(const ValueKey('letterTapArea')));
+      await pumpUntilLetterPage(tester);
 
       expect(find.byType(LetterPage), findsOneWidget);
       expect(find.text('letterB'), findsWidgets);
+      expect(find.text('雫を10滴受け取りました'), findsOneWidget);
       expect(harness.shizukuProvider.currentShizuku, 40);
       expect(harness.shizukuProvider.rewardedLetterIds, {'letterB'});
       expect(harness.readLetterProvider.readLetterIds, {'letterB'});
@@ -2155,8 +2157,10 @@ void main() {
         ),
       );
 
-      await _tapLetter(tester);
+      await tester.tap(find.byKey(const ValueKey('letterTapArea')));
+      await pumpUntilLetterPage(tester);
       expect(find.text('letterB'), findsWidgets);
+      expect(find.byKey(const ValueKey('dropRewardFeedback')), findsNothing);
       await tester.pageBack();
       await _pumpPastFiniteAnimations(tester);
       await _tapLetter(tester);
@@ -2166,6 +2170,29 @@ void main() {
       expect(harness.shizukuRepository.saveCallCount, 0);
       expect(harness.readLetterRepository.saveCallCount, 0);
       expect(harness.letterRepository.getAllCallCount, 2);
+    });
+
+    testWidgets('未読でも報酬済みのLetterではfeedbackを表示しない', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: {},
+          deliveredLetters: {'2026-08-07': 'letterB'},
+        ),
+        initialShizukuState: const ShizukuState(
+          currentShizuku: 40,
+          rewardedLetterIds: {'letterB'},
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('letterTapArea')));
+      await pumpUntilLetterPage(tester);
+
+      expect(find.byType(LetterPage), findsOneWidget);
+      expect(find.byKey(const ValueKey('dropRewardFeedback')), findsNothing);
+      expect(harness.shizukuProvider.currentShizuku, 40);
+      expect(harness.shizukuRepository.saveCallCount, 0);
+      expect(harness.shizukuProvider.rewardedLetterIds, {'letterB'});
     });
 
     testWidgets('連続タップでも報酬・既読保存・画面pushを一度だけ行う', (tester) async {
@@ -3001,10 +3028,12 @@ void main() {
         ),
       );
 
-      await _tapLetter(tester);
+      await tester.tap(find.byKey(const ValueKey('letterTapArea')));
+      await pumpUntilLetterPage(tester);
 
       expect(find.byType(LetterPage), findsOneWidget);
       expect(find.text('tutorial_001'), findsWidgets);
+      expect(find.text('雫を30滴受け取りました'), findsOneWidget);
       expect(
         harness.readLetterProvider.readLetterIds,
         contains('tutorial_001'),

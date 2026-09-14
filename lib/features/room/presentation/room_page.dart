@@ -825,9 +825,16 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
         return;
       }
 
+      int? rewardFeedbackAmount;
       if (!readLetterProvider.readLetterIds.contains(deliveredLetterId)) {
         try {
-          await shizukuProvider.rewardForLetter(deliveredLetterId);
+          final rewardResult = await shizukuProvider.rewardForLetter(
+            deliveredLetterId,
+          );
+          if (rewardResult.status == LetterRewardStatus.rewarded &&
+              rewardResult.amount > 0) {
+            rewardFeedbackAmount = rewardResult.amount;
+          }
         } catch (_) {
           return;
         }
@@ -852,7 +859,10 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
       }
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (context) => LetterPage(letter: deliveredLetter!),
+          builder: (context) => LetterPage(
+            letter: deliveredLetter!,
+            rewardAmount: rewardFeedbackAmount,
+          ),
         ),
       );
       if (mounted &&
