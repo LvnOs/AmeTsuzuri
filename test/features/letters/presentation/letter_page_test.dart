@@ -105,7 +105,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('雫獲得feedbackは便箋内の本文前に表示して2.8秒後に消える', (tester) async {
+  testWidgets('雫獲得feedbackは便箋内の本文前に3.5秒間表示してから消える', (tester) async {
     await _setSurfaceSize(tester, const Size(390, 700));
     await _pumpLetter(
       tester,
@@ -132,7 +132,11 @@ void main() {
         .getTopLeft(find.byKey(const ValueKey('letterRules')))
         .dy;
 
-    await tester.pump(const Duration(milliseconds: 2800));
+    await tester.pump(const Duration(milliseconds: 3000));
+
+    expect(feedback, findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(feedback, findsNothing);
     expect(
