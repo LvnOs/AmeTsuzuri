@@ -12,6 +12,7 @@ import 'package:ame_tsuzuri/features/furniture/provider/catalog_provider.dart';
 import 'package:ame_tsuzuri/features/room/presentation/prototype_controls.dart';
 import 'package:ame_tsuzuri/features/room/presentation/prototype_reset_page.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/autumn_leaf_effect.dart';
+import 'package:ame_tsuzuri/features/room/presentation/widgets/furniture_reaction.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/interaction_hint_marker.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/last_raindrop.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/rain_overlay.dart';
@@ -96,6 +97,7 @@ class RoomPage extends StatefulWidget {
   // Flower composition tuning. Scale is relative to the room canvas width.
   static const Alignment _flowerAlignment = Alignment(0.34, -0.26);
   static const double _flowerScale = 0.13;
+  static const double _flowerAspectRatio = 256 / 384;
   static const String _windowVaseSlotId = 'living_room_window_vase';
   static const Set<String> _flowerFurnitureIds = {
     'small_white_flower',
@@ -168,6 +170,7 @@ class RoomPage extends StatefulWidget {
     -0.93,
   );
   static const double _windowHangingDecorFurnitureScale = 0.18;
+  static const double _windowHangingDecorFurnitureAspectRatio = 256 / 384;
   static const Set<String> _windowHangingDecorFurnitureIds = {
     'wind_chime',
     'teru_teru_bozu',
@@ -306,6 +309,7 @@ class RoomPage extends StatefulWidget {
   // Chair composition tuning. Scale is relative to the room canvas width.
   static const Alignment _chairAlignment = Alignment(0, 0.72);
   static const double _chairScale = 0.47;
+  static const double _chairAspectRatio = 512 / 679;
   static const String _chairSlotId = 'living_room_chair';
   static const Set<String> _chairFurnitureIds = {
     'wooden_chair',
@@ -366,6 +370,9 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
   late final AnimationController _arrivalController;
   late final AnimationController _tutorialGlowController;
   late final AnimationController _tutorialMoveController;
+  final _windowHangingReactionKey = GlobalKey<FurnitureReactionState>();
+  final _flowerReactionKey = GlobalKey<FurnitureReactionState>();
+  final _chairReactionKey = GlobalKey<FurnitureReactionState>();
   _TutorialTarget _requestedTutorialTarget = _TutorialTarget.none;
   bool _isTutorialGlowSyncScheduled = false;
   _TutorialMove _tutorialMove = _TutorialMove.none;
@@ -516,6 +523,9 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
               floorRugFurnitureId: floorRugFurnitureId,
               chairFurnitureId: chairFurnitureId,
               curtainFurnitureId: curtainFurnitureId,
+              windowHangingReactionKey: _windowHangingReactionKey,
+              flowerReactionKey: _flowerReactionKey,
+              chairReactionKey: _chairReactionKey,
               onTapBottle: _onTapBottle,
               onTapBookshelf: _onTapBookshelf,
               onTapLetter: _onTapLetter,
@@ -1132,6 +1142,9 @@ class _RoomBackgroundLayers extends StatelessWidget {
     required this.floorRugFurnitureId,
     required this.chairFurnitureId,
     required this.curtainFurnitureId,
+    required this.windowHangingReactionKey,
+    required this.flowerReactionKey,
+    required this.chairReactionKey,
     required this.onTapBottle,
     required this.onTapBookshelf,
     required this.onTapLetter,
@@ -1166,6 +1179,9 @@ class _RoomBackgroundLayers extends StatelessWidget {
   final String? floorRugFurnitureId;
   final String? chairFurnitureId;
   final String? curtainFurnitureId;
+  final GlobalKey<FurnitureReactionState> windowHangingReactionKey;
+  final GlobalKey<FurnitureReactionState> flowerReactionKey;
+  final GlobalKey<FurnitureReactionState> chairReactionKey;
   final VoidCallback onTapBottle;
   final VoidCallback onTapBookshelf;
   final VoidCallback onTapLetter;
@@ -1248,6 +1264,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
                 scale: RoomPage._windowHangingDecorFurnitureScale,
                 scaleCorrections: RoomPage._windowHangingDecorScaleCorrections,
                 supportedFurnitureIds: RoomPage._windowHangingDecorFurnitureIds,
+                reactionKey: windowHangingReactionKey,
               ),
               tutorialTarget == _TutorialTarget.none
                   ? const SizedBox.shrink(
@@ -1362,6 +1379,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
                 furnituresFuture: furnituresFuture,
                 furnitureId: flowerFurnitureId,
                 roomWidth: constraints.maxWidth,
+                reactionKey: flowerReactionKey,
               ),
               Align(
                 alignment: RoomPage._vaseAlignment,
@@ -1446,7 +1464,41 @@ class _RoomBackgroundLayers extends StatelessWidget {
                 furnituresFuture: furnituresFuture,
                 furnitureId: chairFurnitureId,
                 roomWidth: constraints.maxWidth,
+                reactionKey: chairReactionKey,
               ),
+              if (windowHangingDecorFurnitureId != null &&
+                  furnitureReactionTypeFor(windowHangingDecorFurnitureId!) !=
+                      null)
+                _FurnitureReactionTapArea(
+                  furnitureId: windowHangingDecorFurnitureId!,
+                  alignment: RoomPage._windowHangingDecorFurnitureAlignment,
+                  width:
+                      constraints.maxWidth *
+                      RoomPage._windowHangingDecorFurnitureScale *
+                      (RoomPage
+                              ._windowHangingDecorScaleCorrections[windowHangingDecorFurnitureId!] ??
+                          1),
+                  aspectRatio: RoomPage._windowHangingDecorFurnitureAspectRatio,
+                  onTap: () => windowHangingReactionKey.currentState?.play(),
+                ),
+              if (flowerFurnitureId != null &&
+                  furnitureReactionTypeFor(flowerFurnitureId!) != null)
+                _FurnitureReactionTapArea(
+                  furnitureId: flowerFurnitureId!,
+                  alignment: RoomPage._flowerAlignment,
+                  width: constraints.maxWidth * RoomPage._flowerScale,
+                  aspectRatio: RoomPage._flowerAspectRatio,
+                  onTap: () => flowerReactionKey.currentState?.play(),
+                ),
+              if (chairFurnitureId != null &&
+                  furnitureReactionTypeFor(chairFurnitureId!) != null)
+                _FurnitureReactionTapArea(
+                  furnitureId: chairFurnitureId!,
+                  alignment: RoomPage._chairAlignment,
+                  width: constraints.maxWidth * RoomPage._chairScale,
+                  aspectRatio: RoomPage._chairAspectRatio,
+                  onTap: () => chairReactionKey.currentState?.play(),
+                ),
               Positioned(
                 left: 0,
                 top: constraints.maxHeight * 0.46,
@@ -1592,6 +1644,7 @@ class _FlowerLayer extends StatelessWidget {
     required this.furnituresFuture,
     required this.furnitureId,
     required this.roomWidth,
+    required this.reactionKey,
   });
 
   static const String _initialFlowerAssetPath =
@@ -1600,6 +1653,7 @@ class _FlowerLayer extends StatelessWidget {
   final Future<List<Furniture>> furnituresFuture;
   final String? furnitureId;
   final double roomWidth;
+  final GlobalKey<FurnitureReactionState> reactionKey;
 
   @override
   Widget build(BuildContext context) {
@@ -1630,27 +1684,28 @@ class _FlowerLayer extends StatelessWidget {
   }
 
   Widget _buildFlower(String imagePath, {String? furnitureId}) {
+    final image = Image.asset(
+      imagePath,
+      key: ValueKey(
+        furnitureId == null
+            ? 'roomInitialFlowerImage'
+            : 'roomFurnitureImage-$furnitureId',
+      ),
+      fit: BoxFit.contain,
+      errorBuilder: furnitureId == null
+          ? null
+          : (context, error, stackTrace) => Image.asset(
+              _initialFlowerAssetPath,
+              key: const ValueKey('roomInitialFlowerImage'),
+              fit: BoxFit.contain,
+            ),
+    );
     return Align(
       key: const ValueKey('roomFlowerLayer'),
       alignment: RoomPage._flowerAlignment,
       child: SizedBox(
         width: roomWidth * RoomPage._flowerScale,
-        child: Image.asset(
-          imagePath,
-          key: ValueKey(
-            furnitureId == null
-                ? 'roomInitialFlowerImage'
-                : 'roomFurnitureImage-$furnitureId',
-          ),
-          fit: BoxFit.contain,
-          errorBuilder: furnitureId == null
-              ? null
-              : (context, error, stackTrace) => Image.asset(
-                  _initialFlowerAssetPath,
-                  key: const ValueKey('roomInitialFlowerImage'),
-                  fit: BoxFit.contain,
-                ),
-        ),
+        child: _withFurnitureReaction(image, furnitureId, reactionKey),
       ),
     );
   }
@@ -1662,6 +1717,7 @@ class _ChairLayer extends StatelessWidget {
     required this.furnituresFuture,
     required this.furnitureId,
     required this.roomWidth,
+    required this.reactionKey,
   });
 
   static const String _fixedChairAssetPath = 'assets/images/room/chair.png';
@@ -1669,6 +1725,7 @@ class _ChairLayer extends StatelessWidget {
   final Future<List<Furniture>> furnituresFuture;
   final String? furnitureId;
   final double roomWidth;
+  final GlobalKey<FurnitureReactionState> reactionKey;
 
   @override
   Widget build(BuildContext context) {
@@ -1699,27 +1756,28 @@ class _ChairLayer extends StatelessWidget {
   }
 
   Widget _buildChair(String imagePath, {String? furnitureId}) {
+    final image = Image.asset(
+      imagePath,
+      key: ValueKey(
+        furnitureId == null
+            ? 'roomFixedChairImage'
+            : 'roomFurnitureImage-$furnitureId',
+      ),
+      fit: BoxFit.contain,
+      errorBuilder: furnitureId == null
+          ? null
+          : (context, error, stackTrace) => Image.asset(
+              _fixedChairAssetPath,
+              key: const ValueKey('roomFixedChairImage'),
+              fit: BoxFit.contain,
+            ),
+    );
     return Align(
       key: const ValueKey('roomChairLayer'),
       alignment: RoomPage._chairAlignment,
       child: SizedBox(
         width: roomWidth * RoomPage._chairScale,
-        child: Image.asset(
-          imagePath,
-          key: ValueKey(
-            furnitureId == null
-                ? 'roomFixedChairImage'
-                : 'roomFurnitureImage-$furnitureId',
-          ),
-          fit: BoxFit.contain,
-          errorBuilder: furnitureId == null
-              ? null
-              : (context, error, stackTrace) => Image.asset(
-                  _fixedChairAssetPath,
-                  key: const ValueKey('roomFixedChairImage'),
-                  fit: BoxFit.contain,
-                ),
-        ),
+        child: _withFurnitureReaction(image, furnitureId, reactionKey),
       ),
     );
   }
@@ -1879,6 +1937,7 @@ class _FurnitureImageLayer extends StatelessWidget {
     required this.scale,
     required this.scaleCorrections,
     required this.supportedFurnitureIds,
+    this.reactionKey,
   });
 
   final Key layerKey;
@@ -1889,6 +1948,7 @@ class _FurnitureImageLayer extends StatelessWidget {
   final double scale;
   final Map<String, double> scaleCorrections;
   final Set<String> supportedFurnitureIds;
+  final GlobalKey<FurnitureReactionState>? reactionKey;
 
   @override
   Widget build(BuildContext context) {
@@ -1917,21 +1977,70 @@ class _FurnitureImageLayer extends StatelessWidget {
         }
 
         final scaleCorrection = scaleCorrections[selectedId] ?? 1;
+        final image = Image.asset(
+          'assets/images/${selectedFurniture.imagePath}',
+          key: ValueKey('roomFurnitureImage-$selectedId'),
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+        );
         return Align(
           key: layerKey,
           alignment: alignment,
           child: SizedBox(
             width: roomWidth * scale * scaleCorrection,
-            child: Image.asset(
-              'assets/images/${selectedFurniture.imagePath}',
-              key: ValueKey('roomFurnitureImage-$selectedId'),
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) =>
-                  const SizedBox.shrink(),
-            ),
+            child: _withFurnitureReaction(image, selectedId, reactionKey),
           ),
         );
       },
+    );
+  }
+}
+
+Widget _withFurnitureReaction(
+  Widget child,
+  String? furnitureId,
+  GlobalKey<FurnitureReactionState>? reactionKey,
+) {
+  if (furnitureId == null) {
+    return child;
+  }
+  final reactionType = furnitureReactionTypeFor(furnitureId);
+  if (reactionType == null) {
+    return child;
+  }
+  return FurnitureReaction(
+    key: reactionKey ?? ValueKey('furnitureReactionState-$furnitureId'),
+    furnitureId: furnitureId,
+    type: reactionType,
+    child: child,
+  );
+}
+
+class _FurnitureReactionTapArea extends StatelessWidget {
+  const _FurnitureReactionTapArea({
+    required this.furnitureId,
+    required this.alignment,
+    required this.width,
+    required this.aspectRatio,
+    required this.onTap,
+  });
+
+  final String furnitureId;
+  final Alignment alignment;
+  final double width;
+  final double aspectRatio;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: alignment,
+      child: GestureDetector(
+        key: ValueKey('furnitureReactionTapArea-$furnitureId'),
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: SizedBox(width: width, height: width / aspectRatio),
+      ),
     );
   }
 }

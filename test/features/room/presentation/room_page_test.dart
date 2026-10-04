@@ -20,6 +20,7 @@ import 'package:ame_tsuzuri/features/letters/repository/shizuku_repository.dart'
 import 'package:ame_tsuzuri/features/room/presentation/prototype_controls.dart';
 import 'package:ame_tsuzuri/features/room/presentation/room_page.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/autumn_leaf_effect.dart';
+import 'package:ame_tsuzuri/features/room/presentation/widgets/furniture_reaction.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/rain_overlay.dart';
 import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
 import 'package:ame_tsuzuri/shared/model/weather_type.dart';
@@ -60,6 +61,14 @@ void main() {
           find.image(AssetImage('assets/images/${entry.value}')),
           findsOneWidget,
         );
+        if (entry.key == 'rocking_chair') {
+          await _expectFurnitureReactionStarts(tester, entry.key);
+        } else {
+          expect(
+            find.byKey(ValueKey('furnitureReaction-${entry.key}')),
+            findsNothing,
+          );
+        }
       });
     }
 
@@ -237,6 +246,7 @@ void main() {
           findsOneWidget,
         );
         expect(_fixedVaseImage, findsOneWidget);
+        await _expectFurnitureReactionStarts(tester, entry.key);
       });
     }
 
@@ -851,6 +861,7 @@ void main() {
           (image.image as AssetImage).assetName,
           'assets/images/${entry.value}',
         );
+        await _expectFurnitureReactionStarts(tester, entry.key);
       });
     }
 
@@ -925,6 +936,29 @@ void main() {
       });
       expect(_windowHangingDecorFurnitureLayer, findsOneWidget);
     });
+  });
+
+  testWidgets('reaction家具は390×700とPC幅でoverflowしない', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetDevicePixelRatio();
+      tester.view.resetPhysicalSize();
+    });
+
+    for (final size in const [Size(390, 700), Size(1200, 800)]) {
+      tester.view.physicalSize = size;
+      await _pumpRoom(
+        tester,
+        initialPlacedFurnitureIds: const {
+          _windowHangingDecorSlotId: 'wind_chime',
+          _windowVaseSlotId: 'small_white_flower',
+          _chairSlotId: 'rocking_chair',
+        },
+      );
+
+      expect(find.byType(FurnitureReaction), findsNWidgets(3));
+      expect(tester.takeException(), isNull);
+    }
   });
 
   group('窓辺A家具', () {
@@ -3880,6 +3914,38 @@ double _opacityForKey(WidgetTester tester, String key) {
     matching: find.byType(Opacity),
   );
   return tester.widget<Opacity>(ancestorOpacity.first).opacity;
+}
+
+Future<void> _expectFurnitureReactionStarts(
+  WidgetTester tester,
+  String furnitureId,
+) async {
+  final reaction = find.byKey(
+    ValueKey('furnitureReactionTapArea-$furnitureId'),
+  );
+  final transform = find.byKey(
+    ValueKey('furnitureReactionTransform-$furnitureId'),
+  );
+  expect(reaction, findsOneWidget);
+  expect(
+    tester.widget<Transform>(transform).transform.storage[1],
+    closeTo(0, 0.000001),
+  );
+
+  await tester.tap(reaction);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 100));
+
+  expect(
+    tester.widget<Transform>(transform).transform.storage[1].abs(),
+    greaterThan(0.0001),
+  );
+
+  await tester.pump(const Duration(seconds: 1));
+  expect(
+    tester.widget<Transform>(transform).transform.storage[1],
+    closeTo(0, 0.000001),
+  );
 }
 
 Future<_RoomHarness> _pumpRoom(
