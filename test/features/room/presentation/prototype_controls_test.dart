@@ -14,7 +14,9 @@ import 'package:ame_tsuzuri/features/letters/repository/read_letter_repository.d
 import 'package:ame_tsuzuri/features/letters/repository/shizuku_repository.dart';
 import 'package:ame_tsuzuri/features/room/presentation/room_page.dart';
 import 'package:ame_tsuzuri/features/room/presentation/prototype_controls.dart';
+import 'package:ame_tsuzuri/features/room/presentation/widgets/last_raindrop.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/rain_overlay.dart';
+import 'package:ame_tsuzuri/features/room/presentation/widgets/soft_sunlight.dart';
 import 'package:ame_tsuzuri/shared/model/season_type.dart';
 import 'package:ame_tsuzuri/shared/model/weather_type.dart';
 import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
@@ -120,6 +122,86 @@ void main() {
         findsOneWidget,
       );
     }
+  });
+
+  testWidgets('天気overrideでauto・rain・sunnyを切り替えて保存状態を変更しない', (tester) async {
+    await _pumpPrototypeRoom(tester);
+    final prefs = await SharedPreferences.getInstance();
+    final savedDate = prefs.getString('prototypeDate');
+    final savedReadState = prefs.getString('readLetterState');
+
+    expect(find.byType(RainOverlay), findsOneWidget);
+    expect(find.byType(SoftSunlight), findsNothing);
+    expect(find.byType(LastRaindrop), findsNothing);
+
+    await _selectPrototypeOperation(tester, 'prototypeWeatherSunny');
+    expect(find.byType(RainOverlay), findsNothing);
+    expect(find.byType(SoftSunlight), findsOneWidget);
+    expect(find.byType(LastRaindrop), findsOneWidget);
+
+    await _selectPrototypeOperation(tester, 'prototypeWeatherRain');
+    expect(find.byType(RainOverlay), findsOneWidget);
+    expect(find.byType(SoftSunlight), findsNothing);
+    expect(find.byType(LastRaindrop), findsNothing);
+
+    await _selectPrototypeOperation(tester, 'prototypeWeatherSunny');
+    tester
+        .widget<PrototypeControls>(find.byType(PrototypeControls))
+        .onRainIntensityChanged(RainIntensity.heavy);
+    await tester.pump();
+    expect(find.byType(RainOverlay), findsNothing);
+
+    await _selectPrototypeOperation(tester, 'prototypeWeatherAuto');
+    expect(find.byType(RainOverlay), findsOneWidget);
+    expect(find.byType(SoftSunlight), findsNothing);
+    expect(prefs.getString('prototypeDate'), savedDate);
+    expect(prefs.getString('readLetterState'), savedReadState);
+  });
+
+  testWidgets('autoのsunny→sunnyと前日未定義ではLastRaindropを表示しない', (tester) async {
+    await _pumpPrototypeRoom(
+      tester,
+      weatherRepository: _MapWeatherRepository({
+        DateTime(2026, 8, 6): WeatherType.sunny,
+        DateTime(2026, 8, 7): WeatherType.sunny,
+      }),
+    );
+
+    expect(find.byType(SoftSunlight), findsOneWidget);
+    expect(find.byType(LastRaindrop), findsNothing);
+
+    await _pumpPrototypeRoom(
+      tester,
+      weatherRepository: _MapWeatherRepository({
+        DateTime(2026, 8, 7): WeatherType.sunny,
+      }),
+    );
+
+    expect(find.byType(SoftSunlight), findsOneWidget);
+    expect(find.byType(LastRaindrop), findsNothing);
+  });
+
+  testWidgets('sunny overrideで通常配達せずrainへ戻すと未配達日に一度だけ配達する', (tester) async {
+    final harness = await _pumpPrototypeRoom(tester);
+
+    await _selectPrototypeOperation(tester, 'prototypeWeatherSunny');
+    await _selectPrototypeOperation(tester, 'prototypeNextDay');
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(harness.read.deliveredLetterIdOn(DateTime(2026, 8, 8)), isNull);
+
+    await _selectPrototypeOperation(tester, 'prototypeWeatherRain');
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(harness.read.deliveredLetterIdOn(DateTime(2026, 8, 8)), 'letter_01');
+
+    await _selectPrototypeOperation(tester, 'prototypeWeatherSunny');
+    await tester.pump(const Duration(seconds: 1));
+    expect(harness.read.deliveredLetterIdOn(DateTime(2026, 8, 8)), 'letter_01');
+    expect(
+      harness.read.deliveredLetters.values.where((id) => id == 'letter_01'),
+      hasLength(1),
+    );
   });
 
   testWidgets('翌日へ進むとゲーム状態を維持して翌日の手紙を配達する', (tester) async {
@@ -262,6 +344,7 @@ Future<_PrototypeHarness> _pumpPrototypeRoom(
   WidgetTester tester, {
   DateTime? date,
   PurchasedFurnitureRepository? purchasedRepository,
+  WeatherRepository? weatherRepository,
 }) async {
   SharedPreferences.setMockInitialValues({
     'prototypeDate': (date ?? DateTime(2026, 8, 7)).toIso8601String(),
@@ -306,7 +389,8 @@ Future<_PrototypeHarness> _pumpPrototypeRoom(
         ChangeNotifierProvider.value(value: placed),
         ChangeNotifierProvider.value(value: appDate),
         ChangeNotifierProvider(
-          create: (_) => WeatherProvider(_RainWeatherRepository()),
+          create: (_) =>
+              WeatherProvider(weatherRepository ?? _RainWeatherRepository()),
         ),
       ],
       child: MaterialApp(
@@ -367,6 +451,17 @@ class _EmptyFurnitureRepository extends FurnitureRepository {
 class _RainWeatherRepository extends WeatherRepository {
   @override
   Future<WeatherType?> getByDate(DateTime date) async => WeatherType.rain;
+}
+
+class _MapWeatherRepository extends WeatherRepository {
+  _MapWeatherRepository(this.weatherByDate);
+
+  final Map<DateTime, WeatherType> weatherByDate;
+
+  @override
+  Future<WeatherType?> getByDate(DateTime date) async {
+    return weatherByDate[DateTime(date.year, date.month, date.day)];
+  }
 }
 
 class _FailOncePurchasedRepository extends PurchasedFurnitureRepository {

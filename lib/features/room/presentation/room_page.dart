@@ -13,7 +13,9 @@ import 'package:ame_tsuzuri/features/room/presentation/prototype_controls.dart';
 import 'package:ame_tsuzuri/features/room/presentation/prototype_reset_page.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/autumn_leaf_effect.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/interaction_hint_marker.dart';
+import 'package:ame_tsuzuri/features/room/presentation/widgets/last_raindrop.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/rain_overlay.dart';
+import 'package:ame_tsuzuri/features/room/presentation/widgets/soft_sunlight.dart';
 import 'package:ame_tsuzuri/features/furniture/provider/placed_furniture_provider.dart';
 import 'package:ame_tsuzuri/features/furniture/model/furniture.dart';
 import 'package:ame_tsuzuri/features/furniture/repository/furniture_repository.dart';
@@ -359,6 +361,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
   bool _isArrivalAnimating = false;
   bool _isPrototypeOperationRunning = false;
   SeasonType? _outdoorSeasonOverride;
+  WeatherType? _weatherOverride;
   RainIntensity? _rainIntensityOverride;
   late final AnimationController _arrivalController;
   late final AnimationController _tutorialGlowController;
@@ -406,6 +409,17 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     final catalogProvider = context.watch<CatalogProvider>();
     final placedFurnitureProvider = context.watch<PlacedFurnitureProvider>();
     final weatherProvider = context.watch<WeatherProvider>();
+    final today = appDateProvider.isLoaded
+        ? _dateOnly(appDateProvider.today)
+        : null;
+    final hasWeatherForToday =
+        today != null && weatherProvider.loadedDate == today;
+    final effectiveWeather =
+        _weatherOverride ??
+        (hasWeatherForToday ? weatherProvider.currentWeather : null);
+    final previousWeather = hasWeatherForToday
+        ? weatherProvider.previousWeather
+        : null;
 
     final deskSurfaceLeftFurnitureId = placedFurnitureProvider.isLoaded
         ? placedFurnitureProvider.placedFurnitureIds[RoomPage
@@ -481,11 +495,9 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
             aspectRatio: RoomPage._designWidth / RoomPage._designHeight,
             child: _RoomBackgroundLayers(
               season: _outdoorSeasonOverride ?? appDateProvider.currentSeason,
-              showRain:
-                  appDateProvider.isLoaded &&
-                  weatherProvider.loadedDate ==
-                      _dateOnly(appDateProvider.today) &&
-                  weatherProvider.currentWeather == WeatherType.rain,
+              effectiveWeather: effectiveWeather,
+              previousWeather: previousWeather,
+              weatherDate: hasWeatherForToday ? today : null,
               isTutorialCompleted: readLetterProvider.tutorialCompleted,
               rainIntensityOverride: _rainIntensityOverride,
               hasDeliveredLetter: showLetter,
@@ -511,6 +523,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
               isPrototypeOperationRunning: _isPrototypeOperationRunning,
               onMoveToNextDay: _moveToNextDay,
               onOutdoorSeasonChanged: _setOutdoorSeasonOverride,
+              onWeatherChanged: _setWeatherOverride,
               onRainIntensityChanged: _setRainIntensityOverride,
               onResetPrototype: _confirmPrototypeReset,
             ),
@@ -522,6 +535,13 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
 
   void _setOutdoorSeasonOverride(SeasonType? season) {
     setState(() => _outdoorSeasonOverride = season);
+  }
+
+  void _setWeatherOverride(WeatherType? weather) {
+    setState(() {
+      _weatherOverride = weather;
+      _attemptedDeliveryDate = null;
+    });
   }
 
   void _setRainIntensityOverride(RainIntensity? intensity) {
@@ -666,7 +686,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
         return;
       }
 
-      final currentWeather = weatherProvider.currentWeather;
+      final currentWeather = _weatherOverride ?? weatherProvider.currentWeather;
       if (currentWeather == null) {
         return;
       }
@@ -1091,7 +1111,9 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
 class _RoomBackgroundLayers extends StatelessWidget {
   const _RoomBackgroundLayers({
     required this.season,
-    required this.showRain,
+    required this.effectiveWeather,
+    required this.previousWeather,
+    required this.weatherDate,
     required this.isTutorialCompleted,
     required this.rainIntensityOverride,
     required this.hasDeliveredLetter,
@@ -1117,12 +1139,15 @@ class _RoomBackgroundLayers extends StatelessWidget {
     required this.isPrototypeOperationRunning,
     required this.onMoveToNextDay,
     required this.onOutdoorSeasonChanged,
+    required this.onWeatherChanged,
     required this.onRainIntensityChanged,
     required this.onResetPrototype,
   });
 
   final SeasonType season;
-  final bool showRain;
+  final WeatherType? effectiveWeather;
+  final WeatherType? previousWeather;
+  final DateTime? weatherDate;
   final bool isTutorialCompleted;
   final RainIntensity? rainIntensityOverride;
   final bool hasDeliveredLetter;
@@ -1148,6 +1173,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
   final bool isPrototypeOperationRunning;
   final VoidCallback onMoveToNextDay;
   final ValueChanged<SeasonType?> onOutdoorSeasonChanged;
+  final ValueChanged<WeatherType?> onWeatherChanged;
   final ValueChanged<RainIntensity?> onRainIntensityChanged;
   final VoidCallback onResetPrototype;
 
@@ -1176,10 +1202,18 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   alignment: RoomPage._outdoorAlignment,
                 ),
               ),
-              if (showRain)
+              if (effectiveWeather == WeatherType.rain)
                 RainOverlay(
                   isTutorialCompleted: isTutorialCompleted,
                   intensityOverride: rainIntensityOverride,
+                ),
+              if (effectiveWeather == WeatherType.sunny &&
+                  previousWeather == WeatherType.rain &&
+                  weatherDate != null)
+                LastRaindrop(
+                  key: ValueKey(
+                    'lastRaindrop-${weatherDate!.toIso8601String()}',
+                  ),
                 ),
               if (season == SeasonType.autumn) const AutumnLeafEffect(),
               Align(
@@ -1201,6 +1235,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
                 'assets/images/room/room_base.png',
                 fit: BoxFit.cover,
               ),
+              if (effectiveWeather == WeatherType.sunny) const SoftSunlight(),
               _FurnitureImageLayer(
                 key: const ValueKey(
                   'roomWindowHangingDecorAsyncFurnitureLayer',
@@ -1487,6 +1522,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   isRunning: isPrototypeOperationRunning,
                   onNextDay: onMoveToNextDay,
                   onOutdoorSeasonChanged: onOutdoorSeasonChanged,
+                  onWeatherChanged: onWeatherChanged,
                   onRainIntensityChanged: onRainIntensityChanged,
                   onReset: onResetPrototype,
                 ),

@@ -8,6 +8,7 @@ class WeatherProvider extends ChangeNotifier {
 
   final WeatherRepository _repository;
   WeatherType? _currentWeather;
+  WeatherType? _previousWeather;
   DateTime? _loadedDate;
   DateTime? _loadingDate;
   Future<void>? _loadingFuture;
@@ -15,6 +16,7 @@ class WeatherProvider extends ChangeNotifier {
   int _loadGeneration = 0;
 
   WeatherType? get currentWeather => _currentWeather;
+  WeatherType? get previousWeather => _previousWeather;
   DateTime? get loadedDate => _loadedDate;
   bool get isLoaded => _isLoaded;
 
@@ -29,6 +31,7 @@ class WeatherProvider extends ChangeNotifier {
 
     final generation = ++_loadGeneration;
     _currentWeather = null;
+    _previousWeather = null;
     _loadedDate = null;
     _isLoaded = false;
     _loadingDate = targetDate;
@@ -45,8 +48,15 @@ class WeatherProvider extends ChangeNotifier {
       if (generation != _loadGeneration) {
         return;
       }
+      final previousWeather = await _repository.getByDate(
+        targetDate.subtract(const Duration(days: 1)),
+      );
+      if (generation != _loadGeneration) {
+        return;
+      }
 
       _currentWeather = weather;
+      _previousWeather = previousWeather;
       _loadedDate = targetDate;
       _isLoaded = true;
       notifyListeners();

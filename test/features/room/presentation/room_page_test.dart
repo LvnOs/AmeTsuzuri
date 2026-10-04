@@ -557,7 +557,10 @@ void main() {
       );
 
       expect(harness.letterRepository.getAllCallCount, 0);
-      expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
+      expect(harness.weatherRepository.requestedDates, [
+        DateTime(2026, 8, 7),
+        DateTime(2026, 8, 6),
+      ]);
       expect(find.byType(RainOverlay), findsOneWidget);
     });
 
@@ -572,7 +575,9 @@ void main() {
 
       expect(harness.weatherRepository.requestedDates, [
         DateTime(2026, 8, 7),
+        DateTime(2026, 8, 6),
         DateTime(2026, 8, 8),
+        DateTime(2026, 8, 7),
       ]);
       expect(find.byType(RainOverlay), findsNothing);
     });
@@ -588,7 +593,9 @@ void main() {
 
       expect(harness.weatherRepository.requestedDates, [
         DateTime(2026, 8, 7),
+        DateTime(2026, 8, 6),
         DateTime(2026, 8, 8),
+        DateTime(2026, 8, 7),
       ]);
       expect(find.byType(RainOverlay), findsOneWidget);
     });
@@ -1918,7 +1925,10 @@ void main() {
       );
       expect(find.byKey(const ValueKey('roomLetterLayer')), findsOneWidget);
       expect(harness.letterRepository.getAllCallCount, 1);
-      expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
+      expect(harness.weatherRepository.requestedDates, [
+        DateTime(2026, 8, 7),
+        DateTime(2026, 8, 6),
+      ]);
     });
 
     testWidgets('配達済み未読なら候補を再選択せずletterレイヤーを表示する', (tester) async {
@@ -1933,7 +1943,10 @@ void main() {
 
       expect(find.byKey(const ValueKey('roomLetterLayer')), findsOneWidget);
       expect(harness.letterRepository.getAllCallCount, 0);
-      expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
+      expect(harness.weatherRepository.requestedDates, [
+        DateTime(2026, 8, 7),
+        DateTime(2026, 8, 6),
+      ]);
     });
 
     testWidgets('配達済み既読でも当日はletterレイヤーを表示する', (tester) async {
@@ -2031,7 +2044,9 @@ void main() {
       );
       expect(harness.weatherRepository.requestedDates, [
         DateTime(2026, 8, 7),
+        DateTime(2026, 8, 6),
         DateTime(2026, 8, 8),
+        DateTime(2026, 8, 7),
       ]);
     });
 
@@ -2053,6 +2068,7 @@ void main() {
       expect(harness.weatherRepository.requestedDates, [
         DateTime(2026, 8, 7),
         DateTime(2026, 8, 7),
+        DateTime(2026, 8, 6),
       ]);
       expect(
         harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
@@ -2136,7 +2152,10 @@ void main() {
         DateTime(2026, 8, 7),
       );
       expect(harness.letterRepository.getAllCallCount, 1);
-      expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
+      expect(harness.weatherRepository.requestedDates, [
+        DateTime(2026, 8, 7),
+        DateTime(2026, 8, 6),
+      ]);
 
       await tester.pageBack();
       await _pumpPastFiniteAnimations(tester);
@@ -2466,7 +2485,10 @@ void main() {
       await _tapLetter(tester);
 
       expect(find.text('letterB'), findsWidgets);
-      expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
+      expect(harness.weatherRepository.requestedDates, [
+        DateTime(2026, 8, 7),
+        DateTime(2026, 8, 6),
+      ]);
       expect(
         harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
         'letterB',
@@ -2905,7 +2927,10 @@ void main() {
         harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
         'tutorial_001',
       );
-      expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
+      expect(harness.weatherRepository.requestedDates, [
+        DateTime(2026, 8, 7),
+        DateTime(2026, 8, 6),
+      ]);
     });
 
     testWidgets('季節と天候が一致しなくてもtutorial_001を配達する', (tester) async {
@@ -2925,7 +2950,10 @@ void main() {
         harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
         'tutorial_001',
       );
-      expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
+      expect(harness.weatherRepository.requestedDates, [
+        DateTime(2026, 8, 7),
+        DateTime(2026, 8, 6),
+      ]);
     });
 
     testWidgets('配達済み未読ならrebuildでも通常手紙へ変えない', (tester) async {
@@ -2978,7 +3006,10 @@ void main() {
         harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
         'letterA',
       );
-      expect(harness.weatherRepository.requestedDates, [DateTime(2026, 8, 7)]);
+      expect(harness.weatherRepository.requestedDates, [
+        DateTime(2026, 8, 7),
+        DateTime(2026, 8, 6),
+      ]);
     });
 
     testWidgets('通常配達候補からtutorial_001を除外する', (tester) async {
