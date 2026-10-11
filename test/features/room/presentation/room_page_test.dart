@@ -22,6 +22,8 @@ import 'package:ame_tsuzuri/features/room/presentation/room_page.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/autumn_leaf_effect.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/furniture_reaction.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/rain_overlay.dart';
+import 'package:ame_tsuzuri/features/room/presentation/widgets/winter_frost_effect.dart';
+import 'package:ame_tsuzuri/features/room/presentation/widgets/winter_ice_grain_effect.dart';
 import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
 import 'package:ame_tsuzuri/shared/model/weather_type.dart';
 import 'package:ame_tsuzuri/shared/model/season_type.dart';
@@ -437,6 +439,77 @@ void main() {
           reason: '${entry.key.month}月の表示',
         );
       }
+    });
+
+    testWidgets('winterだけWinterFrostEffectを表示する', (tester) async {
+      for (final entry in <DateTime, bool>{
+        DateTime(2026, 4, 1): false,
+        DateTime(2026, 8, 1): false,
+        DateTime(2026, 9, 1): false,
+        DateTime(2026, 12, 1): true,
+      }.entries) {
+        await _pumpRoom(tester, date: entry.key);
+
+        expect(
+          find.byType(WinterFrostEffect),
+          entry.value ? findsOneWidget : findsNothing,
+          reason: '${entry.key.month}月の表示',
+        );
+      }
+    });
+
+    testWidgets('winterだけWinterIceGrainEffectを配置する', (tester) async {
+      for (final entry in <DateTime, bool>{
+        DateTime(2026, 4, 1): false,
+        DateTime(2026, 8, 1): false,
+        DateTime(2026, 9, 1): false,
+        DateTime(2026, 12, 1): true,
+      }.entries) {
+        await _pumpRoom(tester, date: entry.key);
+
+        expect(
+          find.byType(WinterIceGrainEffect),
+          entry.value ? findsOneWidget : findsNothing,
+          reason: '${entry.key.month}月の表示',
+        );
+      }
+    });
+
+    testWidgets('RainOverlay、氷粒、霜、post、room_baseの順で描画する', (tester) async {
+      await _pumpRoom(
+        tester,
+        date: DateTime(2026, 12, 1),
+        weather: WeatherType.rain,
+      );
+
+      final roomStack = tester.widget<Stack>(
+        find
+            .ancestor(
+              of: find.byType(WinterFrostEffect),
+              matching: find.byType(Stack),
+            )
+            .first,
+      );
+      final rainIndex = roomStack.children.indexWhere(
+        (child) => child is RainOverlay,
+      );
+      final grainIndex = roomStack.children.indexWhere(
+        (child) => child is WinterIceGrainEffect,
+      );
+      final frostIndex = roomStack.children.indexWhere(
+        (child) => child is WinterFrostEffect,
+      );
+      final postIndex = roomStack.children.indexWhere(
+        (child) => _containsAsset(child, 'assets/images/room/post.png'),
+      );
+      final roomBaseIndex = roomStack.children.indexWhere(
+        (child) => _containsAsset(child, 'assets/images/room/room_base.png'),
+      );
+
+      expect(rainIndex, lessThan(grainIndex));
+      expect(grainIndex, lessThan(frostIndex));
+      expect(frostIndex, lessThan(postIndex));
+      expect(postIndex, lessThan(roomBaseIndex));
     });
 
     testWidgets('prototype overrideでautumnへ切り替えると初回待機から生成する', (tester) async {

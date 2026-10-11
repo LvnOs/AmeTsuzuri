@@ -17,6 +17,8 @@ import 'package:ame_tsuzuri/features/room/presentation/widgets/interaction_hint_
 import 'package:ame_tsuzuri/features/room/presentation/widgets/last_raindrop.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/rain_overlay.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/soft_sunlight.dart';
+import 'package:ame_tsuzuri/features/room/presentation/widgets/winter_frost_effect.dart';
+import 'package:ame_tsuzuri/features/room/presentation/widgets/winter_ice_grain_effect.dart';
 import 'package:ame_tsuzuri/features/furniture/provider/placed_furniture_provider.dart';
 import 'package:ame_tsuzuri/features/furniture/model/furniture.dart';
 import 'package:ame_tsuzuri/features/furniture/repository/furniture_repository.dart';
@@ -1232,6 +1234,8 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   ),
                 ),
               if (season == SeasonType.autumn) const AutumnLeafEffect(),
+              if (season == SeasonType.winter) const WinterIceGrainEffect(),
+              if (season == SeasonType.winter) const WinterFrostEffect(),
               Align(
                 alignment: RoomPage._postAlignment,
                 child: SizedBox(
