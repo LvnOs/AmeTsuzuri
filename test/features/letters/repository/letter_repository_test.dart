@@ -24,7 +24,7 @@ void main() {
     expect(tutorial.body, isNot(contains('本棚からいつでも読み返せます')));
   });
 
-  test('実データはtutorial 1件・summer 10件・autumn 10件を重複なく読み込む', () async {
+  test('実データはtutorial 1件・summer 10件・autumn 10件・winter 10件を重複なく読み込む', () async {
     final letters = await LetterRepository().getAll();
     final ids = letters.map((letter) => letter.id).toList();
     final summerLetters = letters
@@ -33,15 +33,19 @@ void main() {
     final autumnLetters = letters
         .where((letter) => letter.requiredSeason == SeasonType.autumn)
         .toList();
+    final winterLetters = letters
+        .where((letter) => letter.requiredSeason == SeasonType.winter)
+        .toList();
 
-    expect(letters, hasLength(21));
-    expect(ids.toSet(), hasLength(21));
+    expect(letters, hasLength(31));
+    expect(ids.toSet(), hasLength(31));
     expect(
       letters.where((letter) => letter.id == 'tutorial_001'),
       hasLength(1),
     );
     expect(summerLetters, hasLength(10));
     expect(autumnLetters, hasLength(10));
+    expect(winterLetters, hasLength(10));
     expect(autumnLetters.map((letter) => letter.id), const [
       'letter_20260817',
       'letter_20260818',
@@ -64,9 +68,31 @@ void main() {
       autumnLetters.every((letter) => letter.body.trim().isNotEmpty),
       isTrue,
     );
+    expect(winterLetters.map((letter) => letter.id), const [
+      'letter_20260827',
+      'letter_20260828',
+      'letter_20260829',
+      'letter_20260830',
+      'letter_20260831',
+      'letter_20260901',
+      'letter_20260902',
+      'letter_20260903',
+      'letter_20260904',
+      'letter_20260905',
+    ]);
+    expect(
+      winterLetters.every(
+        (letter) => letter.requiredWeather == WeatherType.rain,
+      ),
+      isTrue,
+    );
+    expect(
+      winterLetters.every((letter) => letter.body.trim().isNotEmpty),
+      isTrue,
+    );
   });
 
-  test('実データのsummerとautumnを季節ごとのYAML順で選択する', () async {
+  test('実データのsummer・autumn・winterを季節ごとのYAML順で選択する', () async {
     final letters = (await LetterRepository().getAll())
         .where((letter) => letter.id != 'tutorial_001')
         .toList();
@@ -118,6 +144,18 @@ void main() {
       'letter_20260824',
       'letter_20260825',
       'letter_20260826',
+    ]);
+    expectSelectionOrder(SeasonType.winter, const [
+      'letter_20260827',
+      'letter_20260828',
+      'letter_20260829',
+      'letter_20260830',
+      'letter_20260831',
+      'letter_20260901',
+      'letter_20260902',
+      'letter_20260903',
+      'letter_20260904',
+      'letter_20260905',
     ]);
   });
 
