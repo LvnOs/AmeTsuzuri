@@ -22,6 +22,7 @@ import 'package:ame_tsuzuri/features/room/presentation/room_page.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/autumn_leaf_effect.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/furniture_reaction.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/rain_overlay.dart';
+import 'package:ame_tsuzuri/features/room/presentation/widgets/spring_petal_drift_effect.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/winter_frost_effect.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/winter_ice_grain_effect.dart';
 import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
@@ -439,6 +440,56 @@ void main() {
           reason: '${entry.key.month}月の表示',
         );
       }
+    });
+
+    testWidgets('springだけSpringPetalDriftEffectを配置する', (tester) async {
+      for (final entry in <DateTime, bool>{
+        DateTime(2026, 4, 1): true,
+        DateTime(2026, 8, 1): false,
+        DateTime(2026, 9, 1): false,
+        DateTime(2026, 12, 1): false,
+      }.entries) {
+        await _pumpRoom(tester, date: entry.key);
+
+        expect(
+          find.byType(SpringPetalDriftEffect),
+          entry.value ? findsOneWidget : findsNothing,
+          reason: '${entry.key.month}月の表示',
+        );
+      }
+    });
+
+    testWidgets('RainOverlay、花びら、post、room_baseの順で描画する', (tester) async {
+      await _pumpRoom(
+        tester,
+        date: DateTime(2026, 4, 1),
+        weather: WeatherType.rain,
+      );
+
+      final roomStack = tester.widget<Stack>(
+        find
+            .ancestor(
+              of: find.byType(SpringPetalDriftEffect),
+              matching: find.byType(Stack),
+            )
+            .first,
+      );
+      final rainIndex = roomStack.children.indexWhere(
+        (child) => child is RainOverlay,
+      );
+      final petalIndex = roomStack.children.indexWhere(
+        (child) => child is SpringPetalDriftEffect,
+      );
+      final postIndex = roomStack.children.indexWhere(
+        (child) => _containsAsset(child, 'assets/images/room/post.png'),
+      );
+      final roomBaseIndex = roomStack.children.indexWhere(
+        (child) => _containsAsset(child, 'assets/images/room/room_base.png'),
+      );
+
+      expect(rainIndex, lessThan(petalIndex));
+      expect(petalIndex, lessThan(postIndex));
+      expect(postIndex, lessThan(roomBaseIndex));
     });
 
     testWidgets('winterだけWinterFrostEffectを表示する', (tester) async {
