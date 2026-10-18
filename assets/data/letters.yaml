@@ -370,3 +370,123 @@ letters:
       - 枝
       - 季節
     body_file: letters/2026-09-05.md
+
+  - id: letter_20260906
+    title: つくし
+    season: spring
+    weather: rain
+    tutorial: false
+    tags:
+      - 春
+      - 植物
+      - 足元
+      - 雨上がり
+    body_file: letters/2026-09-06.md
+
+  - id: letter_20260907
+    title: 傘についた花びら
+    season: spring
+    weather: rain
+    tutorial: false
+    tags:
+      - 春
+      - 花びら
+      - 傘
+      - 暮らし
+    body_file: letters/2026-09-07.md
+
+  - id: letter_20260908
+    title: 春の匂い
+    season: spring
+    weather: rain
+    tutorial: false
+    tags:
+      - 春
+      - 匂い
+      - 雨上がり
+      - 草
+    body_file: letters/2026-09-08.md
+
+  - id: letter_20260909
+    title: 若葉
+    season: spring
+    weather: rain
+    tutorial: false
+    tags:
+      - 春
+      - 若葉
+      - 雨粒
+      - 植物
+    body_file: letters/2026-09-09.md
+
+  - id: letter_20260910
+    title: 燕
+    season: spring
+    weather: rain
+    tutorial: false
+    tags:
+      - 春
+      - 燕
+      - 空
+      - 生き物
+    body_file: letters/2026-09-10.md
+
+  - id: letter_20260911
+    title: 水路
+    season: spring
+    weather: rain
+    tutorial: false
+    tags:
+      - 春
+      - 水路
+      - 流れ
+      - 雨
+    body_file: letters/2026-09-11.md
+
+  - id: letter_20260912
+    title: 菜の花
+    season: spring
+    weather: rain
+    tutorial: false
+    tags:
+      - 春
+      - 菜の花
+      - 色
+      - 景色
+    body_file: letters/2026-09-12.md
+
+  - id: letter_20260913
+    title: 雨上がりの自転車
+    season: spring
+    weather: rain
+    tutorial: false
+    tags:
+      - 春
+      - 自転車
+      - 雨上がり
+      - 道
+    body_file: letters/2026-09-13.md
+
+  - id: letter_20260914
+    title: てんとう虫
+    season: spring
+    weather: rain
+    tutorial: false
+    tags:
+      - 春
+      - てんとう虫
+      - 生き物
+      - 葉
+    body_file: letters/2026-09-14.md
+
+  - id: letter_20260915
+    title: カーテンを開けた朝
+    season: spring
+    weather: rain
+    tutorial: false
+    tags:
+      - 春
+      - 朝
+      - 窓
+      - 暮らし
+    body_file: letters/2026-09-15.md
