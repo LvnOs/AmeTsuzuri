@@ -24,9 +24,12 @@ void main() {
     expect(tutorial.body, isNot(contains('本棚からいつでも読み返せます')));
   });
 
-  test('実データはtutorial 1件・summer 10件・autumn 10件・winter 10件を重複なく読み込む', () async {
+  test('実データはtutorial 1件・四季各10件を重複なく読み込む', () async {
     final letters = await LetterRepository().getAll();
     final ids = letters.map((letter) => letter.id).toList();
+    final springLetters = letters
+        .where((letter) => letter.requiredSeason == SeasonType.spring)
+        .toList();
     final summerLetters = letters
         .where((letter) => letter.requiredSeason == SeasonType.summer)
         .toList();
@@ -37,15 +40,38 @@ void main() {
         .where((letter) => letter.requiredSeason == SeasonType.winter)
         .toList();
 
-    expect(letters, hasLength(31));
-    expect(ids.toSet(), hasLength(31));
+    expect(letters, hasLength(41));
+    expect(ids.toSet(), hasLength(41));
     expect(
       letters.where((letter) => letter.id == 'tutorial_001'),
       hasLength(1),
     );
+    expect(springLetters, hasLength(10));
     expect(summerLetters, hasLength(10));
     expect(autumnLetters, hasLength(10));
     expect(winterLetters, hasLength(10));
+    expect(springLetters.map((letter) => letter.id), const [
+      'letter_20260906',
+      'letter_20260907',
+      'letter_20260908',
+      'letter_20260909',
+      'letter_20260910',
+      'letter_20260911',
+      'letter_20260912',
+      'letter_20260913',
+      'letter_20260914',
+      'letter_20260915',
+    ]);
+    expect(
+      springLetters.every(
+        (letter) => letter.requiredWeather == WeatherType.rain,
+      ),
+      isTrue,
+    );
+    expect(
+      springLetters.every((letter) => letter.body.trim().isNotEmpty),
+      isTrue,
+    );
     expect(autumnLetters.map((letter) => letter.id), const [
       'letter_20260817',
       'letter_20260818',
