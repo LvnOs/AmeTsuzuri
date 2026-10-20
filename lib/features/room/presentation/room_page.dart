@@ -368,6 +368,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
   bool _isArrivalAnimating = false;
   bool _isPrototypeOperationRunning = false;
   SeasonType? _outdoorSeasonOverride;
+  SeasonType? _letterSeasonOverride;
   WeatherType? _weatherOverride;
   RainIntensity? _rainIntensityOverride;
   late final AnimationController _arrivalController;
@@ -536,6 +537,8 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
               isPrototypeOperationRunning: _isPrototypeOperationRunning,
               onMoveToNextDay: _moveToNextDay,
               onOutdoorSeasonChanged: _setOutdoorSeasonOverride,
+              letterSeasonOverride: _letterSeasonOverride,
+              onLetterSeasonChanged: _setLetterSeasonOverride,
               onWeatherChanged: _setWeatherOverride,
               onRainIntensityChanged: _setRainIntensityOverride,
               onResetPrototype: _confirmPrototypeReset,
@@ -548,6 +551,10 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
 
   void _setOutdoorSeasonOverride(SeasonType? season) {
     setState(() => _outdoorSeasonOverride = season);
+  }
+
+  void _setLetterSeasonOverride(SeasonType? season) {
+    setState(() => _letterSeasonOverride = season);
   }
 
   void _setWeatherOverride(WeatherType? weather) {
@@ -707,11 +714,17 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
       final normalLetters = letters
           .where((letter) => letter.id != RoomPage._tutorialLetterId)
           .toList();
+      final excludedLetterIds = <String>{
+        ...readLetterProvider.readLetterIds,
+        ...readLetterProvider.deliveredLetters.values,
+      };
       final letter = _letterDeliveryService.selectLetter(
         letters: normalLetters,
-        currentSeason: context.read<AppDateProvider>().currentSeason,
+        currentSeason:
+            _letterSeasonOverride ??
+            context.read<AppDateProvider>().currentSeason,
         currentWeather: currentWeather,
-        readLetterIds: readLetterProvider.readLetterIds,
+        readLetterIds: excludedLetterIds,
       );
       if (letter == null) {
         return;
@@ -1155,6 +1168,8 @@ class _RoomBackgroundLayers extends StatelessWidget {
     required this.isPrototypeOperationRunning,
     required this.onMoveToNextDay,
     required this.onOutdoorSeasonChanged,
+    required this.letterSeasonOverride,
+    required this.onLetterSeasonChanged,
     required this.onWeatherChanged,
     required this.onRainIntensityChanged,
     required this.onResetPrototype,
@@ -1192,6 +1207,8 @@ class _RoomBackgroundLayers extends StatelessWidget {
   final bool isPrototypeOperationRunning;
   final VoidCallback onMoveToNextDay;
   final ValueChanged<SeasonType?> onOutdoorSeasonChanged;
+  final SeasonType? letterSeasonOverride;
+  final ValueChanged<SeasonType?> onLetterSeasonChanged;
   final ValueChanged<WeatherType?> onWeatherChanged;
   final ValueChanged<RainIntensity?> onRainIntensityChanged;
   final VoidCallback onResetPrototype;
@@ -1234,8 +1251,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
                     'lastRaindrop-${weatherDate!.toIso8601String()}',
                   ),
                 ),
-              if (season == SeasonType.spring)
-                const SpringPetalDriftEffect(),
+              if (season == SeasonType.spring) const SpringPetalDriftEffect(),
               if (season == SeasonType.autumn) const AutumnLeafEffect(),
               if (season == SeasonType.winter) const WinterIceGrainEffect(),
               if (season == SeasonType.winter) const WinterFrostEffect(),
@@ -1581,6 +1597,8 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   isRunning: isPrototypeOperationRunning,
                   onNextDay: onMoveToNextDay,
                   onOutdoorSeasonChanged: onOutdoorSeasonChanged,
+                  letterSeasonOverride: letterSeasonOverride,
+                  onLetterSeasonChanged: onLetterSeasonChanged,
                   onWeatherChanged: onWeatherChanged,
                   onRainIntensityChanged: onRainIntensityChanged,
                   onReset: onResetPrototype,

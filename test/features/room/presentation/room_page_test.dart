@@ -2208,6 +2208,63 @@ void main() {
       ]);
     });
 
+    testWidgets('前日に配達済みの未読Letterは再配達せず次の候補を配達する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: {},
+          deliveredLetters: {'2026-08-07': 'letterA'},
+        ),
+      );
+
+      await harness.dateProvider.moveToNextDay();
+      await _pumpPastFiniteAnimations(tester);
+
+      expect(harness.readLetterProvider.readLetterIds, isEmpty);
+      expect(
+        harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 8)),
+        'letterB',
+      );
+    });
+
+    testWidgets('既読と配達済み未読を除外して次の候補を選ぶ', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        letters: [_letter('letterA'), _letter('letterB'), _letter('letterC')],
+        initialReadState: ReadLetterState(
+          receivedLetters: {'letterA': DateTime(2026, 8, 6)},
+          deliveredLetters: {'2026-08-07': 'letterB'},
+        ),
+      );
+
+      await harness.dateProvider.moveToNextDay();
+      await _pumpPastFiniteAnimations(tester);
+
+      expect(
+        harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 8)),
+        'letterC',
+      );
+    });
+
+    testWidgets('対象季節の既読・配達済み候補を使い切ったら配達しない', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'letterA': DateTime(2026, 8, 6)},
+          deliveredLetters: {'2026-08-07': 'letterB'},
+        ),
+      );
+
+      await harness.dateProvider.moveToNextDay();
+      await _pumpPastFiniteAnimations(tester);
+
+      expect(
+        harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 8)),
+        isNull,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('通常配達の天候ロードが一度失敗すると750ms後に一度だけ再試行する', (tester) async {
       final harness = await _pumpRoom(
         tester,

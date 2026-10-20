@@ -19,6 +19,57 @@ void main() {
     expect(find.byKey(const ValueKey('letterPaper')), findsOneWidget);
   });
 
+  testWidgets('空白なしの先頭H1がtitleと同じなら本文から除外する', (tester) async {
+    await _pumpLetter(tester, title: '春のにおい', body: '#春のにおい\n\n雨が止んだあとです。');
+
+    expect(find.text('春のにおい'), findsOneWidget);
+    expect(find.textContaining('#春のにおい'), findsNothing);
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('letterBody'))).data,
+      '雨が止んだあとです。',
+    );
+  });
+
+  testWidgets('空白ありの先頭H1もtitleと同じなら本文から除外する', (tester) async {
+    await _pumpLetter(tester, title: '春のにおい', body: '# 春のにおい\n\n草の香りがします。');
+
+    expect(find.text('春のにおい'), findsOneWidget);
+    expect(find.textContaining('# 春のにおい'), findsNothing);
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('letterBody'))).data,
+      '草の香りがします。',
+    );
+  });
+
+  testWidgets('先頭見出しがない本文は変更しない', (tester) async {
+    const body = '雨の日に届いた手紙です。\n次の行です。';
+    await _pumpLetter(tester, body: body);
+
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('letterBody'))).data,
+      body,
+    );
+  });
+
+  testWidgets('本文途中の#は変更しない', (tester) async {
+    const body = '雨の日に届いた手紙です。\n#ここは本文の一部です。';
+    await _pumpLetter(tester, body: body);
+
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('letterBody'))).data,
+      body,
+    );
+  });
+
+  testWidgets('titleと異なる先頭H1は#だけ外して内容を残す', (tester) async {
+    await _pumpLetter(tester, body: '# 小さな追伸\n\n本文です。');
+
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('letterBody'))).data,
+      '小さな追伸\n\n本文です。',
+    );
+  });
+
   testWidgets('便箋Containerは生成り色と控えめな角・影を持つ', (tester) async {
     await _setSurfaceSize(tester, const Size(390, 700));
     await _pumpLetter(tester, body: '短い手紙です。');
@@ -204,6 +255,7 @@ Future<void> _setSurfaceSize(WidgetTester tester, Size size) async {
 Future<void> _pumpLetter(
   WidgetTester tester, {
   required String body,
+  String title = '雨の手紙',
   int? rewardAmount,
   bool settle = true,
 }) async {
@@ -220,7 +272,7 @@ Future<void> _pumpLetter(
                       rewardAmount: rewardAmount,
                       letter: Letter(
                         id: 'letter',
-                        title: '雨の手紙',
+                        title: title,
                         body: body,
                         requiredSeason: SeasonType.any,
                         requiredWeather: WeatherType.rain,

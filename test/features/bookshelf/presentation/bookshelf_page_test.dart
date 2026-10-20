@@ -17,6 +17,122 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
+  group('季節フィルター', () {
+    final letters = [
+      _letter('any', '季節なし', season: SeasonType.any),
+      _letter('springOld', '春の古い手紙', season: SeasonType.spring),
+      _letter('summer', '夏の手紙', season: SeasonType.summer),
+      _letter('autumn', '秋の手紙', season: SeasonType.autumn),
+      _letter('winter', '冬の手紙', season: SeasonType.winter),
+      _letter('springNew', '春の新しい手紙', season: SeasonType.spring),
+      _letter('unreadSpring', '未受取の春', season: SeasonType.spring),
+    ];
+    final receivedLetters = <String, DateTime?>{
+      'any': DateTime(2026, 8, 1),
+      'springOld': DateTime(2026, 8, 2),
+      'summer': DateTime(2026, 8, 3),
+      'autumn': DateTime(2026, 8, 4),
+      'winter': DateTime(2026, 8, 5),
+      'springNew': DateTime(2026, 8, 6),
+    };
+
+    testWidgets('初期状態はすべてを選び受取済みLetterだけを表示する', (tester) async {
+      await _pumpBookshelf(
+        tester,
+        letters: letters,
+        receivedLetters: receivedLetters,
+      );
+
+      expect(
+        tester.widget<Text>(find.text('すべて')).style?.fontWeight,
+        FontWeight.w600,
+      );
+      expect(await _allLetterOrder(tester), [
+        'springNew',
+        'winter',
+        'autumn',
+        'summer',
+        'springOld',
+        'any',
+      ]);
+      expect(find.text('未受取の春'), findsNothing);
+    });
+
+    testWidgets('春夏秋冬ごとに絞り込み、anyと未受取Letterを除外する', (tester) async {
+      await _pumpBookshelf(
+        tester,
+        letters: letters,
+        receivedLetters: receivedLetters,
+      );
+
+      const expected = {
+        SeasonType.spring: ['springNew', 'springOld'],
+        SeasonType.summer: ['summer'],
+        SeasonType.autumn: ['autumn'],
+        SeasonType.winter: ['winter'],
+      };
+      for (final entry in expected.entries) {
+        await _selectSeason(tester, entry.key.name);
+        expect(await _allLetterOrder(tester), entry.value);
+        expect(find.text('季節なし'), findsNothing);
+        expect(find.text('未受取の春'), findsNothing);
+      }
+
+      await _selectSeason(tester, 'all');
+      expect(await _allLetterOrder(tester), contains('any'));
+      expect(find.text('未受取の春'), findsNothing);
+    });
+
+    testWidgets('季節フィルター後も受取日降順を維持する', (tester) async {
+      await _pumpBookshelf(
+        tester,
+        letters: letters,
+        receivedLetters: receivedLetters,
+      );
+
+      await _selectSeason(tester, 'spring');
+
+      expect(await _allLetterOrder(tester), ['springNew', 'springOld']);
+    });
+
+    testWidgets('該当季節が0件なら季節用Empty文言を表示する', (tester) async {
+      await _pumpBookshelf(
+        tester,
+        letters: [_letter('summer', '夏の手紙', season: SeasonType.summer)],
+        receivedLetters: {'summer': DateTime(2026, 8, 3)},
+      );
+
+      await _selectSeason(tester, 'spring');
+
+      expect(find.text('この季節に届いた手紙はありません'), findsOneWidget);
+      expect(find.text('まだ読んだ手紙はありません'), findsNothing);
+    });
+
+    testWidgets('Letterを開いて戻っても選択中の季節を維持する', (tester) async {
+      await _pumpBookshelf(
+        tester,
+        letters: letters,
+        receivedLetters: receivedLetters,
+      );
+      await _selectSeason(tester, 'spring');
+
+      await tester.tap(
+        find.byKey(const ValueKey('bookshelfLetterRow-springNew')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(LetterPage), findsOneWidget);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      expect(await _allLetterOrder(tester), ['springNew', 'springOld']);
+      expect(
+        tester.widget<Text>(find.text('春')).style?.fontWeight,
+        FontWeight.w600,
+      );
+    });
+  });
+
   group('受取日の新しい順', () {
     final letters = [
       _letter('legacyA', '不明A'),
@@ -56,11 +172,11 @@ void main() {
             letterRepository: repository,
             receivedLetters: received,
           );
-          expect(_visibleLetterOrder(tester), expected);
+          expect(await _allLetterOrder(tester), expected);
           final context = tester.element(find.byType(BookshelfPage));
           await context.read<ReadLetterProvider>().load();
           await tester.pumpAndSettle();
-          expect(_visibleLetterOrder(tester), expected);
+          expect(await _allLetterOrder(tester), expected);
           expect(repository.letters, selected);
           await tester.pumpWidget(const SizedBox.shrink());
         }
@@ -77,7 +193,7 @@ void main() {
       final context = tester.element(find.byType(BookshelfPage));
       final read = context.read<ReadLetterProvider>();
       final shizuku = context.read<ShizukuProvider>();
-      final beforeOrder = _visibleLetterOrder(tester);
+      final beforeOrder = await _allLetterOrder(tester);
       final beforeDates = Map.of(read.receivedLetters);
       final beforeDrops = shizuku.currentShizuku;
       final beforeBottle = shizuku.bottleRecordCount;
@@ -88,10 +204,18 @@ void main() {
       expect(find.byType(LetterPage), findsOneWidget);
       await tester.pageBack();
       await tester.pumpAndSettle();
-      expect(_visibleLetterOrder(tester), beforeOrder);
+      expect(await _allLetterOrder(tester), beforeOrder);
       expect(read.receivedLetters, beforeDates);
       expect(shizuku.currentShizuku, beforeDrops);
       expect(shizuku.bottleRecordCount, beforeBottle);
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('bookshelfLetterRow-legacyA')),
+        200,
+        scrollable: find.descendant(
+          of: find.byKey(const ValueKey('bookshelfLetterList')),
+          matching: find.byType(Scrollable),
+        ),
+      );
       expect(find.text('受取日不明'), findsNWidgets(2));
     });
 
@@ -102,7 +226,7 @@ void main() {
         receivedLetters: {'legacyA': null},
         deliveredLetters: {'2026-08-09': 'letter_20260801'},
       );
-      expect(_visibleLetterOrder(tester), ['legacyA']);
+      expect(await _allLetterOrder(tester), ['legacyA']);
     });
   });
 
@@ -370,6 +494,10 @@ void main() {
 
         expect(find.byKey(const ValueKey('bookshelfPaper')), findsOneWidget);
         expect(
+          find.byKey(const ValueKey('bookshelfSeasonFilters')),
+          findsOneWidget,
+        );
+        expect(
           find.byKey(const ValueKey('bookshelfLetterRow-long_letter')),
           findsOneWidget,
         );
@@ -464,23 +592,64 @@ Future<void> _pumpBookshelf(
   await tester.pump();
 }
 
-List<String> _visibleLetterOrder(WidgetTester tester) {
-  return tester
-      .widgetList<InkWell>(find.byType(InkWell))
-      .map((widget) => widget.key)
-      .whereType<ValueKey<String>>()
-      .map((key) => key.value)
-      .where((key) => key.startsWith('bookshelfLetterRow-'))
-      .map((key) => key.substring('bookshelfLetterRow-'.length))
-      .toList();
+Future<List<String>> _allLetterOrder(WidgetTester tester) async {
+  final list = find.byKey(const ValueKey('bookshelfLetterList'));
+  if (list.evaluate().isEmpty) {
+    return [];
+  }
+
+  final scrollable = find.descendant(
+    of: list,
+    matching: find.byType(Scrollable),
+  );
+  final position = tester.state<ScrollableState>(scrollable).position;
+  final order = <String>[];
+
+  void collectMountedRows() {
+    final mountedIds = tester
+        .widgetList<InkWell>(find.byType(InkWell))
+        .map((widget) => widget.key)
+        .whereType<ValueKey<String>>()
+        .map((key) => key.value)
+        .where((key) => key.startsWith('bookshelfLetterRow-'))
+        .map((key) => key.substring('bookshelfLetterRow-'.length));
+    for (final id in mountedIds) {
+      if (!order.contains(id)) {
+        order.add(id);
+      }
+    }
+  }
+
+  collectMountedRows();
+  for (var step = 0; step < 100; step++) {
+    final before = position.pixels;
+    final maximum = position.maxScrollExtent;
+    if (maximum - before <= 0.5) {
+      break;
+    }
+    position.jumpTo((before + 200).clamp(0, maximum));
+    await tester.pump();
+    collectMountedRows();
+    if ((position.pixels - before).abs() <= 0.5) {
+      break;
+    }
+  }
+  position.jumpTo(0);
+  await tester.pump();
+  return order;
 }
 
-Letter _letter(String id, String title) {
+Future<void> _selectSeason(WidgetTester tester, String season) async {
+  await tester.tap(find.byKey(ValueKey('bookshelfSeasonFilter-$season')));
+  await tester.pump();
+}
+
+Letter _letter(String id, String title, {SeasonType season = SeasonType.any}) {
   return Letter(
     id: id,
     title: title,
     body: id,
-    requiredSeason: SeasonType.any,
+    requiredSeason: season,
     requiredWeather: WeatherType.rain,
   );
 }

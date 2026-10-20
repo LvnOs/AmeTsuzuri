@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../letters/model/letter.dart';
 import '../../letters/presentation/letter_page.dart';
 import '../../letters/repository/letter_repository.dart';
 import '../../letters/provider/read_letter_provider.dart';
 import '../../letters/provider/shizuku_provider.dart';
+import '../../../shared/model/season_type.dart';
 
-class BookshelfPage extends StatelessWidget {
+class BookshelfPage extends StatefulWidget {
   const BookshelfPage({super.key, this.letterRepository});
 
   static const Color _pageBackgroundColor = Color(0xFFE5DDD0);
@@ -18,18 +20,39 @@ class BookshelfPage extends StatelessWidget {
   final LetterRepository? letterRepository;
 
   @override
+  State<BookshelfPage> createState() => _BookshelfPageState();
+}
+
+class _BookshelfPageState extends State<BookshelfPage> {
+  late Future<List<Letter>> _lettersFuture;
+  SeasonType? _selectedSeason;
+
+  @override
+  void initState() {
+    super.initState();
+    _lettersFuture = (widget.letterRepository ?? LetterRepository()).getAll();
+  }
+
+  @override
+  void didUpdateWidget(covariant BookshelfPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.letterRepository != oldWidget.letterRepository) {
+      _lettersFuture = (widget.letterRepository ?? LetterRepository()).getAll();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final readLetterProvider = context.watch<ReadLetterProvider>();
     final readLetterIds = readLetterProvider.readLetterIds;
     final fullBottleCount = context.watch<ShizukuProvider>().fullBottleCount;
-    final repository = letterRepository ?? LetterRepository();
 
     return Scaffold(
-      backgroundColor: _pageBackgroundColor,
+      backgroundColor: BookshelfPage._pageBackgroundColor,
       appBar: AppBar(
         title: const Text('本棚'),
-        backgroundColor: _pageBackgroundColor,
-        foregroundColor: _inkColor,
+        backgroundColor: BookshelfPage._pageBackgroundColor,
+        foregroundColor: BookshelfPage._inkColor,
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
@@ -45,7 +68,7 @@ class BookshelfPage extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(18, 24, 18, 20),
                 decoration: BoxDecoration(
-                  color: _paperColor,
+                  color: BookshelfPage._paperColor,
                   borderRadius: BorderRadius.circular(4),
                   boxShadow: const [
                     BoxShadow(
@@ -62,7 +85,7 @@ class BookshelfPage extends StatelessWidget {
                       '届いた手紙',
                       key: ValueKey('bookshelfPaperTitle'),
                       style: TextStyle(
-                        color: _inkColor,
+                        color: BookshelfPage._inkColor,
                         fontSize: 23,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 0.8,
@@ -73,16 +96,29 @@ class BookshelfPage extends StatelessWidget {
                       '満ちた瓶 $fullBottleCount本',
                       key: const ValueKey('bookshelfBottleRecord'),
                       style: const TextStyle(
-                        color: _secondaryInkColor,
+                        color: BookshelfPage._secondaryInkColor,
                         fontSize: 14,
                         letterSpacing: 0.3,
                       ),
                     ),
                     const SizedBox(height: 18),
-                    const Divider(height: 1, thickness: 0.8, color: _ruleColor),
+                    const Divider(
+                      height: 1,
+                      thickness: 0.8,
+                      color: BookshelfPage._ruleColor,
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 1),
+                      child: _BookshelfSeasonFilter(
+                        selectedSeason: _selectedSeason,
+                        onChanged: (season) {
+                          setState(() => _selectedSeason = season);
+                        },
+                      ),
+                    ),
                     Expanded(
                       child: FutureBuilder(
-                        future: repository.getAll(),
+                        future: _lettersFuture,
                         builder: (context, snapshot) {
                           if (snapshot.connectionState ==
                               ConnectionState.waiting) {
@@ -96,7 +132,9 @@ class BookshelfPage extends StatelessWidget {
                               child: Text(
                                 '手紙の読み込みに失敗しました\n${snapshot.error}',
                                 textAlign: TextAlign.center,
-                                style: const TextStyle(color: _inkColor),
+                                style: const TextStyle(
+                                  color: BookshelfPage._inkColor,
+                                ),
                               ),
                             );
                           }
@@ -128,11 +166,34 @@ class BookshelfPage extends StatelessWidget {
                                   : a.$1.compareTo(b.$1);
                             });
 
+                          final visibleLetters = _selectedSeason == null
+                              ? orderedLetters
+                              : orderedLetters
+                                    .where(
+                                      (entry) =>
+                                          entry.$2.requiredSeason ==
+                                          _selectedSeason,
+                                    )
+                                    .toList();
+
                           if (readLetters.isEmpty) {
                             return const Center(
                               child: Text(
                                 'まだ読んだ手紙はありません',
-                                style: TextStyle(color: _secondaryInkColor),
+                                style: TextStyle(
+                                  color: BookshelfPage._secondaryInkColor,
+                                ),
+                              ),
+                            );
+                          }
+
+                          if (visibleLetters.isEmpty) {
+                            return const Center(
+                              child: Text(
+                                'この季節に届いた手紙はありません',
+                                style: TextStyle(
+                                  color: BookshelfPage._secondaryInkColor,
+                                ),
                               ),
                             );
                           }
@@ -140,14 +201,14 @@ class BookshelfPage extends StatelessWidget {
                           return ListView.separated(
                             key: const ValueKey('bookshelfLetterList'),
                             padding: EdgeInsets.zero,
-                            itemCount: readLetters.length,
+                            itemCount: visibleLetters.length,
                             separatorBuilder: (context, index) => const Divider(
                               height: 1,
                               thickness: 0.8,
-                              color: _ruleColor,
+                              color: BookshelfPage._ruleColor,
                             ),
                             itemBuilder: (context, index) {
-                              final letter = orderedLetters[index].$2;
+                              final letter = visibleLetters[index].$2;
 
                               return _BookshelfLetterRow(
                                 letterId: letter.id,
@@ -184,6 +245,93 @@ class BookshelfPage extends StatelessWidget {
       return '受取日不明';
     }
     return '${date.year}年${date.month}月${date.day}日';
+  }
+}
+
+class _BookshelfSeasonFilter extends StatelessWidget {
+  const _BookshelfSeasonFilter({
+    required this.selectedSeason,
+    required this.onChanged,
+  });
+
+  final SeasonType? selectedSeason;
+  final ValueChanged<SeasonType?> onChanged;
+
+  static const _options = <(String, SeasonType?)>[
+    ('すべて', null),
+    ('春', SeasonType.spring),
+    ('夏', SeasonType.summer),
+    ('秋', SeasonType.autumn),
+    ('冬', SeasonType.winter),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      key: const ValueKey('bookshelfSeasonFilters'),
+      spacing: 4,
+      runSpacing: 0,
+      children: [
+        for (final option in _options)
+          _BookshelfSeasonFilterItem(
+            key: ValueKey('bookshelfSeasonFilter-${option.$2?.name ?? 'all'}'),
+            label: option.$1,
+            isSelected: selectedSeason == option.$2,
+            onTap: () => onChanged(option.$2),
+          ),
+      ],
+    );
+  }
+}
+
+class _BookshelfSeasonFilterItem extends StatelessWidget {
+  const _BookshelfSeasonFilterItem({
+    super.key,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(2),
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: BookshelfPage._inkColor,
+                    fontSize: 13.5,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 120),
+                  width: isSelected ? 18 : 0,
+                  height: 1,
+                  color: BookshelfPage._secondaryInkColor,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

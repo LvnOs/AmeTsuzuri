@@ -28,6 +28,8 @@ class LetterPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final displayBody = _formatLetterBodyForDisplay(letter);
+
     return Scaffold(
       backgroundColor: _pageBackgroundColor,
       appBar: AppBar(
@@ -129,7 +131,8 @@ class LetterPage extends StatelessWidget {
                             child: SizedBox(
                               width: double.infinity,
                               child: Text(
-                                letter.body,
+                                displayBody,
+                                key: const ValueKey('letterBody'),
                                 style: _bodyTextStyle,
                                 strutStyle: const StrutStyle(
                                   fontSize: _bodyFontSize,
@@ -151,6 +154,44 @@ class LetterPage extends StatelessWidget {
       ),
     );
   }
+}
+
+String _formatLetterBodyForDisplay(Letter letter) {
+  final body = letter.body;
+  final lineBreakIndex = body.indexOf('\n');
+  final firstLine =
+      (lineBreakIndex == -1 ? body : body.substring(0, lineBreakIndex))
+          .replaceFirst(RegExp(r'\r$'), '');
+  final headingMatch = RegExp(
+    r'^#(?!#)[ \t]*(.+?)[ \t]*$',
+  ).firstMatch(firstLine);
+  if (headingMatch == null) {
+    return body;
+  }
+
+  final heading = headingMatch.group(1)!.trim();
+  if (heading.isEmpty) {
+    return body;
+  }
+
+  final remainingBody = lineBreakIndex == -1
+      ? ''
+      : body.substring(lineBreakIndex + 1);
+  if (heading == letter.title) {
+    return _removeSingleLeadingBlankLine(remainingBody);
+  }
+
+  return remainingBody.isEmpty ? heading : '$heading\n$remainingBody';
+}
+
+String _removeSingleLeadingBlankLine(String body) {
+  if (body.startsWith('\r\n')) {
+    return body.substring(2);
+  }
+  if (body.startsWith('\n')) {
+    return body.substring(1);
+  }
+  return body;
 }
 
 class _DropRewardFeedback extends StatefulWidget {

@@ -10,6 +10,11 @@ enum PrototypeOperation {
   outdoorSummer,
   outdoorAutumn,
   outdoorWinter,
+  letterAuto,
+  letterSpring,
+  letterSummer,
+  letterAutumn,
+  letterWinter,
   weatherAuto,
   weatherRain,
   weatherSunny,
@@ -26,6 +31,8 @@ class PrototypeControls extends StatelessWidget {
     required this.isRunning,
     required this.onNextDay,
     required this.onOutdoorSeasonChanged,
+    required this.letterSeasonOverride,
+    required this.onLetterSeasonChanged,
     required this.onWeatherChanged,
     required this.onRainIntensityChanged,
     required this.onReset,
@@ -34,6 +41,8 @@ class PrototypeControls extends StatelessWidget {
   final bool isRunning;
   final VoidCallback onNextDay;
   final ValueChanged<SeasonType?> onOutdoorSeasonChanged;
+  final SeasonType? letterSeasonOverride;
+  final ValueChanged<SeasonType?> onLetterSeasonChanged;
   final ValueChanged<WeatherType?> onWeatherChanged;
   final ValueChanged<RainIntensity?> onRainIntensityChanged;
   final VoidCallback onReset;
@@ -66,6 +75,21 @@ class PrototypeControls extends StatelessWidget {
             return;
           case PrototypeOperation.outdoorWinter:
             onOutdoorSeasonChanged(SeasonType.winter);
+            return;
+          case PrototypeOperation.letterAuto:
+            onLetterSeasonChanged(null);
+            return;
+          case PrototypeOperation.letterSpring:
+            onLetterSeasonChanged(SeasonType.spring);
+            return;
+          case PrototypeOperation.letterSummer:
+            onLetterSeasonChanged(SeasonType.summer);
+            return;
+          case PrototypeOperation.letterAutumn:
+            onLetterSeasonChanged(SeasonType.autumn);
+            return;
+          case PrototypeOperation.letterWinter:
+            onLetterSeasonChanged(SeasonType.winter);
             return;
           case PrototypeOperation.weatherAuto:
             onWeatherChanged(null);
@@ -133,6 +157,37 @@ class PrototypeControls extends StatelessWidget {
         ),
         const PopupMenuDivider(height: _dividerHeight),
         PopupMenuItem<PrototypeOperation>(
+          key: const ValueKey('prototypeLetterAuto'),
+          height: _itemHeight,
+          value: PrototypeOperation.letterAuto,
+          child: _menuLabel('手紙：自動', letterSeasonOverride == null),
+        ),
+        PopupMenuItem<PrototypeOperation>(
+          key: const ValueKey('prototypeLetterSpring'),
+          height: _itemHeight,
+          value: PrototypeOperation.letterSpring,
+          child: _menuLabel('手紙：春', letterSeasonOverride == SeasonType.spring),
+        ),
+        PopupMenuItem<PrototypeOperation>(
+          key: const ValueKey('prototypeLetterSummer'),
+          height: _itemHeight,
+          value: PrototypeOperation.letterSummer,
+          child: _menuLabel('手紙：夏', letterSeasonOverride == SeasonType.summer),
+        ),
+        PopupMenuItem<PrototypeOperation>(
+          key: const ValueKey('prototypeLetterAutumn'),
+          height: _itemHeight,
+          value: PrototypeOperation.letterAutumn,
+          child: _menuLabel('手紙：秋', letterSeasonOverride == SeasonType.autumn),
+        ),
+        PopupMenuItem<PrototypeOperation>(
+          key: const ValueKey('prototypeLetterWinter'),
+          height: _itemHeight,
+          value: PrototypeOperation.letterWinter,
+          child: _menuLabel('手紙：冬', letterSeasonOverride == SeasonType.winter),
+        ),
+        const PopupMenuDivider(height: _dividerHeight),
+        PopupMenuItem<PrototypeOperation>(
           key: const ValueKey('prototypeWeatherAuto'),
           height: _itemHeight,
           value: PrototypeOperation.weatherAuto,
@@ -197,6 +252,15 @@ class PrototypeControls extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _menuLabel(String label, bool isSelected) {
+    return Row(
+      children: [
+        Expanded(child: Text(label)),
+        if (isSelected) const Icon(Icons.check, size: 16),
+      ],
     );
   }
 }

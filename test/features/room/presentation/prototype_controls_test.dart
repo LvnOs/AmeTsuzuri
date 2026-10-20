@@ -108,6 +108,73 @@ void main() {
     );
   });
 
+  testWidgets('Letter季節overrideは春夏秋冬を選べて翌日配達に反映する', (tester) async {
+    const cases = {
+      'prototypeLetterSpring': 'spring_01',
+      'prototypeLetterSummer': 'letter_01',
+      'prototypeLetterAutumn': 'autumn_01',
+      'prototypeLetterWinter': 'winter_01',
+    };
+
+    for (final entry in cases.entries) {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      final harness = await _pumpPrototypeRoom(tester);
+
+      await _selectPrototypeOperation(tester, entry.key);
+      await _selectPrototypeOperation(tester, 'prototypeNextDay');
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(
+        harness.read.deliveredLetterIdOn(DateTime(2026, 8, 8)),
+        entry.value,
+        reason: entry.key,
+      );
+    }
+  });
+
+  testWidgets('Letter季節overrideは背景と独立し、変更だけで当日の手紙を差し替えない', (tester) async {
+    final harness = await _pumpPrototypeRoom(tester);
+
+    await _selectPrototypeOperation(tester, 'prototypeOutdoorSpring');
+    await _selectPrototypeOperation(tester, 'prototypeLetterWinter');
+
+    expect(harness.date.today, DateTime(2026, 8, 7));
+    expect(
+      harness.read.deliveredLetterIdOn(DateTime(2026, 8, 7)),
+      'tutorial_001',
+    );
+    expect(
+      find.image(const AssetImage('assets/images/room/outdoor_spring.png')),
+      findsOneWidget,
+    );
+
+    await _selectPrototypeOperation(tester, 'prototypeNextDay');
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(harness.read.deliveredLetterIdOn(DateTime(2026, 8, 8)), 'winter_01');
+    expect(
+      find.image(const AssetImage('assets/images/room/outdoor_spring.png')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Letter季節overrideを自動に戻すと実日付の季節を使う', (tester) async {
+    final harness = await _pumpPrototypeRoom(
+      tester,
+      date: DateTime(2026, 8, 31),
+    );
+
+    await _selectPrototypeOperation(tester, 'prototypeLetterWinter');
+    await _selectPrototypeOperation(tester, 'prototypeLetterAuto');
+    await _selectPrototypeOperation(tester, 'prototypeNextDay');
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(harness.date.today, DateTime(2026, 9, 1));
+    expect(harness.date.currentSeason, SeasonType.autumn);
+    expect(harness.read.deliveredLetterIdOn(DateTime(2026, 9, 1)), 'autumn_01');
+  });
+
   testWidgets('雨量overrideで小雨・通常・大雨を切り替えられる', (tester) async {
     await _pumpPrototypeRoom(tester);
 
@@ -232,11 +299,7 @@ void main() {
   testWidgets('最初からやり直すは確認し、キャンセルならRoomを維持する', (tester) async {
     final harness = await _pumpPrototypeRoom(tester);
 
-    await tester.tap(find.byKey(const ValueKey('prototypeControls')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.tap(find.byKey(const ValueKey('prototypeReset')));
-    await tester.pump();
+    await _selectPrototypeOperation(tester, 'prototypeReset');
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text('最初からやり直しますか？'), findsOneWidget);
@@ -253,11 +316,7 @@ void main() {
       date: DateTime(2026, 8, 10),
     );
 
-    await tester.tap(find.byKey(const ValueKey('prototypeControls')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.tap(find.byKey(const ValueKey('prototypeReset')));
-    await tester.pump();
+    await _selectPrototypeOperation(tester, 'prototypeReset');
     await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.text('最初から'));
     await tester.pump();
@@ -304,11 +363,7 @@ void main() {
       purchasedRepository: repository,
     );
 
-    await tester.tap(find.byKey(const ValueKey('prototypeControls')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.tap(find.byKey(const ValueKey('prototypeReset')));
-    await tester.pump();
+    await _selectPrototypeOperation(tester, 'prototypeReset');
     await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.text('最初から'));
     await tester.pump();
@@ -336,7 +391,9 @@ Future<void> _selectPrototypeOperation(
   await tester.tap(find.byKey(const ValueKey('prototypeControls')));
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 500));
-  await tester.tap(find.byKey(ValueKey(operationKey)));
+  final operation = find.byKey(ValueKey(operationKey));
+  await tester.ensureVisible(operation);
+  await tester.tap(operation);
   await tester.pump();
 }
 
@@ -438,6 +495,27 @@ class _PrototypeLetterRepository extends LetterRepository {
       title: 'letter',
       body: 'letter',
       requiredSeason: SeasonType.summer,
+      requiredWeather: WeatherType.rain,
+    ),
+    Letter(
+      id: 'spring_01',
+      title: 'spring',
+      body: 'spring',
+      requiredSeason: SeasonType.spring,
+      requiredWeather: WeatherType.rain,
+    ),
+    Letter(
+      id: 'autumn_01',
+      title: 'autumn',
+      body: 'autumn',
+      requiredSeason: SeasonType.autumn,
+      requiredWeather: WeatherType.rain,
+    ),
+    Letter(
+      id: 'winter_01',
+      title: 'winter',
+      body: 'winter',
+      requiredSeason: SeasonType.winter,
       requiredWeather: WeatherType.rain,
     ),
   ];
