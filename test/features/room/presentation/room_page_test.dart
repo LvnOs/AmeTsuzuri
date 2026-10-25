@@ -22,6 +22,7 @@ import 'package:ame_tsuzuri/features/room/presentation/room_page.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/autumn_leaf_effect.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/furniture_reaction.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/rain_overlay.dart';
+import 'package:ame_tsuzuri/features/room/presentation/widgets/room_furniture_picker_sheet.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/spring_petal_drift_effect.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/winter_frost_effect.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/winter_ice_grain_effect.dart';
@@ -36,6 +37,915 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
+  group('模様替えモード', () {
+    testWidgets('tutorial完了後にmodeを開始・終了できる', (tester) async {
+      await _pumpRoom(tester, initialReadState: _completedTutorialReadState());
+
+      expect(find.text('模様替え'), findsOneWidget);
+      expect(find.text('おわる'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('rearrangeInteractionBlocker')),
+        findsNothing,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('rearrangeModeButton')));
+      await tester.pump();
+
+      expect(find.text('模様替え'), findsNothing);
+      expect(find.text('おわる'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('rearrangeInteractionBlocker')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('rearrangeModeButton')));
+      await tester.pump();
+
+      expect(find.text('模様替え'), findsOneWidget);
+      expect(find.text('おわる'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('rearrangeInteractionBlocker')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('通常時はmarkerを表示せず模様替え中は操作可能slotだけ表示する', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialReadState: _completedTutorialReadState(),
+        initialPurchasedFurnitureIds: const {'wooden_mug', 'wind_chime'},
+        initialPlacedFurnitureIds: const {
+          _chairSlotId: 'rocking_chair',
+          'living_room_lamp': 'wooden_stand_lamp',
+        },
+        furnitures: const [
+          ..._roomFurnitures,
+          Furniture(
+            id: 'wooden_stand_lamp',
+            name: 'wooden stand lamp',
+            price: 50,
+            size: 'medium',
+            slotIds: ['living_room_lamp'],
+            imagePath: 'furniture/lamp/wooden_stand_lamp.png',
+            initialAvailable: false,
+          ),
+        ],
+      );
+
+      expect(find.byKey(const ValueKey('rearrangeSlotLayer')), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('rearrangeModeButton')));
+      await tester.pump();
+      await tester.pump();
+
+      for (final slotId in const [
+        _deskSurfaceLeftSlotId,
+        _deskSurfaceRightSlotId,
+        _windowHangingDecorSlotId,
+        _chairSlotId,
+      ]) {
+        expect(
+          find.byKey(ValueKey('rearrangeSlotMarker-$slotId')),
+          findsOneWidget,
+        );
+      }
+      for (final slotId in const [
+        _windowShelfDecorSlotId,
+        _windowVaseSlotId,
+        _curtainSlotId,
+        _floorRugSlotId,
+        'living_room_lamp',
+      ]) {
+        expect(
+          find.byKey(ValueKey('rearrangeSlotMarker-$slotId')),
+          findsNothing,
+        );
+      }
+    });
+
+    testWidgets('空slotでも購入済み対応Furnitureがあれば8slotを表示できる', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialReadState: _completedTutorialReadState(),
+        initialPurchasedFurnitureIds: const {
+          'wooden_mug',
+          'small_houseplant',
+          'wind_chime',
+          'small_white_flower',
+          'white_linen_curtains',
+          'round_rug',
+          'wooden_chair',
+        },
+      );
+      await tester.tap(find.byKey(const ValueKey('rearrangeModeButton')));
+      await tester.pump();
+      await tester.pump();
+
+      for (final slotId in _rearrangeSlotIds) {
+        expect(
+          find.byKey(ValueKey('rearrangeSlotMarker-$slotId')),
+          findsOneWidget,
+        );
+      }
+    });
+
+    testWidgets('slot tapでslot名と購入済み互換Furnitureだけを表示する', (tester) async {
+      const legacyFurniture = Furniture(
+        id: 'legacy_desk_item',
+        name: '以前の机上飾り',
+        price: 30,
+        size: 'small',
+        slotIds: [_deskSurfaceLeftSlotId],
+        imagePath: 'furniture/desk/wooden_mug.png',
+        initialAvailable: false,
+      );
+      await _pumpRoom(
+        tester,
+        initialReadState: _completedTutorialReadState(),
+        initialPurchasedFurnitureIds: const {
+          'wooden_mug',
+          'wooden_chair',
+          'legacy_desk_item',
+        },
+        furnitures: const [..._roomFurnitures, legacyFurniture],
+      );
+      await _enterRearrangeMode(tester);
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey('rearrangeSlotTapArea-$_deskSurfaceLeftSlotId'),
+        ),
+      );
+      await _pumpBottomSheet(tester);
+
+      expect(find.byType(RoomFurniturePickerSheet), findsOneWidget);
+      expect(find.text('机の左'), findsOneWidget);
+      expect(find.text('wooden mug'), findsOneWidget);
+      expect(find.text(legacyFurniture.name), findsOneWidget);
+      expect(find.text('ink bottle'), findsNothing);
+      expect(find.text('wooden chair'), findsNothing);
+    });
+
+    testWidgets('現在配置中Furnitureを表示し空slotでは使用中表示しない', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialReadState: _completedTutorialReadState(),
+        initialPurchasedFurnitureIds: const {
+          'white_linen_curtains',
+          'beige_curtains',
+          'wooden_mug',
+        },
+        initialPlacedFurnitureIds: const {
+          _curtainSlotId: 'white_linen_curtains',
+        },
+      );
+      await _enterRearrangeMode(tester);
+
+      final curtainTarget = find.byKey(
+        const ValueKey('rearrangeSlotTapArea-$_curtainSlotId'),
+      );
+      await tester.tap(curtainTarget);
+      await _pumpBottomSheet(tester);
+      expect(
+        find.descendant(
+          of: find.byKey(
+            const ValueKey('roomFurniturePickerCandidate-white_linen_curtains'),
+          ),
+          matching: find.text('使用中'),
+        ),
+        findsOneWidget,
+      );
+
+      await _dismissFurniturePicker(tester);
+      await tester.tap(
+        find.byKey(
+          const ValueKey('rearrangeSlotTapArea-$_deskSurfaceLeftSlotId'),
+        ),
+      );
+      await _pumpBottomSheet(tester);
+      expect(find.text('使用中'), findsNothing);
+    });
+
+    testWidgets('Furniture選択で即時保存してRoomを交換する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialReadState: _completedTutorialReadState(),
+        initialPurchasedFurnitureIds: const {
+          'white_linen_curtains',
+          'beige_curtains',
+        },
+        initialPlacedFurnitureIds: const {
+          _curtainSlotId: 'white_linen_curtains',
+        },
+      );
+      await _enterRearrangeMode(tester);
+      final curtainTarget = find.byKey(
+        const ValueKey('rearrangeSlotTapArea-$_curtainSlotId'),
+      );
+      await tester.tap(curtainTarget);
+      await _pumpBottomSheet(tester);
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey('roomFurniturePickerCandidate-beige_curtains'),
+        ),
+      );
+      await _pumpBottomSheet(tester);
+
+      expect(find.byType(RoomFurniturePickerSheet), findsNothing);
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _curtainSlotId: 'beige_curtains',
+      });
+      expect(harness.placedFurnitureRepository.saveCallCount, 1);
+      expect(harness.placedFurnitureRepository.state, const {
+        _curtainSlotId: 'beige_curtains',
+      });
+      expect(harness.catalogProvider.purchasedFurnitureIds, const {
+        'white_linen_curtains',
+        'beige_curtains',
+      });
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-beige_curtains')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-white_linen_curtains')),
+        findsNothing,
+      );
+      expect(find.text('おわる'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: curtainTarget,
+          matching: find.byKey(
+            const ValueKey('rearrangeSelectedSlotIndicator'),
+          ),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(curtainTarget);
+      await _pumpBottomSheet(tester);
+      expect(find.byType(RoomFurniturePickerSheet), findsOneWidget);
+    });
+
+    testWidgets('空slotへFurnitureを配置して即時保存する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialReadState: _completedTutorialReadState(),
+        initialPurchasedFurnitureIds: const {'wooden_mug'},
+      );
+      await _enterRearrangeMode(tester);
+
+      await _selectRearrangeFurniture(
+        tester,
+        slotId: _deskSurfaceLeftSlotId,
+        furnitureId: 'wooden_mug',
+      );
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _deskSurfaceLeftSlotId: 'wooden_mug',
+      });
+      expect(harness.placedFurnitureRepository.state, const {
+        _deskSurfaceLeftSlotId: 'wooden_mug',
+      });
+      expect(harness.placedFurnitureRepository.saveCallCount, 1);
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-wooden_mug')),
+        findsOneWidget,
+      );
+      expect(find.text('おわる'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(
+            const ValueKey('rearrangeSlotTapArea-$_deskSurfaceLeftSlotId'),
+          ),
+          matching: find.byKey(
+            const ValueKey('rearrangeSelectedSlotIndicator'),
+          ),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('同じFurnitureを別slotへ移動すると旧slotから消える', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialReadState: _completedTutorialReadState(),
+        initialPurchasedFurnitureIds: const {'wooden_mug'},
+        initialPlacedFurnitureIds: const {_deskSurfaceLeftSlotId: 'wooden_mug'},
+      );
+      await _enterRearrangeMode(tester);
+
+      await _selectRearrangeFurniture(
+        tester,
+        slotId: _deskSurfaceRightSlotId,
+        furnitureId: 'wooden_mug',
+      );
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _deskSurfaceRightSlotId: 'wooden_mug',
+      });
+      expect(harness.placedFurnitureRepository.state, const {
+        _deskSurfaceRightSlotId: 'wooden_mug',
+      });
+    });
+
+    testWidgets('空になるslotは「取り外す」でRoomから消す', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialReadState: _completedTutorialReadState(),
+        initialPurchasedFurnitureIds: const {'wooden_mug'},
+        initialPlacedFurnitureIds: const {_deskSurfaceLeftSlotId: 'wooden_mug'},
+      );
+      await _enterRearrangeMode(tester);
+
+      await _requestRearrangeRecovery(
+        tester,
+        slotId: _deskSurfaceLeftSlotId,
+        label: '取り外す',
+      );
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, isEmpty);
+      expect(harness.placedFurnitureRepository.state, isEmpty);
+      expect(harness.placedFurnitureRepository.saveCallCount, 1);
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-wooden_mug')),
+        findsNothing,
+      );
+      expect(find.text('おわる'), findsOneWidget);
+    });
+
+    testWidgets('初期画像slotは「元に戻す」でfallbackを復元する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialReadState: _completedTutorialReadState(),
+        initialPurchasedFurnitureIds: const {'beige_curtains'},
+        initialPlacedFurnitureIds: const {_curtainSlotId: 'beige_curtains'},
+      );
+      await _enterRearrangeMode(tester);
+      expect(_initialCurtainImage, findsNothing);
+
+      await _requestRearrangeRecovery(
+        tester,
+        slotId: _curtainSlotId,
+        label: '元に戻す',
+      );
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, isEmpty);
+      expect(harness.placedFurnitureRepository.state, isEmpty);
+      expect(_initialCurtainImage, findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-beige_curtains')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('現在配置中Furnitureの再選択は保存しない', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialReadState: _completedTutorialReadState(),
+        initialPurchasedFurnitureIds: const {'white_linen_curtains'},
+        initialPlacedFurnitureIds: const {
+          _curtainSlotId: 'white_linen_curtains',
+        },
+      );
+      await _enterRearrangeMode(tester);
+
+      await _selectRearrangeFurniture(
+        tester,
+        slotId: _curtainSlotId,
+        furnitureId: 'white_linen_curtains',
+      );
+
+      expect(harness.placedFurnitureRepository.saveCallCount, 0);
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _curtainSlotId: 'white_linen_curtains',
+      });
+    });
+
+    testWidgets('保存失敗時はRoomを変更せずmodeとselected slotを維持する', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialReadState: _completedTutorialReadState(),
+        initialPurchasedFurnitureIds: const {
+          'white_linen_curtains',
+          'beige_curtains',
+        },
+        initialPlacedFurnitureIds: const {
+          _curtainSlotId: 'white_linen_curtains',
+        },
+      );
+      harness.placedFurnitureRepository.failNextSave = true;
+      await _enterRearrangeMode(tester);
+
+      await _selectRearrangeFurniture(
+        tester,
+        slotId: _curtainSlotId,
+        furnitureId: 'beige_curtains',
+      );
+
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _curtainSlotId: 'white_linen_curtains',
+      });
+      expect(harness.placedFurnitureRepository.state, const {
+        _curtainSlotId: 'white_linen_curtains',
+      });
+      expect(find.text('配置を保存できませんでした'), findsOneWidget);
+      expect(find.text('おわる'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('rearrangeSelectedSlotIndicator')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('保存中は「おわる」を無効化し多重保存を防ぐ', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialReadState: _completedTutorialReadState(),
+        initialPurchasedFurnitureIds: const {'wooden_mug'},
+      );
+      harness.placedFurnitureRepository.blockNextSave = true;
+      await _enterRearrangeMode(tester);
+
+      final slotTarget = find.byKey(
+        const ValueKey('rearrangeSlotTapArea-$_deskSurfaceLeftSlotId'),
+      );
+      await tester.tap(slotTarget);
+      await _pumpBottomSheet(tester);
+      await tester.tap(
+        find.byKey(const ValueKey('roomFurniturePickerCandidate-wooden_mug')),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(
+        tester
+            .widget<TextButton>(
+              find.byKey(const ValueKey('rearrangeModeButton')),
+            )
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(slotTarget, warnIfMissed: false);
+      await tester.pump();
+      expect(harness.placedFurnitureRepository.saveCallCount, 1);
+
+      harness.placedFurnitureRepository.completeSave();
+      await tester.pump();
+      await tester.pump();
+      expect(harness.placedFurnitureProvider.placedFurnitureIds, const {
+        _deskSurfaceLeftSlotId: 'wooden_mug',
+      });
+      expect(
+        tester
+            .widget<TextButton>(
+              find.byKey(const ValueKey('rearrangeModeButton')),
+            )
+            .onPressed,
+        isNotNull,
+      );
+    });
+
+    testWidgets('保存状態でRoomを再生成しても配置を復元する', (tester) async {
+      final firstHarness = await _pumpRoom(
+        tester,
+        initialReadState: _completedTutorialReadState(),
+        initialPurchasedFurnitureIds: const {'wooden_mug'},
+      );
+      await _enterRearrangeMode(tester);
+      await _selectRearrangeFurniture(
+        tester,
+        slotId: _deskSurfaceLeftSlotId,
+        furnitureId: 'wooden_mug',
+      );
+      final savedState = Map<String, String>.of(
+        firstHarness.placedFurnitureRepository.state,
+      );
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      final reloadedHarness = await _pumpRoom(
+        tester,
+        initialReadState: _completedTutorialReadState(),
+        initialPurchasedFurnitureIds: const {'wooden_mug'},
+        initialPlacedFurnitureIds: savedState,
+      );
+
+      expect(reloadedHarness.placedFurnitureProvider.placedFurnitureIds, const {
+        _deskSurfaceLeftSlotId: 'wooden_mug',
+      });
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-wooden_mug')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('slot連打でBottomSheetを多重表示しない', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialReadState: _completedTutorialReadState(),
+        initialPurchasedFurnitureIds: const {'wooden_mug'},
+      );
+      await _enterRearrangeMode(tester);
+      final target = find.byKey(
+        const ValueKey('rearrangeSlotTapArea-$_deskSurfaceLeftSlotId'),
+      );
+
+      await tester.tap(target);
+      await tester.tap(target);
+      await _pumpBottomSheet(tester);
+
+      expect(find.byType(RoomFurniturePickerSheet), findsOneWidget);
+    });
+
+    testWidgets('候補0件でも配置中なら復帰操作を表示できる', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialReadState: _completedTutorialReadState(),
+        initialPlacedFurnitureIds: const {_chairSlotId: 'rocking_chair'},
+      );
+      await _enterRearrangeMode(tester);
+
+      await tester.tap(
+        find.byKey(const ValueKey('rearrangeSlotTapArea-$_chairSlotId')),
+      );
+      await _pumpBottomSheet(tester);
+
+      expect(find.byType(RoomFurniturePickerSheet), findsOneWidget);
+      expect(find.text('元に戻す'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('roomFurniturePickerEmpty')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('slot tapで選択し別slotへ切り替えられる', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialReadState: _completedTutorialReadState(),
+        initialPurchasedFurnitureIds: const {'wooden_mug'},
+      );
+      await tester.tap(find.byKey(const ValueKey('rearrangeModeButton')));
+      await tester.pump();
+      await tester.pump();
+
+      final leftTarget = find.byKey(
+        const ValueKey('rearrangeSlotTapArea-$_deskSurfaceLeftSlotId'),
+      );
+      final rightTarget = find.byKey(
+        const ValueKey('rearrangeSlotTapArea-$_deskSurfaceRightSlotId'),
+      );
+      await tester.tap(leftTarget);
+      await _pumpBottomSheet(tester);
+
+      expect(
+        find.descendant(
+          of: leftTarget,
+          matching: find.byKey(
+            const ValueKey('rearrangeSelectedSlotIndicator'),
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: rightTarget,
+          matching: find.byKey(
+            const ValueKey('rearrangeSelectedSlotIndicator'),
+          ),
+        ),
+        findsNothing,
+      );
+
+      await _dismissFurniturePicker(tester);
+
+      await tester.tap(rightTarget);
+      await _pumpBottomSheet(tester);
+
+      expect(
+        find.descendant(
+          of: leftTarget,
+          matching: find.byKey(
+            const ValueKey('rearrangeSelectedSlotIndicator'),
+          ),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: rightTarget,
+          matching: find.byKey(
+            const ValueKey('rearrangeSelectedSlotIndicator'),
+          ),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('おわるとselected slotをclearする', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialReadState: _completedTutorialReadState(),
+        initialPurchasedFurnitureIds: const {'wooden_mug'},
+      );
+      final modeButton = find.byKey(const ValueKey('rearrangeModeButton'));
+      await tester.tap(modeButton);
+      await tester.pump();
+      await tester.pump();
+      await tester.tap(
+        find.byKey(
+          const ValueKey('rearrangeSlotTapArea-$_deskSurfaceLeftSlotId'),
+        ),
+      );
+      await _pumpBottomSheet(tester);
+      expect(
+        find.byKey(const ValueKey('rearrangeSelectedSlotIndicator')),
+        findsOneWidget,
+      );
+
+      await _dismissFurniturePicker(tester);
+
+      await tester.tap(modeButton);
+      await tester.pump();
+      await tester.tap(modeButton);
+      await tester.pump();
+
+      expect(
+        find.byKey(const ValueKey('rearrangeSelectedSlotIndicator')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('Letter到着による自動終了でもselected slotをclearする', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        letters: [_letter('letterB')],
+        initialReadState: _completedTutorialReadState(),
+        initialPurchasedFurnitureIds: const {'wooden_mug'},
+      );
+      await tester.tap(find.byKey(const ValueKey('rearrangeModeButton')));
+      await tester.pump();
+      await tester.pump();
+      await tester.tap(
+        find.byKey(
+          const ValueKey('rearrangeSlotTapArea-$_deskSurfaceLeftSlotId'),
+        ),
+      );
+      await tester.pump();
+
+      await harness.dateProvider.moveToNextDay();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('おわる'), findsNothing);
+      expect(find.byKey(const ValueKey('rearrangeSlotLayer')), findsNothing);
+
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('rearrangeModeButton')));
+      await tester.pump();
+      await tester.pump();
+      expect(
+        find.byKey(const ValueKey('rearrangeSelectedSlotIndicator')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('slot tapは下層のFurniture reactionを発火しない', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialReadState: _completedTutorialReadState(),
+        initialPlacedFurnitureIds: const {_chairSlotId: 'rocking_chair'},
+      );
+      final transform = find.byKey(
+        const ValueKey('furnitureReactionTransform-rocking_chair'),
+      );
+      await tester.tap(find.byKey(const ValueKey('rearrangeModeButton')));
+      await tester.pump();
+      await tester.tap(
+        find.byKey(const ValueKey('rearrangeSlotTapArea-$_chairSlotId')),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(
+        tester.widget<Transform>(transform).transform.storage[1],
+        closeTo(0, 0.000001),
+      );
+      expect(find.byType(LetterPage), findsNothing);
+      expect(find.byType(CatalogPage), findsNothing);
+      expect(find.byType(BookshelfPage), findsNothing);
+      expect(find.byType(SnackBar), findsNothing);
+    });
+
+    testWidgets('tutorial中は模様替えを表示しない', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 7)},
+          deliveredLetters: const {'2026-08-07': 'tutorial_001'},
+          hasOpenedTutorialBottle: true,
+        ),
+        initialPurchasedFurnitureIds: const {'wooden_mug'},
+        initialPlacedFurnitureIds: const {_deskSurfaceLeftSlotId: 'wooden_mug'},
+      );
+
+      expect(find.byKey(const ValueKey('rearrangeModeButton')), findsNothing);
+    });
+
+    testWidgets('Letter到着演出中は非表示で完了後に表示する', (tester) async {
+      await _pumpRoom(
+        tester,
+        letters: [_letter('letterA')],
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+          tutorialCompleted: true,
+        ),
+        dismissInitialGuide: false,
+      );
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.byKey(const ValueKey('postArrivalGlow')), findsOneWidget);
+      expect(find.byKey(const ValueKey('rearrangeModeButton')), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('postTapArea')));
+      await tester.pump();
+
+      expect(find.byKey(const ValueKey('postArrivalGlow')), findsNothing);
+      expect(find.text('模様替え'), findsOneWidget);
+    });
+
+    testWidgets('模様替え中はFurniture reactionを発火せず終了後は再び発火する', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialReadState: _completedTutorialReadState(),
+        initialPlacedFurnitureIds: const {_chairSlotId: 'rocking_chair'},
+      );
+      final reaction = find.byKey(
+        const ValueKey('furnitureReactionTapArea-rocking_chair'),
+      );
+      final transform = find.byKey(
+        const ValueKey('furnitureReactionTransform-rocking_chair'),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('rearrangeModeButton')));
+      await tester.pump();
+      await tester.tapAt(tester.getCenter(reaction));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(
+        tester.widget<Transform>(transform).transform.storage[1],
+        closeTo(0, 0.000001),
+      );
+
+      expect(find.byType(RoomFurniturePickerSheet), findsOneWidget);
+      await _dismissFurniturePicker(tester);
+
+      await tester.tap(find.byKey(const ValueKey('rearrangeModeButton')));
+      await tester.pump();
+      await _expectFurnitureReactionStarts(tester, 'rocking_chair');
+    });
+
+    testWidgets('模様替え中はLetter・post・瓶・本棚のtapを吸収する', (tester) async {
+      await _pumpRoom(tester, initialReadState: _completedTutorialReadState());
+
+      await tester.tap(find.byKey(const ValueKey('rearrangeModeButton')));
+      await tester.pump();
+      for (final key in const [
+        'letterTapArea',
+        'postTapArea',
+        'bottleTapArea',
+        'bookshelfTapArea',
+      ]) {
+        await tester.tapAt(tester.getCenter(find.byKey(ValueKey(key))));
+        await tester.pump();
+      }
+
+      expect(find.byType(LetterPage), findsNothing);
+      expect(find.byType(CatalogPage), findsNothing);
+      expect(find.byType(BookshelfPage), findsNothing);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(find.byType(RoomPage), findsOneWidget);
+    });
+
+    for (final target in const ['Letter', 'post', '瓶', '本棚']) {
+      testWidgets('mode終了後は$targetを再び操作できる', (tester) async {
+        await _pumpRoom(
+          tester,
+          initialReadState: _completedTutorialReadState(),
+        );
+        await tester.tap(find.byKey(const ValueKey('rearrangeModeButton')));
+        await tester.pump();
+        await tester.tap(find.byKey(const ValueKey('rearrangeModeButton')));
+        await tester.pump();
+
+        switch (target) {
+          case 'Letter':
+            await tester.tap(find.byKey(const ValueKey('letterTapArea')));
+            await pumpUntilLetterPage(tester);
+            expect(find.byType(LetterPage), findsOneWidget);
+            break;
+          case 'post':
+            await tester.tap(find.byKey(const ValueKey('postTapArea')));
+            await tester.pump();
+            expect(find.text('ポストは、雨の中で静かに佇んでいます。'), findsOneWidget);
+            break;
+          case '瓶':
+            await tester.tap(find.byKey(const ValueKey('bottleTapArea')));
+            await _pumpRouteTransition(tester);
+            expect(find.byType(CatalogPage), findsOneWidget);
+            break;
+          case '本棚':
+            await tester.tap(find.byKey(const ValueKey('bookshelfTapArea')));
+            await _pumpRouteTransition(tester);
+            expect(find.byType(BookshelfPage), findsOneWidget);
+            break;
+        }
+      });
+    }
+
+    testWidgets('模様替え中もPrototypeControlsを操作できる', (tester) async {
+      await _pumpRoom(tester, initialReadState: _completedTutorialReadState());
+      await tester.tap(find.byKey(const ValueKey('rearrangeModeButton')));
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('prototypeControls')));
+      await tester.pump();
+
+      expect(find.byKey(const ValueKey('prototypeNextDay')), findsOneWidget);
+    });
+
+    testWidgets('320pxと390pxでoverflowせず既存tap areaと重ならない', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      addTearDown(() {
+        tester.view.resetDevicePixelRatio();
+        tester.view.resetPhysicalSize();
+      });
+
+      for (final size in const [Size(320, 700), Size(390, 700)]) {
+        tester.view.physicalSize = size;
+        await _pumpRoom(
+          tester,
+          initialReadState: _completedTutorialReadState(),
+          initialPurchasedFurnitureIds: _allRearrangePurchasedIds,
+        );
+
+        final buttonRect = tester.getRect(
+          find.byKey(const ValueKey('rearrangeModeButton')),
+        );
+        for (final key in const [
+          'prototypeControls',
+          'letterTapArea',
+          'postTapArea',
+          'bottleTapArea',
+          'bookshelfTapArea',
+        ]) {
+          expect(
+            buttonRect.overlaps(tester.getRect(find.byKey(ValueKey(key)))),
+            isFalse,
+          );
+        }
+        expect(tester.takeException(), isNull);
+
+        await tester.tap(find.byKey(const ValueKey('rearrangeModeButton')));
+        await tester.pump();
+        await tester.pump();
+        final slotRects = <({String slotId, Rect rect})>[];
+        for (final slotId in _rearrangeSlotIds) {
+          final target = find.byKey(ValueKey('rearrangeSlotTapArea-$slotId'));
+          expect(target, findsOneWidget);
+          final rect = tester.getRect(target);
+          expect(rect.left, greaterThanOrEqualTo(0));
+          expect(rect.top, greaterThanOrEqualTo(0));
+          expect(rect.right, lessThanOrEqualTo(size.width));
+          expect(rect.bottom, lessThanOrEqualTo(size.height));
+          for (final other in slotRects) {
+            expect(
+              rect.overlaps(other.rect),
+              isFalse,
+              reason: '$slotId overlaps ${other.slotId} at $size',
+            );
+          }
+          slotRects.add((slotId: slotId, rect: rect));
+        }
+        for (final slotId in const [
+          _windowHangingDecorSlotId,
+          _windowVaseSlotId,
+          _curtainSlotId,
+        ]) {
+          final rect = tester.getRect(
+            find.byKey(ValueKey('rearrangeSlotTapArea-$slotId')),
+          );
+          expect(rect.width, greaterThanOrEqualTo(55));
+          expect(rect.height, greaterThanOrEqualTo(100));
+        }
+        expect(tester.takeException(), isNull);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+      }
+    });
+  });
+
   group('chair furniture', () {
     testWidgets('未配置なら初期chairだけを表示する', (tester) async {
       await _pumpRoom(tester);
@@ -4026,6 +4936,25 @@ const _floorRugSlotId = 'living_room_floor_rug';
 const _chairSlotId = 'living_room_chair';
 const _curtainSlotId = 'living_room_window_curtain';
 const _windowVaseSlotId = 'living_room_window_vase';
+const _rearrangeSlotIds = [
+  _deskSurfaceLeftSlotId,
+  _deskSurfaceRightSlotId,
+  _windowShelfDecorSlotId,
+  _windowHangingDecorSlotId,
+  _windowVaseSlotId,
+  _curtainSlotId,
+  _floorRugSlotId,
+  _chairSlotId,
+];
+const _allRearrangePurchasedIds = {
+  'wooden_mug',
+  'small_houseplant',
+  'wind_chime',
+  'small_white_flower',
+  'white_linen_curtains',
+  'round_rug',
+  'wooden_chair',
+};
 final _roomRugLayer = find.byKey(const ValueKey('roomRugLayer'));
 final _fixedRugImage = find.byKey(const ValueKey('roomFixedRugImage'));
 final _roundRugImage = find.byKey(
@@ -4062,6 +4991,49 @@ Future<void> _pumpRouteTransition(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 1));
 }
 
+Future<void> _enterRearrangeMode(WidgetTester tester) async {
+  await tester.tap(find.byKey(const ValueKey('rearrangeModeButton')));
+  await tester.pump();
+  await tester.pump();
+}
+
+Future<void> _pumpBottomSheet(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 500));
+}
+
+Future<void> _selectRearrangeFurniture(
+  WidgetTester tester, {
+  required String slotId,
+  required String furnitureId,
+}) async {
+  await tester.tap(find.byKey(ValueKey('rearrangeSlotTapArea-$slotId')));
+  await _pumpBottomSheet(tester);
+  await tester.tap(
+    find.byKey(ValueKey('roomFurniturePickerCandidate-$furnitureId')),
+  );
+  await _pumpBottomSheet(tester);
+}
+
+Future<void> _requestRearrangeRecovery(
+  WidgetTester tester, {
+  required String slotId,
+  required String label,
+}) async {
+  await tester.tap(find.byKey(ValueKey('rearrangeSlotTapArea-$slotId')));
+  await _pumpBottomSheet(tester);
+  expect(find.text(label), findsOneWidget);
+  await tester.tap(
+    find.byKey(const ValueKey('roomFurniturePickerRecoveryAction')),
+  );
+  await _pumpBottomSheet(tester);
+}
+
+Future<void> _dismissFurniturePicker(WidgetTester tester) async {
+  Navigator.of(tester.element(find.byType(RoomFurniturePickerSheet))).pop();
+  await _pumpBottomSheet(tester);
+}
+
 Future<void> _pumpPastFiniteAnimations(WidgetTester tester) async {
   // RainOverlay repeats for as long as a rainy Room is mounted, so
   // pumpAndSettle cannot be used to wait for the Room's finite animations.
@@ -4079,6 +5051,18 @@ Future<void> pumpUntilLetterPage(WidgetTester tester) async {
 Future<void> _tapLetter(WidgetTester tester) async {
   await tester.tap(find.byKey(const ValueKey('letterTapArea')));
   await _pumpPastFiniteAnimations(tester);
+}
+
+ReadLetterState _completedTutorialReadState() {
+  return ReadLetterState(
+    receivedLetters: {
+      'tutorial_001': DateTime(2026, 8, 6),
+      'letterA': DateTime(2026, 8, 7),
+    },
+    deliveredLetters: const {'2026-08-07': 'letterA'},
+    hasOpenedTutorialBottle: true,
+    tutorialCompleted: true,
+  );
 }
 
 double _opacityForKey(WidgetTester tester, String key) {
@@ -4175,9 +5159,10 @@ Future<_RoomHarness> _pumpRoom(
   final catalogProvider = CatalogProvider(
     _FakePurchasedFurnitureRepository(initialPurchasedFurnitureIds),
   );
-  final placedProvider = PlacedFurnitureProvider(
-    _FakePlacedFurnitureRepository(initialPlacedFurnitureIds),
+  final placedFurnitureRepository = _FakePlacedFurnitureRepository(
+    initialPlacedFurnitureIds,
   );
+  final placedProvider = PlacedFurnitureProvider(placedFurnitureRepository);
   final dateProvider = AppDateProvider(
     appDateRepository ?? _FakeAppDateRepository(date ?? DateTime(2026, 8, 7)),
   );
@@ -4235,6 +5220,7 @@ Future<_RoomHarness> _pumpRoom(
     letterRepository: letterRepository,
     catalogProvider: catalogProvider,
     placedFurnitureProvider: placedProvider,
+    placedFurnitureRepository: placedFurnitureRepository,
   );
 }
 
@@ -4249,6 +5235,7 @@ class _RoomHarness {
     required this.letterRepository,
     required this.catalogProvider,
     required this.placedFurnitureProvider,
+    required this.placedFurnitureRepository,
   });
 
   final _FakeShizukuRepository shizukuRepository;
@@ -4260,6 +5247,7 @@ class _RoomHarness {
   final _FakeLetterRepository letterRepository;
   final CatalogProvider catalogProvider;
   final PlacedFurnitureProvider placedFurnitureProvider;
+  final _FakePlacedFurnitureRepository placedFurnitureRepository;
 }
 
 class _FakeFurnitureRepository extends FurnitureRepository {
@@ -4687,6 +5675,10 @@ class _FakePlacedFurnitureRepository extends PlacedFurnitureRepository {
     : state = Map.of(initialState);
 
   Map<String, String> state;
+  int saveCallCount = 0;
+  bool failNextSave = false;
+  bool blockNextSave = false;
+  Completer<void>? _saveCompleter;
 
   @override
   Future<Map<String, String>> loadPlacedFurnitureIds() async => Map.of(state);
@@ -4695,7 +5687,24 @@ class _FakePlacedFurnitureRepository extends PlacedFurnitureRepository {
   Future<void> savePlacedFurnitureIds(
     Map<String, String> placedFurnitureIds,
   ) async {
+    saveCallCount++;
+    if (failNextSave) {
+      failNextSave = false;
+      throw StateError('placed furniture save failed');
+    }
+    if (blockNextSave) {
+      blockNextSave = false;
+      _saveCompleter = Completer<void>();
+      await _saveCompleter!.future;
+    }
     state = Map.of(placedFurnitureIds);
+  }
+
+  void completeSave() {
+    final completer = _saveCompleter;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete();
+    }
   }
 
   @override

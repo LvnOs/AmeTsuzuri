@@ -286,6 +286,32 @@ void main() {
     expect(provider.placedFurnitureIds, {'desk': 'wooden_mug'});
   });
 
+  test('removeは配置を保存してからstateから削除する', () async {
+    final repository = _FakePlacedRepository(
+      ids: {'desk': 'wooden_mug', 'window': 'small_houseplant'},
+    );
+    final provider = PlacedFurnitureProvider(repository);
+    await provider.load();
+
+    await provider.remove('wooden_mug');
+
+    expect(repository.saveCallCount, 1);
+    expect(repository.ids, {'window': 'small_houseplant'});
+    expect(provider.placedFurnitureIds, {'window': 'small_houseplant'});
+  });
+
+  test('removeの保存失敗時は配置stateを維持する', () async {
+    final repository = _FakePlacedRepository(ids: {'desk': 'wooden_mug'})
+      ..failSave = true;
+    final provider = PlacedFurnitureProvider(repository);
+    await provider.load();
+
+    await expectLater(provider.remove('wooden_mug'), throwsStateError);
+
+    expect(repository.ids, {'desk': 'wooden_mug'});
+    expect(provider.placedFurnitureIds, {'desk': 'wooden_mug'});
+  });
+
   test('resetはclear成功後に配置家具を空にする', () async {
     final repository = _FakePlacedRepository(ids: {'desk': 'wooden_mug'});
     final provider = PlacedFurnitureProvider(repository);

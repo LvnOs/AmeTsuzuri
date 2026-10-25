@@ -16,6 +16,7 @@ import 'package:ame_tsuzuri/features/room/presentation/widgets/furniture_reactio
 import 'package:ame_tsuzuri/features/room/presentation/widgets/interaction_hint_marker.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/last_raindrop.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/rain_overlay.dart';
+import 'package:ame_tsuzuri/features/room/presentation/widgets/room_furniture_picker_sheet.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/soft_sunlight.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/spring_petal_drift_effect.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/winter_frost_effect.dart';
@@ -328,6 +329,23 @@ class RoomPage extends StatefulWidget {
   static const double _rugHeightScale = 0.75;
   static const String _floorRugSlotId = 'living_room_floor_rug';
 
+  static const List<String> _rearrangeSlotIds = [
+    _deskSurfaceLeftSlotId,
+    _deskSurfaceRightSlotId,
+    _windowShelfDecorSlotId,
+    _windowHangingDecorSlotId,
+    _windowVaseSlotId,
+    _curtainSlotId,
+    _floorRugSlotId,
+    _chairSlotId,
+  ];
+  static const Set<String> _rearrangeFallbackSlotIds = {
+    _windowVaseSlotId,
+    _curtainSlotId,
+    _floorRugSlotId,
+    _chairSlotId,
+  };
+
   @visibleForTesting
   static String resolveTutorialTargetForTesting({
     required bool areProvidersLoaded,
@@ -366,6 +384,10 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
   bool _isOpeningLetter = false;
   bool _isNavigatingFromRoom = false;
   bool _isArrivalAnimating = false;
+  bool _isRearrangeMode = false;
+  String? _selectedRearrangeSlotId;
+  bool _isRearrangePickerOpen = false;
+  bool _isRearrangeSaving = false;
   bool _isPrototypeOperationRunning = false;
   SeasonType? _outdoorSeasonOverride;
   SeasonType? _letterSeasonOverride;
@@ -497,6 +519,16 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
         ? _TutorialTarget.none
         : tutorialTarget;
     _scheduleTutorialGlowSync(visibleTutorialTarget);
+    final showRearrangeButton =
+        appDateProvider.isLoaded &&
+        readLetterProvider.isLoaded &&
+        catalogProvider.isLoaded &&
+        placedFurnitureProvider.isLoaded &&
+        readLetterProvider.tutorialCompleted &&
+        !_isArrivalAnimating &&
+        !_isNavigatingFromRoom &&
+        !_isPrototypeOperationRunning &&
+        _tutorialMove == _TutorialMove.none;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -518,6 +550,14 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
               tutorialGlowAnimation: _tutorialGlowController,
               tutorialMove: _tutorialMove,
               tutorialMoveAnimation: _tutorialMoveController,
+              isRearrangeMode: _isRearrangeMode,
+              selectedRearrangeSlotId: _selectedRearrangeSlotId,
+              isRearrangeSaving: _isRearrangeSaving,
+              showRearrangeButton: showRearrangeButton,
+              onToggleRearrangeMode: _toggleRearrangeMode,
+              onSelectRearrangeSlot: _selectRearrangeSlot,
+              purchasedFurnitureIds: catalogProvider.purchasedFurnitureIds,
+              placedFurnitureIds: placedFurnitureProvider.placedFurnitureIds,
               furnituresFuture: _furnituresFuture,
               deskSurfaceLeftFurnitureId: deskSurfaceLeftFurnitureId,
               deskSurfaceRightFurnitureId: deskSurfaceRightFurnitureId,
@@ -566,6 +606,144 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
 
   void _setRainIntensityOverride(RainIntensity? intensity) {
     setState(() => _rainIntensityOverride = intensity);
+  }
+
+  void _toggleRearrangeMode() {
+    if (_isRearrangeSaving) {
+      return;
+    }
+    setState(() {
+      _isRearrangeMode = !_isRearrangeMode;
+      _selectedRearrangeSlotId = null;
+    });
+  }
+
+  Future<void> _selectRearrangeSlot(String slotId) async {
+    if (!_isRearrangeMode ||
+        _isRearrangePickerOpen ||
+        _isRearrangeSaving ||
+        !RoomPage._rearrangeSlotIds.contains(slotId)) {
+      return;
+    }
+
+    setState(() {
+      _selectedRearrangeSlotId = slotId;
+      _isRearrangePickerOpen = true;
+    });
+
+    try {
+      final furnitures = await _furnituresFuture;
+      if (!mounted || !_isRearrangeMode || _selectedRearrangeSlotId != slotId) {
+        return;
+      }
+
+      final purchasedFurnitureIds = context
+          .read<CatalogProvider>()
+          .purchasedFurnitureIds;
+      final candidates = furnitures
+          .where(
+            (furniture) =>
+                purchasedFurnitureIds.contains(furniture.id) &&
+                furniture.slotIds.contains(slotId),
+          )
+          .toList(growable: false);
+      final placedFurnitureProvider = context.read<PlacedFurnitureProvider>();
+      final currentFurnitureId =
+          placedFurnitureProvider.placedFurnitureIds[slotId];
+      if (candidates.isEmpty && currentFurnitureId == null) {
+        return;
+      }
+
+      final pickerResult =
+          await showModalBottomSheet<RoomFurniturePickerResult>(
+            context: context,
+            useSafeArea: true,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            barrierColor: const Color(0x660F0C09),
+            builder: (context) => RoomFurniturePickerSheet(
+              slotName: _rearrangeSlotGeometry(slotId).label,
+              furnitureCandidates: candidates,
+              currentFurnitureId: currentFurnitureId,
+              recoveryActionLabel: currentFurnitureId == null
+                  ? null
+                  : RoomPage._rearrangeFallbackSlotIds.contains(slotId)
+                  ? '元に戻す'
+                  : '取り外す',
+            ),
+          );
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isRearrangePickerOpen = false);
+      if (pickerResult == null) {
+        return;
+      }
+      await _applyRearrangeResult(
+        slotId: slotId,
+        candidates: candidates,
+        result: pickerResult,
+      );
+    } catch (_) {
+      // Missing or malformed Furniture data leaves the selected slot unchanged.
+    } finally {
+      if (mounted) {
+        setState(() => _isRearrangePickerOpen = false);
+      }
+    }
+  }
+
+  Future<void> _applyRearrangeResult({
+    required String slotId,
+    required List<Furniture> candidates,
+    required RoomFurniturePickerResult result,
+  }) async {
+    final placedFurnitureProvider = context.read<PlacedFurnitureProvider>();
+    final currentFurnitureId =
+        placedFurnitureProvider.placedFurnitureIds[slotId];
+    if (result case RoomFurnitureSelected(
+      :final furnitureId,
+    ) when furnitureId == currentFurnitureId) {
+      return;
+    }
+    if (result is RoomFurnitureRemovalRequested && currentFurnitureId == null) {
+      return;
+    }
+
+    setState(() => _isRearrangeSaving = true);
+    try {
+      switch (result) {
+        case RoomFurnitureSelected(:final furnitureId):
+          final furniture = candidates.firstWhere(
+            (candidate) => candidate.id == furnitureId,
+          );
+          final placeResult = await placedFurnitureProvider.place(
+            slotId: slotId,
+            furnitureId: furniture.id,
+            isPurchased: context
+                .read<CatalogProvider>()
+                .purchasedFurnitureIds
+                .contains(furniture.id),
+            allowedSlotIds: furniture.slotIds,
+          );
+          if (placeResult != PlaceFurnitureResult.success) {
+            throw StateError('Furniture placement was rejected.');
+          }
+        case RoomFurnitureRemovalRequested():
+          await placedFurnitureProvider.remove(currentFurnitureId!);
+      }
+    } catch (_) {
+      if (mounted) {
+        final messenger = ScaffoldMessenger.of(context);
+        messenger
+          ..removeCurrentSnackBar()
+          ..showSnackBar(const SnackBar(content: Text('配置を保存できませんでした')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isRearrangeSaving = false);
+      }
+    }
   }
 
   void _onTapPost() {
@@ -788,7 +966,14 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
   }
 
   void _startArrivalAnimation() {
-    setState(() => _isArrivalAnimating = true);
+    if (_isRearrangePickerOpen) {
+      Navigator.of(context).pop();
+    }
+    setState(() {
+      _isArrivalAnimating = true;
+      _isRearrangeMode = false;
+      _selectedRearrangeSlotId = null;
+    });
     _arrivalController.forward(from: 0);
   }
 
@@ -1069,7 +1254,11 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
       return;
     }
 
-    setState(() => _isPrototypeOperationRunning = true);
+    setState(() {
+      _isPrototypeOperationRunning = true;
+      _isRearrangeMode = false;
+      _selectedRearrangeSlotId = null;
+    });
     try {
       await context.read<AppDateProvider>().moveToNextDay();
     } catch (_) {
@@ -1149,6 +1338,14 @@ class _RoomBackgroundLayers extends StatelessWidget {
     required this.tutorialGlowAnimation,
     required this.tutorialMove,
     required this.tutorialMoveAnimation,
+    required this.isRearrangeMode,
+    required this.selectedRearrangeSlotId,
+    required this.isRearrangeSaving,
+    required this.showRearrangeButton,
+    required this.onToggleRearrangeMode,
+    required this.onSelectRearrangeSlot,
+    required this.purchasedFurnitureIds,
+    required this.placedFurnitureIds,
     required this.furnituresFuture,
     required this.deskSurfaceLeftFurnitureId,
     required this.deskSurfaceRightFurnitureId,
@@ -1188,6 +1385,14 @@ class _RoomBackgroundLayers extends StatelessWidget {
   final Animation<double> tutorialGlowAnimation;
   final _TutorialMove tutorialMove;
   final Animation<double> tutorialMoveAnimation;
+  final bool isRearrangeMode;
+  final String? selectedRearrangeSlotId;
+  final bool isRearrangeSaving;
+  final bool showRearrangeButton;
+  final VoidCallback onToggleRearrangeMode;
+  final ValueChanged<String> onSelectRearrangeSlot;
+  final Set<String> purchasedFurnitureIds;
+  final Map<String, String> placedFurnitureIds;
   final Future<List<Furniture>> furnituresFuture;
   final String? deskSurfaceLeftFurnitureId;
   final String? deskSurfaceRightFurnitureId;
@@ -1590,6 +1795,58 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   top: constraints.maxHeight * 0.10,
                   child: _TutorialRoomGuide(target: tutorialTarget),
                 ),
+              if (isRearrangeMode)
+                const Positioned.fill(
+                  child: AbsorbPointer(
+                    key: ValueKey('rearrangeInteractionBlocker'),
+                    child: ColoredBox(color: Colors.transparent),
+                  ),
+                ),
+              if (isRearrangeMode && showRearrangeButton)
+                _RearrangeSlotLayer(
+                  furnituresFuture: furnituresFuture,
+                  purchasedFurnitureIds: purchasedFurnitureIds,
+                  placedFurnitureIds: placedFurnitureIds,
+                  selectedSlotId: selectedRearrangeSlotId,
+                  onSelectSlot: onSelectRearrangeSlot,
+                ),
+              if (showRearrangeButton)
+                Positioned(
+                  right: 12,
+                  bottom: 14,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: const Color(0xE6FFF8E8),
+                      border: Border.all(
+                        color: const Color(0x66766B5E),
+                        width: 0.8,
+                      ),
+                      borderRadius: BorderRadius.circular(3),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x263D342B),
+                          blurRadius: 5,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: TextButton(
+                      key: const ValueKey('rearrangeModeButton'),
+                      onPressed: isRearrangeSaving
+                          ? null
+                          : onToggleRearrangeMode,
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF4A4035),
+                        backgroundColor: Colors.transparent,
+                        minimumSize: const Size(72, 40),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        shape: const RoundedRectangleBorder(),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      child: Text(isRearrangeMode ? 'おわる' : '模様替え'),
+                    ),
+                  ),
+                ),
               Positioned(
                 right: 10,
                 top: 10,
@@ -1610,6 +1867,200 @@ class _RoomBackgroundLayers extends StatelessWidget {
       },
     );
   }
+}
+
+class _RearrangeSlotLayer extends StatelessWidget {
+  const _RearrangeSlotLayer({
+    required this.furnituresFuture,
+    required this.purchasedFurnitureIds,
+    required this.placedFurnitureIds,
+    required this.selectedSlotId,
+    required this.onSelectSlot,
+  });
+
+  final Future<List<Furniture>> furnituresFuture;
+  final Set<String> purchasedFurnitureIds;
+  final Map<String, String> placedFurnitureIds;
+  final String? selectedSlotId;
+  final ValueChanged<String> onSelectSlot;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Furniture>>(
+      future: furnituresFuture,
+      builder: (context, snapshot) {
+        final purchasableSlotIds = <String>{};
+        for (final furniture in snapshot.data ?? const <Furniture>[]) {
+          if (!purchasedFurnitureIds.contains(furniture.id)) {
+            continue;
+          }
+          purchasableSlotIds.addAll(furniture.slotIds);
+        }
+
+        final visibleSlotIds = RoomPage._rearrangeSlotIds.where(
+          (slotId) =>
+              placedFurnitureIds.containsKey(slotId) ||
+              purchasableSlotIds.contains(slotId),
+        );
+
+        return Stack(
+          key: const ValueKey('rearrangeSlotLayer'),
+          fit: StackFit.expand,
+          children: [
+            for (final slotId in visibleSlotIds)
+              _RearrangeSlotTarget(
+                slotId: slotId,
+                geometry: _rearrangeSlotGeometry(slotId),
+                isSelected: selectedSlotId == slotId,
+                onTap: () => onSelectSlot(slotId),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _RearrangeSlotTarget extends StatelessWidget {
+  const _RearrangeSlotTarget({
+    required this.slotId,
+    required this.geometry,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String slotId;
+  final _RearrangeSlotGeometry geometry;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: geometry.alignment,
+      child: FractionallySizedBox(
+        widthFactor: geometry.widthFactor,
+        heightFactor: geometry.heightFactor,
+        child: Semantics(
+          button: true,
+          selected: isSelected,
+          label: '${geometry.label}を選ぶ',
+          child: GestureDetector(
+            key: ValueKey('rearrangeSlotTapArea-$slotId'),
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: Center(
+              child: DecoratedBox(
+                key: ValueKey('rearrangeSlotMarker-$slotId'),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? const Color(0xD9FFF6DE)
+                      : const Color(0x99FFF8E8),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isSelected
+                        ? const Color(0xCC6F604E)
+                        : const Color(0x997E705E),
+                    width: isSelected ? 1.6 : 1,
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x263D342B),
+                      blurRadius: 4,
+                      offset: Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: SizedBox.square(
+                  dimension: isSelected ? 27 : 23,
+                  child: isSelected
+                      ? const Center(
+                          child: DecoratedBox(
+                            key: ValueKey('rearrangeSelectedSlotIndicator'),
+                            decoration: BoxDecoration(
+                              color: Color(0xCC6F604E),
+                              shape: BoxShape.circle,
+                            ),
+                            child: SizedBox.square(dimension: 5),
+                          ),
+                        )
+                      : null,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RearrangeSlotGeometry {
+  const _RearrangeSlotGeometry({
+    required this.label,
+    required this.alignment,
+    required this.widthFactor,
+    required this.heightFactor,
+  });
+
+  final String label;
+  final Alignment alignment;
+  final double widthFactor;
+  final double heightFactor;
+}
+
+_RearrangeSlotGeometry _rearrangeSlotGeometry(String slotId) {
+  return switch (slotId) {
+    RoomPage._deskSurfaceLeftSlotId => const _RearrangeSlotGeometry(
+      label: '机の左',
+      alignment: Alignment(-0.64, 0.10),
+      widthFactor: 0.24,
+      heightFactor: 0.12,
+    ),
+    RoomPage._deskSurfaceRightSlotId => const _RearrangeSlotGeometry(
+      label: '机の右',
+      alignment: Alignment(0.67, 0.10),
+      widthFactor: 0.24,
+      heightFactor: 0.12,
+    ),
+    RoomPage._windowShelfDecorSlotId => const _RearrangeSlotGeometry(
+      label: '窓棚',
+      alignment: Alignment(-0.62, -0.24),
+      widthFactor: 0.24,
+      heightFactor: 0.13,
+    ),
+    RoomPage._windowHangingDecorSlotId => const _RearrangeSlotGeometry(
+      label: '吊り飾り',
+      alignment: Alignment(0.60, -0.88),
+      widthFactor: 0.20,
+      heightFactor: 0.20,
+    ),
+    RoomPage._windowVaseSlotId => const _RearrangeSlotGeometry(
+      label: '一輪挿し',
+      alignment: Alignment(0.37, -0.25),
+      widthFactor: 0.18,
+      heightFactor: 0.18,
+    ),
+    RoomPage._curtainSlotId => const _RearrangeSlotGeometry(
+      label: 'カーテン',
+      alignment: Alignment(-0.88, -0.76),
+      widthFactor: 0.20,
+      heightFactor: 0.23,
+    ),
+    RoomPage._floorRugSlotId => const _RearrangeSlotGeometry(
+      label: 'ラグ',
+      alignment: Alignment(0.10, 0.96),
+      widthFactor: 0.30,
+      heightFactor: 0.11,
+    ),
+    RoomPage._chairSlotId => const _RearrangeSlotGeometry(
+      label: '椅子',
+      alignment: Alignment(0, 0.64),
+      widthFactor: 0.34,
+      heightFactor: 0.22,
+    ),
+    _ => throw ArgumentError.value(slotId, 'slotId'),
+  };
 }
 
 class _TutorialRoomGuide extends StatelessWidget {
