@@ -33,6 +33,7 @@ import 'package:ame_tsuzuri/shared/provider/weather_provider.dart';
 import 'package:ame_tsuzuri/shared/repository/app_date_repository.dart';
 import 'package:ame_tsuzuri/shared/repository/weather_repository.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -42,7 +43,14 @@ void main() {
       await _pumpRoom(tester, initialReadState: _completedTutorialReadState());
 
       expect(find.text('模様替え'), findsOneWidget);
+      expect(find.text('模様替え中'), findsNothing);
       expect(find.text('おわる'), findsNothing);
+      final normalTagRect = tester.getRect(
+        find.byKey(const ValueKey('rearrangeModeTag')),
+      );
+      expect(normalTagRect.width, inInclusiveRange(80, 90));
+      expect(normalTagRect.height, greaterThanOrEqualTo(44));
+      expect(find.bySemanticsLabel('模様替えを開始'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('rearrangeInteractionBlocker')),
         findsNothing,
@@ -52,7 +60,9 @@ void main() {
       await tester.pump();
 
       expect(find.text('模様替え'), findsNothing);
+      expect(find.text('模様替え中'), findsOneWidget);
       expect(find.text('おわる'), findsOneWidget);
+      expect(find.bySemanticsLabel('模様替えを終了'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('rearrangeInteractionBlocker')),
         findsOneWidget,
@@ -67,6 +77,20 @@ void main() {
         find.byKey(const ValueKey('rearrangeInteractionBlocker')),
         findsNothing,
       );
+    });
+
+    testWidgets('紙札はkeyboard focusからmodeを開始できる', (tester) async {
+      await _pumpRoom(tester, initialReadState: _completedTutorialReadState());
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+
+      expect(find.text('模様替え中'), findsOneWidget);
+      expect(find.bySemanticsLabel('模様替えを終了'), findsOneWidget);
     });
 
     testWidgets('通常時はmarkerを表示せず模様替え中は操作可能slotだけ表示する', (tester) async {
@@ -142,11 +166,49 @@ void main() {
       await tester.pump();
 
       for (final slotId in _rearrangeSlotIds) {
+        final marker = find.byKey(ValueKey('rearrangeSlotMarker-$slotId'));
+        expect(marker, findsOneWidget);
+        expect(tester.getSize(marker).width, closeTo(28, 0.1));
         expect(
-          find.byKey(ValueKey('rearrangeSlotMarker-$slotId')),
+          find.byKey(ValueKey('rearrangeSlotMarkerInner-$slotId')),
           findsOneWidget,
         );
       }
+    });
+
+    testWidgets('selected markerは通常より大きく中央点を表示する', (tester) async {
+      await _pumpRoom(
+        tester,
+        initialReadState: _completedTutorialReadState(),
+        initialPurchasedFurnitureIds: const {'wooden_mug'},
+      );
+      await _enterRearrangeMode(tester);
+      final marker = find.byKey(
+        const ValueKey('rearrangeSlotMarker-$_deskSurfaceLeftSlotId'),
+      );
+      final normalSize = tester.getSize(marker);
+      expect(normalSize.width, inInclusiveRange(27, 29));
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey('rearrangeSlotTapArea-$_deskSurfaceLeftSlotId'),
+        ),
+      );
+      await _pumpBottomSheet(tester);
+
+      final selectedSize = tester.getSize(marker);
+      expect(selectedSize.width, closeTo(34, 0.1));
+      expect(selectedSize.width, greaterThan(normalSize.width));
+      expect(selectedSize.height, greaterThan(normalSize.height));
+      expect(
+        find.descendant(
+          of: marker,
+          matching: find.byKey(
+            const ValueKey('rearrangeSelectedSlotIndicator'),
+          ),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('slot tapでslot名と購入済み互換Furnitureだけを表示する', (tester) async {
@@ -874,14 +936,18 @@ void main() {
       expect(find.byKey(const ValueKey('prototypeNextDay')), findsOneWidget);
     });
 
-    testWidgets('320pxと390pxでoverflowせず既存tap areaと重ならない', (tester) async {
+    testWidgets('320px・390px・PC幅で右端タブとvisual markerが衝突しない', (tester) async {
       tester.view.devicePixelRatio = 1;
       addTearDown(() {
         tester.view.resetDevicePixelRatio();
         tester.view.resetPhysicalSize();
       });
 
-      for (final size in const [Size(320, 700), Size(390, 700)]) {
+      for (final size in const [
+        Size(320, 700),
+        Size(390, 700),
+        Size(1280, 800),
+      ]) {
         tester.view.physicalSize = size;
         await _pumpRoom(
           tester,
@@ -892,6 +958,16 @@ void main() {
         final buttonRect = tester.getRect(
           find.byKey(const ValueKey('rearrangeModeButton')),
         );
+        final roomCanvas = find.byWidgetPredicate(
+          (widget) =>
+              widget is AspectRatio &&
+              (widget.aspectRatio - (390 / 700)).abs() < 0.0001,
+        );
+        expect(roomCanvas, findsOneWidget);
+        final roomRect = tester.getRect(roomCanvas);
+        expect(buttonRect.right, closeTo(roomRect.right, 0.01));
+        expect(buttonRect.width, inInclusiveRange(80, 90));
+        expect(buttonRect.height, greaterThanOrEqualTo(44));
         for (final key in const [
           'prototypeControls',
           'letterTapArea',
@@ -909,7 +985,7 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('rearrangeModeButton')));
         await tester.pump();
         await tester.pump();
-        final slotRects = <({String slotId, Rect rect})>[];
+        final markerRects = <({String slotId, Rect rect})>[];
         for (final slotId in _rearrangeSlotIds) {
           final target = find.byKey(ValueKey('rearrangeSlotTapArea-$slotId'));
           expect(target, findsOneWidget);
@@ -918,14 +994,18 @@ void main() {
           expect(rect.top, greaterThanOrEqualTo(0));
           expect(rect.right, lessThanOrEqualTo(size.width));
           expect(rect.bottom, lessThanOrEqualTo(size.height));
-          for (final other in slotRects) {
+          final markerRect = tester.getRect(
+            find.byKey(ValueKey('rearrangeSlotMarker-$slotId')),
+          );
+          expect(rect.contains(markerRect.center), isTrue);
+          for (final other in markerRects) {
             expect(
-              rect.overlaps(other.rect),
+              markerRect.overlaps(other.rect),
               isFalse,
-              reason: '$slotId overlaps ${other.slotId} at $size',
+              reason: '$slotId marker overlaps ${other.slotId} at $size',
             );
           }
-          slotRects.add((slotId: slotId, rect: rect));
+          markerRects.add((slotId: slotId, rect: markerRect));
         }
         for (final slotId in const [
           _windowHangingDecorSlotId,

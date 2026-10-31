@@ -1,6 +1,13 @@
 import 'package:ame_tsuzuri/features/furniture/model/furniture.dart';
 import 'package:flutter/material.dart';
 
+const _pickerPaperColor = Color(0xFFFFFAEE);
+const _pickerInkColor = Color(0xFF463D33);
+const _pickerMutedSageColor = Color(0xFF596C51);
+const _pickerBorderColor = Color(0x8A766B5E);
+const _pickerDividerColor = Color(0x33766B5E);
+const _pickerShadowColor = Color(0x333D342B);
+
 sealed class RoomFurniturePickerResult {
   const RoomFurniturePickerResult();
 }
@@ -37,20 +44,21 @@ class RoomFurniturePickerSheet extends StatelessWidget {
       color: Colors.transparent,
       child: SafeArea(
         top: false,
+        minimum: const EdgeInsets.only(bottom: 4),
         child: Container(
           key: const ValueKey('roomFurniturePickerSheet'),
           constraints: BoxConstraints(
             maxHeight: MediaQuery.sizeOf(context).height * 0.72,
           ),
           decoration: const BoxDecoration(
-            color: Color(0xFFFFFAEE),
+            color: _pickerPaperColor,
             borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
             border: Border(
-              top: BorderSide(color: Color(0x66766B5E), width: 0.8),
+              top: BorderSide(color: _pickerBorderColor, width: 1),
             ),
             boxShadow: [
               BoxShadow(
-                color: Color(0x333D342B),
+                color: _pickerShadowColor,
                 blurRadius: 16,
                 offset: Offset(0, -3),
               ),
@@ -76,14 +84,14 @@ class RoomFurniturePickerSheet extends StatelessWidget {
                     slotName,
                     key: const ValueKey('roomFurniturePickerSlotName'),
                     style: theme.textTheme.titleMedium?.copyWith(
-                      color: const Color(0xFF463D33),
+                      color: _pickerInkColor,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.4,
                     ),
                   ),
                 ),
               ),
-              const Divider(height: 1, color: Color(0x33766B5E)),
+              const Divider(height: 1, color: _pickerDividerColor),
               Flexible(
                 child: furnitureCandidates.isEmpty
                     ? const Padding(
@@ -105,7 +113,7 @@ class RoomFurniturePickerSheet extends StatelessWidget {
                         separatorBuilder: (context, index) => const Divider(
                           height: 1,
                           indent: 72,
-                          color: Color(0x26766B5E),
+                          color: _pickerDividerColor,
                         ),
                         itemBuilder: (context, index) {
                           final furniture = furnitureCandidates[index];
@@ -120,8 +128,9 @@ class RoomFurniturePickerSheet extends StatelessWidget {
                       ),
               ),
               if (recoveryActionLabel case final label?) ...[
-                const Divider(height: 1, color: Color(0x33766B5E)),
+                const Divider(height: 1, color: _pickerDividerColor),
                 Material(
+                  key: const ValueKey('roomFurniturePickerFooter'),
                   color: Colors.transparent,
                   child: InkWell(
                     key: const ValueKey('roomFurniturePickerRecoveryAction'),
@@ -134,7 +143,7 @@ class RoomFurniturePickerSheet extends StatelessWidget {
                         child: Text(
                           label,
                           style: const TextStyle(
-                            color: Color(0xFF665B4F),
+                            color: _pickerInkColor,
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                           ),
@@ -166,7 +175,7 @@ class _FurnitureCandidateRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: isCurrent ? const Color(0x597F9275) : Colors.transparent,
+      color: isCurrent ? const Color(0x667F9275) : Colors.transparent,
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         key: ValueKey('roomFurniturePickerCandidate-${furniture.id}'),
@@ -201,7 +210,7 @@ class _FurnitureCandidateRow extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: Color(0xFF463D33),
+                      color: _pickerInkColor,
                       fontSize: 15,
                       height: 1.3,
                     ),
@@ -213,12 +222,12 @@ class _FurnitureCandidateRow extends StatelessWidget {
                     key: ValueKey('roomFurniturePickerCurrent'),
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.check, size: 17, color: Color(0xFF596C51)),
+                      Icon(Icons.check, size: 17, color: _pickerMutedSageColor),
                       SizedBox(width: 3),
                       Text(
                         '使用中',
                         style: TextStyle(
-                          color: Color(0xFF596C51),
+                          color: _pickerMutedSageColor,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),

@@ -153,6 +153,12 @@ void main() {
       await tester.pump();
       expect(find.text(candidates.last.name), findsOneWidget);
       expect(find.text('元に戻す'), findsOneWidget);
+      final footerRect = tester.getRect(
+        find.byKey(const ValueKey('roomFurniturePickerFooter')),
+      );
+      expect(footerRect.top, greaterThanOrEqualTo(0));
+      expect(footerRect.bottom, lessThanOrEqualTo(size.height));
+      expect(tester.getRect(list).bottom, lessThanOrEqualTo(footerRect.top));
       expect(tester.takeException(), isNull);
 
       Navigator.of(tester.element(find.byType(RoomFurniturePickerSheet))).pop();
