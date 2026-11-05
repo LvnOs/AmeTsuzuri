@@ -62,6 +62,10 @@ class ShizukuProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> reload() async {
+    await _loadInternal();
+  }
+
   Future<void> addShizuku(int amount) async {
     final nextState = ShizukuState(
       currentShizuku: _currentShizuku + amount,

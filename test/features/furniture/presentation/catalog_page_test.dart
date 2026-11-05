@@ -1740,6 +1740,28 @@ void main() {
       expect(harness.shizukuProvider.currentShizuku, 100);
     });
 
+    testWidgets('購入履歴保存失敗では雫と購入表示を戻し再試行できる', (tester) async {
+      final harness = await _pumpCatalog(
+        tester,
+        blockPurchase: false,
+        failNextCatalogSave: true,
+        purchasedFurnitureIds: const {},
+      );
+
+      await _buyFurniture(tester, '家具A');
+
+      expect(find.text('家具を迎えられませんでした'), findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(harness.catalogProvider.isPurchased('furniture_a'), isFalse);
+      expect(harness.shizukuProvider.currentShizuku, 100);
+
+      await _buyFurniture(tester, '家具A');
+
+      expect(find.text('どこに置きますか？'), findsOneWidget);
+      expect(harness.catalogProvider.isPurchased('furniture_a'), isTrue);
+      expect(harness.shizukuProvider.currentShizuku, 70);
+    });
+
     testWidgets('雫不足では配置Dialogを表示しない', (tester) async {
       await _pumpCatalog(
         tester,
@@ -2029,6 +2051,7 @@ Future<_CatalogHarness> _pumpCatalog(
   bool showTutorialGuide = false,
   bool blockPurchase = true,
   bool failNextShizukuSave = false,
+  bool failNextCatalogSave = false,
   bool loadShizukuProvider = true,
   bool loadCatalogProvider = true,
   PlacementSlotRepository? placementSlotRepository,
@@ -2045,7 +2068,7 @@ Future<_CatalogHarness> _pumpCatalog(
   addTearDown(shizukuRepository.completeSave);
   final catalogRepository = _FakePurchasedFurnitureRepository(
     purchasedFurnitureIds,
-  );
+  )..failNextSave = failNextCatalogSave;
   final shizukuProvider = ShizukuProvider(shizukuRepository);
   final catalogProvider = CatalogProvider(catalogRepository);
   final placedFurnitureProvider = PlacedFurnitureProvider(
@@ -2214,10 +2237,12 @@ class _DelayedPlacementSlotRepository extends _FakePlacementSlotRepository {
 }
 
 class _FakePurchasedFurnitureRepository extends PurchasedFurnitureRepository {
-  _FakePurchasedFurnitureRepository(this.purchasedFurnitureIds);
+  _FakePurchasedFurnitureRepository(Set<String> purchasedFurnitureIds)
+    : purchasedFurnitureIds = Set.of(purchasedFurnitureIds);
 
   final Set<String> purchasedFurnitureIds;
   int saveCallCount = 0;
+  bool failNextSave = false;
 
   @override
   Future<Set<String>> loadPurchasedFurnitureIds() async =>
@@ -2226,6 +2251,13 @@ class _FakePurchasedFurnitureRepository extends PurchasedFurnitureRepository {
   @override
   Future<void> savePurchasedFurnitureIds(Set<String> furnitureIds) async {
     saveCallCount++;
+    if (failNextSave) {
+      failNextSave = false;
+      throw StateError('save failed');
+    }
+    purchasedFurnitureIds
+      ..clear()
+      ..addAll(furnitureIds);
   }
 }
 

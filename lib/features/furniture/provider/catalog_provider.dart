@@ -85,7 +85,20 @@ class CatalogProvider extends ChangeNotifier {
 
       _purchasedFurnitureIds.add(furniture.id);
 
-      await _repository.savePurchasedFurnitureIds(_purchasedFurnitureIds);
+      try {
+        await _repository.savePurchasedFurnitureIds(_purchasedFurnitureIds);
+      } catch (error, stackTrace) {
+        _purchasedFurnitureIds.remove(furniture.id);
+
+        try {
+          await shizukuProvider.addShizuku(furniture.price);
+        } catch (compensationError, compensationStackTrace) {
+          await shizukuProvider.reload();
+          Error.throwWithStackTrace(compensationError, compensationStackTrace);
+        }
+
+        Error.throwWithStackTrace(error, stackTrace);
+      }
 
       return FurniturePurchaseResult.success;
     } finally {
