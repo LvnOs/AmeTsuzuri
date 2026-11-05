@@ -910,7 +910,9 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
 
       await _deliverAndAnimate(letter.id, date);
     } catch (_) {
-      // Delivery is retried on a later Room rebuild or date change.
+      if (_attemptedDeliveryDate == date) {
+        _attemptedDeliveryDate = null;
+      }
     }
   }
 

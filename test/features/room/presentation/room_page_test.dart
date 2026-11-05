@@ -3119,6 +3119,12 @@ void main() {
         isFalse,
       );
       expect(find.byKey(const ValueKey('roomLetterLayer')), findsNothing);
+
+      await harness.dateProvider.setDebugDate(DateTime(2026, 8, 7));
+      await tester.pump();
+      await tester.pump();
+
+      expect(harness.letterRepository.getAllCallCount, 1);
     });
 
     testWidgets('別日の配達IDだけでは今日のletterレイヤーを表示しない', (tester) async {
@@ -3145,12 +3151,61 @@ void main() {
       expect(find.byKey(const ValueKey('roomLetterLayer')), findsNothing);
     });
 
-    testWidgets('配達保存失敗時は配達済みとして表示しない', (tester) async {
+    testWidgets('LetterRepositoryの一時失敗後にtutorial Letterを同日中に1通だけ配達する', (
+      tester,
+    ) async {
+      final harness = await _pumpRoom(
+        tester,
+        letters: [_letter('tutorial_001'), _letter('letterA')],
+        failNextLetterLoad: true,
+      );
+
+      expect(harness.letterRepository.getAllCallCount, 2);
+      expect(harness.readLetterProvider.deliveredLetters, {
+        '2026-08-07': 'tutorial_001',
+      });
+
+      await harness.dateProvider.setDebugDate(DateTime(2026, 8, 7));
+      await tester.pump();
+      await tester.pump();
+
+      expect(harness.letterRepository.getAllCallCount, 2);
+      expect(harness.readLetterProvider.deliveredLetters.length, 1);
+    });
+
+    testWidgets('deliver保存の一時失敗後に同日中に再試行し成功後は再配達しない', (tester) async {
       final harness = await _pumpRoom(tester, failNextReadSave: true);
+
+      expect(harness.readLetterRepository.saveCallCount, 2);
+      expect(harness.readLetterProvider.deliveredLetters, {
+        '2026-08-07': 'letterA',
+      });
+
+      await harness.dateProvider.setDebugDate(DateTime(2026, 8, 7));
+      await tester.pump();
+      await tester.pump();
+
+      expect(harness.readLetterRepository.saveCallCount, 2);
+      expect(harness.readLetterProvider.deliveredLetters.length, 1);
+    });
+
+    testWidgets('LetterRepository読込中に日付が変わると古い日付へ配達しない', (tester) async {
+      final harness = await _pumpRoom(tester, blockNextLetterLoad: true);
+      expect(harness.letterRepository.getAllCallCount, 1);
+
+      await harness.dateProvider.moveToNextDay();
+      await tester.pump();
+      harness.letterRepository.completeLoad();
       await _pumpPastFiniteAnimations(tester);
 
-      expect(harness.readLetterProvider.deliveredLetters, isEmpty);
-      expect(find.byKey(const ValueKey('roomLetterLayer')), findsNothing);
+      expect(
+        harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
+        isNull,
+      );
+      expect(
+        harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 8)),
+        'letterA',
+      );
     });
 
     testWidgets('同日の再buildでは2通目を選択しない', (tester) async {
@@ -5207,6 +5262,8 @@ Future<_RoomHarness> _pumpRoom(
   WeatherType? weather = WeatherType.rain,
   bool failNextWeatherLoad = false,
   int weatherLoadFailureCount = 0,
+  bool failNextLetterLoad = false,
+  bool blockNextLetterLoad = false,
   List<Letter>? letters,
   DateTime? date,
   int initialRewardedCount = 0,
@@ -5252,7 +5309,9 @@ Future<_RoomHarness> _pumpRoom(
     remainingFailures: weatherLoadFailureCount,
   );
   final weatherProvider = WeatherProvider(weatherRepository);
-  final letterRepository = _FakeLetterRepository(letters ?? _defaultLetters);
+  final letterRepository = _FakeLetterRepository(letters ?? _defaultLetters)
+    ..failNextLoad = failNextLetterLoad
+    ..blockNextLoad = blockNextLetterLoad;
 
   if (loadProviders) {
     await Future.wait([
