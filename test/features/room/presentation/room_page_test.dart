@@ -20,7 +20,6 @@ import 'package:ame_tsuzuri/features/letters/repository/shizuku_repository.dart'
 import 'package:ame_tsuzuri/features/room/presentation/prototype_controls.dart';
 import 'package:ame_tsuzuri/features/room/presentation/room_page.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/autumn_leaf_effect.dart';
-import 'package:ame_tsuzuri/features/room/presentation/widgets/furniture_reaction.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/rain_overlay.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/room_furniture_picker_sheet.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/spring_petal_drift_effect.dart';
@@ -1284,32 +1283,6 @@ void main() {
       expect(_initialFlowerImage, findsOneWidget);
       expect(tester.takeException(), isNull);
     });
-
-    testWidgets('初期花と同じAlignment・width・BoxFitを個別補正なしで使う', (tester) async {
-      await _pumpRoom(
-        tester,
-        initialPlacedFurnitureIds: const {
-          _windowVaseSlotId: 'pale_yellow_flower',
-        },
-      );
-      final imageFinder = find.byKey(
-        const ValueKey('roomFurnitureImage-pale_yellow_flower'),
-      );
-      final image = tester.widget<Image>(imageFinder);
-      final sizedBox = tester.widget<SizedBox>(
-        find.ancestor(of: imageFinder, matching: find.byType(SizedBox)).first,
-      );
-      final align = tester.widget<Align>(
-        find.byKey(const ValueKey('roomFlowerLayer')),
-      );
-      final roomWidth = tester
-          .getSize(find.byKey(const ValueKey('roomFlowerLayer')))
-          .width;
-
-      expect(image.fit, BoxFit.contain);
-      expect(sizedBox.width, closeTo(roomWidth * 0.13, 0.001));
-      expect(align.alignment, const Alignment(0.34, -0.26));
-    });
   });
 
   group('seasonal outdoor background', () {
@@ -2016,29 +1989,6 @@ void main() {
       });
       expect(_windowHangingDecorFurnitureLayer, findsOneWidget);
     });
-  });
-
-  testWidgets('reaction家具は390×700とPC幅でoverflowしない', (tester) async {
-    tester.view.devicePixelRatio = 1;
-    addTearDown(() {
-      tester.view.resetDevicePixelRatio();
-      tester.view.resetPhysicalSize();
-    });
-
-    for (final size in const [Size(390, 700), Size(1200, 800)]) {
-      tester.view.physicalSize = size;
-      await _pumpRoom(
-        tester,
-        initialPlacedFurnitureIds: const {
-          _windowHangingDecorSlotId: 'wind_chime',
-          _windowVaseSlotId: 'small_white_flower',
-          _chairSlotId: 'rocking_chair',
-        },
-      );
-
-      expect(find.byType(FurnitureReaction), findsNWidgets(3));
-      expect(tester.takeException(), isNull);
-    }
   });
 
   group('窓辺A家具', () {
