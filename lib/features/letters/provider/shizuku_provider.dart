@@ -126,7 +126,9 @@ class ShizukuProvider extends ChangeNotifier {
     try {
       return await _saveLetterReward(letterId);
     } finally {
-      _pendingLetterRewards.remove(letterId);
+      // Future型が返却されるが、削除処理をしたいだけなので値を明示的に捨てる
+      // removeは同期的に処理されるため、awaitする必要はない
+      final _ = _pendingLetterRewards.remove(letterId);
     }
   }
 

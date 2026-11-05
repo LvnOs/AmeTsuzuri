@@ -1,5 +1,5 @@
-import '../../../shared/model/weather_type.dart';
 import '../../../shared/model/season_type.dart';
+import '../../../shared/model/weather_type.dart';
 
 class Letter {
   const Letter({

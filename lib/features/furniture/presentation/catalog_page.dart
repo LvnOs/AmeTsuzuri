@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../letters/provider/shizuku_provider.dart';
 import '../../furniture/model/furniture.dart';
 import '../../furniture/model/placement_slot.dart';
 import '../../furniture/provider/catalog_provider.dart';
 import '../../furniture/repository/furniture_repository.dart';
 import '../../furniture/repository/placement_slot_repository.dart';
+import '../../letters/provider/shizuku_provider.dart';
 import '../provider/placed_furniture_provider.dart';
 
 class CatalogPage extends StatefulWidget {

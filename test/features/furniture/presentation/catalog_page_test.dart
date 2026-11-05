@@ -9,8 +9,8 @@ import 'package:ame_tsuzuri/features/furniture/repository/furniture_repository.d
 import 'package:ame_tsuzuri/features/furniture/repository/placed_furniture_repository.dart';
 import 'package:ame_tsuzuri/features/furniture/repository/placement_slot_repository.dart';
 import 'package:ame_tsuzuri/features/furniture/repository/purchased_furniture_repository.dart';
-import 'package:ame_tsuzuri/features/letters/provider/shizuku_provider.dart';
 import 'package:ame_tsuzuri/features/letters/model/shizuku_state.dart';
+import 'package:ame_tsuzuri/features/letters/provider/shizuku_provider.dart';
 import 'package:ame_tsuzuri/features/letters/repository/shizuku_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
