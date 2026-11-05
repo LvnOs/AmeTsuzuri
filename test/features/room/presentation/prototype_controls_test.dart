@@ -382,6 +382,31 @@ void main() {
     expect(harness.date.today, DateTime(2026, 8, 7));
     expect(find.byType(RoomPage), findsOneWidget);
   });
+
+  testWidgets('配置load失敗状態でもresetして空配置を再読込できる', (tester) async {
+    final placedRepository = _BrokenUntilClearedPlacedRepository();
+    final harness = await _pumpPrototypeRoom(
+      tester,
+      placedRepository: placedRepository,
+      loadPlacedProvider: false,
+    );
+    await expectLater(harness.placed.load(), throwsStateError);
+
+    await _selectPrototypeOperation(tester, 'prototypeReset');
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.text('最初から'));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.byType(RoomPage), findsOneWidget);
+    expect(harness.placed.isLoaded, isTrue);
+    expect(harness.placed.placedFurnitureIds, isEmpty);
+
+    final recreatedProvider = PlacedFurnitureProvider(placedRepository);
+    await recreatedProvider.load();
+    expect(recreatedProvider.placedFurnitureIds, isEmpty);
+  });
 }
 
 Future<void> _selectPrototypeOperation(
@@ -401,6 +426,8 @@ Future<_PrototypeHarness> _pumpPrototypeRoom(
   WidgetTester tester, {
   DateTime? date,
   PurchasedFurnitureRepository? purchasedRepository,
+  PlacedFurnitureRepository? placedRepository,
+  bool loadPlacedProvider = true,
   WeatherRepository? weatherRepository,
 }) async {
   SharedPreferences.setMockInitialValues({
@@ -427,13 +454,15 @@ Future<_PrototypeHarness> _pumpPrototypeRoom(
   final catalog = CatalogProvider(
     purchasedRepository ?? PurchasedFurnitureRepository(),
   );
-  final placed = PlacedFurnitureProvider(PlacedFurnitureRepository());
+  final placed = PlacedFurnitureProvider(
+    placedRepository ?? PlacedFurnitureRepository(),
+  );
   final appDate = AppDateProvider(AppDateRepository());
   await Future.wait([
     read.load(),
     shizuku.load(),
     catalog.load(),
-    placed.load(),
+    if (loadPlacedProvider) placed.load(),
     appDate.load(),
   ]);
 
@@ -478,6 +507,23 @@ class _PrototypeHarness {
   final CatalogProvider catalog;
   final PlacedFurnitureProvider placed;
   final AppDateProvider date;
+}
+
+class _BrokenUntilClearedPlacedRepository extends PlacedFurnitureRepository {
+  bool _isBroken = true;
+
+  @override
+  Future<Map<String, String>> loadPlacedFurnitureIds() async {
+    if (_isBroken) {
+      throw StateError('placed furniture load failed');
+    }
+    return {};
+  }
+
+  @override
+  Future<void> clear() async {
+    _isBroken = false;
+  }
 }
 
 class _PrototypeLetterRepository extends LetterRepository {

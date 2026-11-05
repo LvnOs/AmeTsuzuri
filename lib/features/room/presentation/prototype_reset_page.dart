@@ -56,13 +56,13 @@ class _PrototypeResetPageState extends State<PrototypeResetPage> {
 
     try {
       await Future.wait([
-        placedFurnitureProvider.load(),
         catalogProvider.load(),
         readLetterProvider.load(),
         shizukuProvider.load(),
         appDateProvider.load(),
       ]);
       await placedFurnitureProvider.reset();
+      await placedFurnitureProvider.load();
       await catalogProvider.reset();
       await readLetterProvider.reset();
       await shizukuProvider.reset();
