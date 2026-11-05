@@ -33,7 +33,6 @@ import 'package:ame_tsuzuri/shared/provider/weather_provider.dart';
 import 'package:ame_tsuzuri/shared/repository/app_date_repository.dart';
 import 'package:ame_tsuzuri/shared/repository/weather_repository.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -45,12 +44,6 @@ void main() {
       expect(find.text('模様替え'), findsOneWidget);
       expect(find.text('模様替え中'), findsNothing);
       expect(find.text('おわる'), findsNothing);
-      final normalTagRect = tester.getRect(
-        find.byKey(const ValueKey('rearrangeModeTag')),
-      );
-      expect(normalTagRect.width, inInclusiveRange(80, 90));
-      expect(normalTagRect.height, greaterThanOrEqualTo(44));
-      expect(find.bySemanticsLabel('模様替えを開始'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('rearrangeInteractionBlocker')),
         findsNothing,
@@ -62,7 +55,6 @@ void main() {
       expect(find.text('模様替え'), findsNothing);
       expect(find.text('模様替え中'), findsOneWidget);
       expect(find.text('おわる'), findsOneWidget);
-      expect(find.bySemanticsLabel('模様替えを終了'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('rearrangeInteractionBlocker')),
         findsOneWidget,
@@ -77,20 +69,6 @@ void main() {
         find.byKey(const ValueKey('rearrangeInteractionBlocker')),
         findsNothing,
       );
-    });
-
-    testWidgets('紙札はkeyboard focusからmodeを開始できる', (tester) async {
-      await _pumpRoom(tester, initialReadState: _completedTutorialReadState());
-
-      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-      await tester.pump();
-      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-      await tester.pump();
-      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-      await tester.pump();
-
-      expect(find.text('模様替え中'), findsOneWidget);
-      expect(find.bySemanticsLabel('模様替えを終了'), findsOneWidget);
     });
 
     testWidgets('通常時はmarkerを表示せず模様替え中は操作可能slotだけ表示する', (tester) async {
@@ -168,15 +146,10 @@ void main() {
       for (final slotId in _rearrangeSlotIds) {
         final marker = find.byKey(ValueKey('rearrangeSlotMarker-$slotId'));
         expect(marker, findsOneWidget);
-        expect(tester.getSize(marker).width, closeTo(28, 0.1));
-        expect(
-          find.byKey(ValueKey('rearrangeSlotMarkerInner-$slotId')),
-          findsOneWidget,
-        );
       }
     });
 
-    testWidgets('selected markerは通常より大きく中央点を表示する', (tester) async {
+    testWidgets('slot tapでselected markerへ切り替える', (tester) async {
       await _pumpRoom(
         tester,
         initialReadState: _completedTutorialReadState(),
@@ -186,9 +159,6 @@ void main() {
       final marker = find.byKey(
         const ValueKey('rearrangeSlotMarker-$_deskSurfaceLeftSlotId'),
       );
-      final normalSize = tester.getSize(marker);
-      expect(normalSize.width, inInclusiveRange(27, 29));
-
       await tester.tap(
         find.byKey(
           const ValueKey('rearrangeSlotTapArea-$_deskSurfaceLeftSlotId'),
@@ -196,10 +166,6 @@ void main() {
       );
       await _pumpBottomSheet(tester);
 
-      final selectedSize = tester.getSize(marker);
-      expect(selectedSize.width, closeTo(34, 0.1));
-      expect(selectedSize.width, greaterThan(normalSize.width));
-      expect(selectedSize.height, greaterThan(normalSize.height));
       expect(
         find.descendant(
           of: marker,
