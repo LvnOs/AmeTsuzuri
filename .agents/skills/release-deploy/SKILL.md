@@ -1,6 +1,6 @@
 ---
 name: release-deploy
-description: 「雨つづり。」で開発機能をリリース、gitを更新するときに使用する。
+description: 「雨つづり。」で開発機能を release / tag / push / Firebase Hosting deploy をするときに使用する。
 ---
 
 # release-deploy
