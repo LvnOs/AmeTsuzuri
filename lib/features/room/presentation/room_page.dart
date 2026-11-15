@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart';
@@ -32,6 +33,8 @@ import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
 import 'package:ame_tsuzuri/shared/provider/weather_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+import '../../ambient_sound/provider/ambient_sound_provider.dart';
 
 enum _TutorialTarget { none, letter, bottle, bookshelf }
 
@@ -307,6 +310,9 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
   final _chairReactionKey = GlobalKey<FurnitureReactionState>();
   _TutorialTarget _requestedTutorialTarget = _TutorialTarget.none;
   bool _isTutorialGlowSyncScheduled = false;
+  bool _isAmbientWeatherSyncScheduled = false;
+  WeatherType? _requestedAmbientWeather;
+  WeatherType? _lastSyncedAmbientWeather;
   _TutorialMove _tutorialMove = _TutorialMove.none;
 
   @override
@@ -359,6 +365,9 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     final previousWeather = hasWeatherForToday
         ? weatherProvider.previousWeather
         : null;
+    if (effectiveWeather != null) {
+      _scheduleAmbientWeatherSync(effectiveWeather);
+    }
 
     final deskSurfaceLeftFurnitureId = placedFurnitureProvider.isLoaded
         ? placedFurnitureProvider.placedFurnitureIds[RoomPage
@@ -679,6 +688,34 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
       load.catchError((_) {
         // A later Room rebuild or the delivery retry can try this date again.
       });
+    });
+  }
+
+  void _scheduleAmbientWeatherSync(WeatherType weather) {
+    _requestedAmbientWeather = weather;
+    if (_isAmbientWeatherSyncScheduled ||
+        weather == _lastSyncedAmbientWeather) {
+      return;
+    }
+
+    _isAmbientWeatherSyncScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _isAmbientWeatherSyncScheduled = false;
+      if (!mounted) {
+        return;
+      }
+
+      final requestedWeather = _requestedAmbientWeather;
+      if (requestedWeather == _lastSyncedAmbientWeather) {
+        return;
+      }
+      _lastSyncedAmbientWeather = requestedWeather;
+      final ambientSoundProvider = context.read<AmbientSoundProvider?>();
+      if (ambientSoundProvider != null) {
+        unawaited(
+          ambientSoundProvider.updateEffectiveWeather(requestedWeather),
+        );
+      }
     });
   }
 
