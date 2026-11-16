@@ -1,6 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../features/ambient_sound/provider/ambient_sound_provider.dart';
+import '../features/ambient_sound/repository/ambient_sound_repository.dart';
+import '../features/ambient_sound/service/ambient_audio_service.dart';
 import '../features/furniture/provider/catalog_provider.dart';
 import '../features/furniture/provider/placed_furniture_provider.dart';
 import '../features/furniture/repository/placed_furniture_repository.dart';
@@ -16,7 +21,16 @@ import '../shared/repository/app_date_repository.dart';
 import '../shared/repository/weather_repository.dart';
 
 class AmeTsuzuriApp extends StatelessWidget {
-  const AmeTsuzuriApp({super.key});
+  const AmeTsuzuriApp({
+    super.key,
+    this.ambientSoundRepository,
+    this.ambientAudioService,
+    this.weatherRepository,
+  });
+
+  final AmbientSoundRepository? ambientSoundRepository;
+  final AmbientAudioService? ambientAudioService;
+  final WeatherRepository? weatherRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +46,14 @@ class AmeTsuzuriApp extends StatelessWidget {
           create: (_) => AppDateProvider(AppDateRepository())..load(),
         ),
         ChangeNotifierProvider(
-          create: (_) => WeatherProvider(WeatherRepository()),
+          create: (_) =>
+              WeatherProvider(weatherRepository ?? WeatherRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => AmbientSoundProvider(
+            ambientSoundRepository ?? AmbientSoundRepository(),
+            ambientAudioService ?? AmbientAudioService(),
+          )..load(),
         ),
         ChangeNotifierProvider(
           create: (_) =>
@@ -43,11 +64,54 @@ class AmeTsuzuriApp extends StatelessWidget {
               PlacedFurnitureProvider(PlacedFurnitureRepository())..load(),
         ),
       ],
-      child: MaterialApp(
-        title: '雨つづり。',
-        debugShowCheckedModeBanner: false,
-        home: const RoomPage(),
+      child: const _AmbientSoundLifecycle(
+        child: MaterialApp(
+          title: '雨つづり。',
+          debugShowCheckedModeBanner: false,
+          home: RoomPage(),
+        ),
       ),
     );
   }
+}
+
+class _AmbientSoundLifecycle extends StatefulWidget {
+  const _AmbientSoundLifecycle({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_AmbientSoundLifecycle> createState() => _AmbientSoundLifecycleState();
+}
+
+class _AmbientSoundLifecycleState extends State<_AmbientSoundLifecycle>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        unawaited(context.read<AmbientSoundProvider>().updateVisibility(true));
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        unawaited(context.read<AmbientSoundProvider>().updateVisibility(false));
+      case AppLifecycleState.inactive:
+        break;
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

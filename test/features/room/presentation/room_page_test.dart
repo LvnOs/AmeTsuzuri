@@ -1,5 +1,9 @@
 import 'dart:async';
 
+import 'package:ame_tsuzuri/features/ambient_sound/provider/ambient_sound_provider.dart';
+import 'package:ame_tsuzuri/features/ambient_sound/repository/ambient_sound_repository.dart';
+import 'package:ame_tsuzuri/features/ambient_sound/service/ambient_audio_platform.dart';
+import 'package:ame_tsuzuri/features/ambient_sound/service/ambient_audio_service.dart';
 import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart';
 import 'package:ame_tsuzuri/features/furniture/model/furniture.dart';
 import 'package:ame_tsuzuri/features/furniture/presentation/catalog_page.dart';
@@ -36,6 +40,121 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
+  group('雨音UI', () {
+    testWidgets('OFF表示からタップでON表示と再生へ切り替える', (tester) async {
+      final ambient = await _createAmbientSoundHarness();
+
+      await _pumpRoom(tester, ambientSoundProvider: ambient.provider);
+
+      expect(find.text('雨音 OFF'), findsOneWidget);
+      expect(ambient.provider.uiState, AmbientSoundUiState.off);
+
+      await tester.tap(find.byKey(const ValueKey('ambientSoundButton')));
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('雨音 ON'), findsOneWidget);
+      expect(ambient.repository.savedValues, [true]);
+      expect(ambient.platform.startCount, 1);
+    });
+
+    testWidgets('reload後のrainは再開操作が必要と表示する', (tester) async {
+      final ambient = await _createAmbientSoundHarness(isEnabled: true);
+
+      await _pumpRoom(tester, ambientSoundProvider: ambient.provider);
+
+      expect(find.text('雨音を再開'), findsOneWidget);
+      expect(ambient.provider.uiState, AmbientSoundUiState.resumeRequired);
+      expect(ambient.platform.startCount, 0);
+    });
+
+    testWidgets('sunnyで設定ONなら待機中と表示する', (tester) async {
+      final ambient = await _createAmbientSoundHarness(isEnabled: true);
+
+      await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        ambientSoundProvider: ambient.provider,
+      );
+
+      expect(find.text('雨音 待機中'), findsOneWidget);
+      expect(ambient.provider.uiState, AmbientSoundUiState.weatherPaused);
+    });
+
+    testWidgets('非表示中は一時停止と表示する', (tester) async {
+      final ambient = await _createAmbientSoundHarness(isEnabled: true);
+      await _pumpRoom(tester, ambientSoundProvider: ambient.provider);
+      await ambient.provider.handleUserTap();
+      await ambient.provider.updateVisibility(false);
+      await tester.pump();
+
+      expect(find.text('雨音 一時停止'), findsOneWidget);
+      expect(ambient.provider.uiState, AmbientSoundUiState.temporarilyPaused);
+    });
+
+    testWidgets('雨音UIと家具操作を共存できる', (tester) async {
+      final ambient = await _createAmbientSoundHarness();
+      await _pumpRoom(
+        tester,
+        ambientSoundProvider: ambient.provider,
+        initialPlacedFurnitureIds: const {_chairSlotId: 'rocking_chair'},
+      );
+
+      final ambientButton = find.byKey(const ValueKey('ambientSoundButton'));
+      final chairTapArea = find.byKey(
+        const ValueKey('furnitureReactionTapArea-rocking_chair'),
+      );
+      expect(ambientButton, findsOneWidget);
+      expect(chairTapArea, findsOneWidget);
+      expect(
+        tester.getRect(ambientButton).overlaps(tester.getRect(chairTapArea)),
+        isFalse,
+      );
+
+      await tester.tap(chairTapArea);
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('雨音 OFF'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('roomFurnitureImage-rocking_chair')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('320px幅でPrototypeControlsとtutorialガイドに重ならない', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(320, 700));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final ambient = await _createAmbientSoundHarness();
+      await _pumpRoom(
+        tester,
+        weather: WeatherType.sunny,
+        ambientSoundProvider: ambient.provider,
+        initialReadState: ReadLetterState(
+          receivedLetters: {'tutorial_001': DateTime(2026, 8, 6)},
+        ),
+      );
+
+      final ambientRect = tester.getRect(
+        find.byKey(const ValueKey('ambientSoundButton')),
+      );
+      final prototypeRect = tester.getRect(
+        find.byKey(const ValueKey('prototypeControls')),
+      );
+      final guideDecoration = find
+          .ancestor(
+            of: find.byKey(const ValueKey('tutorialRoomGuide')),
+            matching: find.byType(DecoratedBox),
+          )
+          .first;
+
+      expect(ambientRect.overlaps(prototypeRect), isFalse);
+      expect(ambientRect.overlaps(tester.getRect(guideDecoration)), isFalse);
+      expect(ambientRect.left, greaterThanOrEqualTo(0));
+      expect(ambientRect.top, greaterThanOrEqualTo(0));
+      expect(ambientRect.right, lessThanOrEqualTo(320));
+    });
+  });
+
   group('模様替えモード', () {
     testWidgets('tutorial完了後にmodeを開始・終了できる', (tester) async {
       await _pumpRoom(tester, initialReadState: _completedTutorialReadState());
@@ -5193,6 +5312,7 @@ Future<_RoomHarness> _pumpRoom(
   Set<String> initialPurchasedFurnitureIds = const {},
   Map<String, String> initialPlacedFurnitureIds = const {},
   List<Furniture> furnitures = _roomFurnitures,
+  AmbientSoundProvider? ambientSoundProvider,
 }) async {
   final shizukuRepository = _FakeShizukuRepository(
     blockSave: blockRewardSave,
@@ -5248,6 +5368,8 @@ Future<_RoomHarness> _pumpRoom(
         ChangeNotifierProvider.value(value: placedProvider),
         ChangeNotifierProvider.value(value: dateProvider),
         ChangeNotifierProvider.value(value: weatherProvider),
+        if (ambientSoundProvider != null)
+          ChangeNotifierProvider.value(value: ambientSoundProvider),
       ],
       child: MaterialApp(
         home: RoomPage(
@@ -5277,6 +5399,65 @@ Future<_RoomHarness> _pumpRoom(
     placedFurnitureProvider: placedProvider,
     placedFurnitureRepository: placedFurnitureRepository,
   );
+}
+
+Future<_AmbientSoundHarness> _createAmbientSoundHarness({
+  bool isEnabled = false,
+}) async {
+  final repository = _FakeAmbientSoundRepository(isEnabled: isEnabled);
+  final platform = _FakeAmbientAudioPlatform();
+  final provider = AmbientSoundProvider(
+    repository,
+    AmbientAudioService.withPlatform(platform),
+  );
+  await provider.load();
+  addTearDown(provider.dispose);
+  return _AmbientSoundHarness(provider, repository, platform);
+}
+
+class _AmbientSoundHarness {
+  const _AmbientSoundHarness(this.provider, this.repository, this.platform);
+
+  final AmbientSoundProvider provider;
+  final _FakeAmbientSoundRepository repository;
+  final _FakeAmbientAudioPlatform platform;
+}
+
+class _FakeAmbientSoundRepository extends AmbientSoundRepository {
+  _FakeAmbientSoundRepository({required this.isEnabled});
+
+  bool isEnabled;
+  final List<bool> savedValues = [];
+
+  @override
+  Future<bool> loadEnabled() async => isEnabled;
+
+  @override
+  Future<void> saveEnabled(bool isEnabled) async {
+    this.isEnabled = isEnabled;
+    savedValues.add(isEnabled);
+  }
+}
+
+class _FakeAmbientAudioPlatform implements AmbientAudioPlatform {
+  int startCount = 0;
+
+  @override
+  Future<void> activate() async {}
+
+  @override
+  Future<void> prepare() async {}
+
+  @override
+  void startLoop() {
+    startCount++;
+  }
+
+  @override
+  void stop() {}
+
+  @override
+  Future<void> dispose() async {}
 }
 
 class _RoomHarness {

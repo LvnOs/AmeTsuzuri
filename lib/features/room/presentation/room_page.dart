@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart';
@@ -32,6 +33,8 @@ import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
 import 'package:ame_tsuzuri/shared/provider/weather_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+import '../../ambient_sound/provider/ambient_sound_provider.dart';
 
 enum _TutorialTarget { none, letter, bottle, bookshelf }
 
@@ -307,6 +310,9 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
   final _chairReactionKey = GlobalKey<FurnitureReactionState>();
   _TutorialTarget _requestedTutorialTarget = _TutorialTarget.none;
   bool _isTutorialGlowSyncScheduled = false;
+  bool _isAmbientWeatherSyncScheduled = false;
+  WeatherType? _requestedAmbientWeather;
+  WeatherType? _lastSyncedAmbientWeather;
   _TutorialMove _tutorialMove = _TutorialMove.none;
 
   @override
@@ -359,6 +365,9 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     final previousWeather = hasWeatherForToday
         ? weatherProvider.previousWeather
         : null;
+    if (effectiveWeather != null) {
+      _scheduleAmbientWeatherSync(effectiveWeather);
+    }
 
     final deskSurfaceLeftFurnitureId = placedFurnitureProvider.isLoaded
         ? placedFurnitureProvider.placedFurnitureIds[RoomPage
@@ -679,6 +688,34 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
       load.catchError((_) {
         // A later Room rebuild or the delivery retry can try this date again.
       });
+    });
+  }
+
+  void _scheduleAmbientWeatherSync(WeatherType weather) {
+    _requestedAmbientWeather = weather;
+    if (_isAmbientWeatherSyncScheduled ||
+        weather == _lastSyncedAmbientWeather) {
+      return;
+    }
+
+    _isAmbientWeatherSyncScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _isAmbientWeatherSyncScheduled = false;
+      if (!mounted) {
+        return;
+      }
+
+      final requestedWeather = _requestedAmbientWeather;
+      if (requestedWeather == _lastSyncedAmbientWeather) {
+        return;
+      }
+      _lastSyncedAmbientWeather = requestedWeather;
+      final ambientSoundProvider = context.read<AmbientSoundProvider?>();
+      if (ambientSoundProvider != null) {
+        unawaited(
+          ambientSoundProvider.updateEffectiveWeather(requestedWeather),
+        );
+      }
     });
   }
 
@@ -1328,6 +1365,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ambientSound = context.watch<AmbientSoundProvider?>();
     final outdoorAssetPath = switch (season) {
       SeasonType.spring => 'assets/images/room/outdoor_spring.png',
       SeasonType.summer => 'assets/images/room/outdoor_summer.png',
@@ -1650,6 +1688,12 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   onToggleRearrangeMode: onToggleRearrangeMode,
                   onSelectSlot: onSelectRearrangeSlot,
                 ),
+              if (ambientSound != null)
+                Positioned(
+                  left: 10,
+                  top: 4,
+                  child: _AmbientSoundButton(ambientSound: ambientSound),
+                ),
               Positioned(
                 right: 10,
                 top: 10,
@@ -1668,6 +1712,64 @@ class _RoomBackgroundLayers extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _AmbientSoundButton extends StatelessWidget {
+  const _AmbientSoundButton({required this.ambientSound});
+
+  final AmbientSoundProvider ambientSound;
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, icon) = switch (ambientSound.uiState) {
+      AmbientSoundUiState.off => ('雨音 OFF', Icons.volume_off_outlined),
+      AmbientSoundUiState.playing => ('雨音 ON', Icons.volume_up_outlined),
+      AmbientSoundUiState.weatherPaused => (
+        '雨音 待機中',
+        Icons.water_drop_outlined,
+      ),
+      AmbientSoundUiState.resumeRequired => ('雨音を再開', Icons.play_arrow_rounded),
+      AmbientSoundUiState.temporarilyPaused => ('雨音 一時停止', Icons.pause_rounded),
+    };
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xD9FFF8E8),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0x667A6548)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x263D342B),
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TextButton.icon(
+        key: const ValueKey('ambientSoundButton'),
+        onPressed: ambientSound.isLoaded
+            ? () {
+                unawaited(ambientSound.handleUserTap().catchError((_) {}));
+              }
+            : null,
+        style: TextButton.styleFrom(
+          foregroundColor: const Color(0xFF4A4034),
+          disabledForegroundColor: const Color(0x994A4034),
+          minimumSize: const Size(44, 44),
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.compact,
+          textStyle: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.2,
+          ),
+        ),
+        icon: Icon(icon, size: 17),
+        label: Text(label),
+      ),
     );
   }
 }
