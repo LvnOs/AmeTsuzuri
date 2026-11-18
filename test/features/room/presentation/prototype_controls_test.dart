@@ -6,7 +6,6 @@ import 'package:ame_tsuzuri/features/furniture/provider/placed_furniture_provide
 import 'package:ame_tsuzuri/features/furniture/repository/furniture_repository.dart';
 import 'package:ame_tsuzuri/features/furniture/repository/placed_furniture_repository.dart';
 import 'package:ame_tsuzuri/features/furniture/repository/purchased_furniture_repository.dart';
-import 'package:ame_tsuzuri/features/letters/model/letter.dart';
 import 'package:ame_tsuzuri/features/letters/provider/read_letter_provider.dart';
 import 'package:ame_tsuzuri/features/letters/provider/shizuku_provider.dart';
 import 'package:ame_tsuzuri/features/letters/repository/letter_repository.dart';
@@ -581,39 +580,39 @@ class _BrokenUntilClearedPlacedRepository extends PlacedFurnitureRepository {
 
 class _PrototypeLetterRepository extends LetterRepository {
   @override
-  Future<List<Letter>> getAll() async => const [
-    Letter(
+  Future<List<LetterSummary>> getSummaries() async => const [
+    LetterSummary(
       id: 'tutorial_001',
       title: 'tutorial',
-      body: 'tutorial',
+      bodyAssetPath: 'assets/letters/tutorial_001.md',
       requiredSeason: SeasonType.summer,
       requiredWeather: WeatherType.rain,
     ),
-    Letter(
+    LetterSummary(
       id: 'letter_01',
       title: 'letter',
-      body: 'letter',
+      bodyAssetPath: 'assets/letters/letter_01.md',
       requiredSeason: SeasonType.summer,
       requiredWeather: WeatherType.rain,
     ),
-    Letter(
+    LetterSummary(
       id: 'spring_01',
       title: 'spring',
-      body: 'spring',
+      bodyAssetPath: 'assets/letters/spring_01.md',
       requiredSeason: SeasonType.spring,
       requiredWeather: WeatherType.rain,
     ),
-    Letter(
+    LetterSummary(
       id: 'autumn_01',
       title: 'autumn',
-      body: 'autumn',
+      bodyAssetPath: 'assets/letters/autumn_01.md',
       requiredSeason: SeasonType.autumn,
       requiredWeather: WeatherType.rain,
     ),
-    Letter(
+    LetterSummary(
       id: 'winter_01',
       title: 'winter',
-      body: 'winter',
+      bodyAssetPath: 'assets/letters/winter_01.md',
       requiredSeason: SeasonType.winter,
       requiredWeather: WeatherType.rain,
     ),

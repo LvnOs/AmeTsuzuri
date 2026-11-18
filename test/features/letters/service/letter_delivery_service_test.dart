@@ -1,4 +1,4 @@
-import 'package:ame_tsuzuri/features/letters/model/letter.dart';
+import 'package:ame_tsuzuri/features/letters/repository/letter_repository.dart';
 import 'package:ame_tsuzuri/features/letters/service/letter_delivery_service.dart';
 import 'package:ame_tsuzuri/shared/model/season_type.dart';
 import 'package:ame_tsuzuri/shared/model/weather_type.dart';
@@ -7,8 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   const service = LetterDeliveryService();
 
-  Letter? select(
-    List<Letter> letters, {
+  LetterSummary? select(
+    List<LetterSummary> letters, {
     SeasonType season = SeasonType.summer,
     WeatherType weather = WeatherType.rain,
     Set<String> readIds = const {},
@@ -188,15 +188,15 @@ void main() {
   });
 }
 
-Letter _letter(
+LetterSummary _letter(
   String id, {
   SeasonType season = SeasonType.summer,
   WeatherType weather = WeatherType.rain,
 }) {
-  return Letter(
+  return LetterSummary(
     id: id,
     title: id,
-    body: id,
+    bodyAssetPath: 'assets/letters/$id.md',
     requiredSeason: season,
     requiredWeather: weather,
   );
