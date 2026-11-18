@@ -288,6 +288,9 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
   final LetterDeliveryService _letterDeliveryService =
       const LetterDeliveryService();
   DateTime? _attemptedDeliveryDate;
+  int? _dateRevision;
+  Future<bool>? _pendingDeliverySave;
+  bool _isMigrationNoticeScheduled = false;
   DateTime? _requestedWeatherDate;
   Future<void>? _requestedWeatherLoad;
   bool _isOpeningLetter = false;
@@ -350,6 +353,14 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final appDateProvider = context.watch<AppDateProvider>();
+    final isPrototypeMode = appDateProvider.isDebugDateEnabled;
+    if (_dateRevision != appDateProvider.dateRevision) {
+      _dateRevision = appDateProvider.dateRevision;
+      _attemptedDeliveryDate = null;
+    }
+    if (appDateProvider.needsMigrationNotice) {
+      _scheduleDateMigrationNotice(appDateProvider);
+    }
     final readLetterProvider = context.watch<ReadLetterProvider>();
     final catalogProvider = context.watch<CatalogProvider>();
     final placedFurnitureProvider = context.watch<PlacedFurnitureProvider>();
@@ -358,14 +369,15 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
         ? _dateOnly(appDateProvider.today)
         : null;
     final hasWeatherForToday =
-        today != null && weatherProvider.loadedDate == today;
-    final effectiveWeather =
-        _weatherOverride ??
-        (hasWeatherForToday ? weatherProvider.currentWeather : null);
+        isPrototypeMode && today != null && weatherProvider.loadedDate == today;
+    final effectiveWeather = isPrototypeMode
+        ? _weatherOverride ??
+              (hasWeatherForToday ? weatherProvider.currentWeather : null)
+        : null;
     final previousWeather = hasWeatherForToday
         ? weatherProvider.previousWeather
         : null;
-    if (effectiveWeather != null) {
+    if (effectiveWeather != null || !isPrototypeMode) {
       _scheduleAmbientWeatherSync(effectiveWeather);
     }
 
@@ -399,8 +411,8 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
         : null;
 
     var showLetter = false;
-    if (appDateProvider.isLoaded) {
-      _scheduleWeatherLoad(_dateOnly(appDateProvider.today));
+    if (isPrototypeMode && today != null) {
+      _scheduleWeatherLoad(today);
     }
     if (appDateProvider.isLoaded && readLetterProvider.isLoaded) {
       final today = _dateOnly(appDateProvider.today);
@@ -452,12 +464,16 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
           child: AspectRatio(
             aspectRatio: RoomPage._designWidth / RoomPage._designHeight,
             child: _RoomBackgroundLayers(
-              season: _outdoorSeasonOverride ?? appDateProvider.currentSeason,
+              season:
+                  (isPrototypeMode ? _outdoorSeasonOverride : null) ??
+                  appDateProvider.currentSeason,
               effectiveWeather: effectiveWeather,
               previousWeather: previousWeather,
               weatherDate: hasWeatherForToday ? today : null,
               isTutorialCompleted: readLetterProvider.tutorialCompleted,
-              rainIntensityOverride: _rainIntensityOverride,
+              rainIntensityOverride: isPrototypeMode
+                  ? _rainIntensityOverride
+                  : null,
               hasDeliveredLetter: showLetter,
               isArrivalAnimating: _isArrivalAnimating,
               arrivalAnimation: _arrivalController,
@@ -489,7 +505,10 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
               onTapBookshelf: _onTapBookshelf,
               onTapLetter: _onTapLetter,
               onTapPost: _onTapPost,
-              isPrototypeOperationRunning: _isPrototypeOperationRunning,
+              isPrototypeOperationRunning:
+                  _isPrototypeOperationRunning || !appDateProvider.isLoaded,
+              isPrototypeMode: isPrototypeMode,
+              onToggleDateMode: _toggleDateMode,
               onMoveToNextDay: _moveToNextDay,
               onOutdoorSeasonChanged: _setOutdoorSeasonOverride,
               letterSeasonOverride: _letterSeasonOverride,
@@ -680,7 +699,14 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
 
     _requestedWeatherDate = date;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _requestedWeatherDate != date) {
+      if (!mounted ||
+          _requestedWeatherDate != date ||
+          !context.read<AppDateProvider>().isDebugDateEnabled ||
+          context.read<AppDateProvider>().today != date) {
+        if (_requestedWeatherDate == date) {
+          _requestedWeatherDate = null;
+          _requestedWeatherLoad = null;
+        }
         return;
       }
       final load = context.read<WeatherProvider>().loadForDate(date);
@@ -691,7 +717,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     });
   }
 
-  void _scheduleAmbientWeatherSync(WeatherType weather) {
+  void _scheduleAmbientWeatherSync(WeatherType? weather) {
     _requestedAmbientWeather = weather;
     if (_isAmbientWeatherSyncScheduled ||
         weather == _lastSyncedAmbientWeather) {
@@ -772,31 +798,23 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     }
 
     _attemptedDeliveryDate = date;
+    final revision = context.read<AppDateProvider>().dateRevision;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _deliverLetterFor(date);
+      await _deliverLetterFor(date, revision);
     });
   }
 
-  Future<void> _deliverLetterFor(DateTime date) async {
-    if (!mounted) {
+  Future<void> _deliverLetterFor(DateTime date, int revision) async {
+    if (!_canContinueDeliveryFor(date, revision)) {
       return;
     }
 
     final appDateProvider = context.read<AppDateProvider>();
     final readLetterProvider = context.read<ReadLetterProvider>();
     final weatherProvider = context.read<WeatherProvider>();
-    if (!appDateProvider.isLoaded ||
-        !readLetterProvider.isLoaded ||
-        _dateOnly(appDateProvider.today) != date ||
-        readLetterProvider.hasDeliveredLetterOn(date)) {
-      return;
-    }
-
     try {
       final letters = await _letterRepository.getAll();
-      if (!mounted ||
-          _dateOnly(context.read<AppDateProvider>().today) != date ||
-          readLetterProvider.hasDeliveredLetterOn(date)) {
+      if (!_canContinueDeliveryFor(date, revision)) {
         return;
       }
 
@@ -808,22 +826,25 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
           RoomPage._tutorialLetterId,
         );
         if (tutorialLetter != null) {
-          await _deliverAndAnimate(tutorialLetter.id, date);
+          await _deliverAndAnimate(tutorialLetter.id, date, revision);
           return;
         }
+      }
+
+      if (!appDateProvider.isDebugDateEnabled) {
+        return;
       }
 
       final didLoadWeather = await _loadWeatherForNormalDelivery(
         weatherProvider: weatherProvider,
         date: date,
+        revision: revision,
       );
       if (!didLoadWeather) {
         return;
       }
 
-      if (!mounted ||
-          _dateOnly(context.read<AppDateProvider>().today) != date ||
-          readLetterProvider.hasDeliveredLetterOn(date)) {
+      if (!_canContinueDeliveryFor(date, revision)) {
         return;
       }
 
@@ -841,9 +862,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
       };
       final letter = _letterDeliveryService.selectLetter(
         letters: normalLetters,
-        currentSeason:
-            _letterSeasonOverride ??
-            context.read<AppDateProvider>().currentSeason,
+        currentSeason: _letterSeasonOverride ?? appDateProvider.currentSeason,
         currentWeather: currentWeather,
         readLetterIds: excludedLetterIds,
       );
@@ -851,9 +870,9 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
         return;
       }
 
-      await _deliverAndAnimate(letter.id, date);
+      await _deliverAndAnimate(letter.id, date, revision);
     } catch (_) {
-      if (_attemptedDeliveryDate == date) {
+      if (_dateRevision == revision && _attemptedDeliveryDate == date) {
         _attemptedDeliveryDate = null;
       }
     }
@@ -862,6 +881,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
   Future<bool> _loadWeatherForNormalDelivery({
     required WeatherProvider weatherProvider,
     required DateTime date,
+    required int revision,
   }) async {
     for (var attempt = 0; attempt < 2; attempt++) {
       try {
@@ -878,7 +898,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
         }
 
         await Future<void>.delayed(_weatherRetryDelay);
-        if (!_canContinueDeliveryFor(date)) {
+        if (!_canContinueDeliveryFor(date, revision)) {
           return false;
         }
       }
@@ -887,7 +907,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     return false;
   }
 
-  bool _canContinueDeliveryFor(DateTime date) {
+  bool _canContinueDeliveryFor(DateTime date, int revision) {
     if (!mounted) {
       return false;
     }
@@ -895,18 +915,45 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     final appDateProvider = context.read<AppDateProvider>();
     final readLetterProvider = context.read<ReadLetterProvider>();
     return appDateProvider.isLoaded &&
+        appDateProvider.dateRevision == revision &&
         readLetterProvider.isLoaded &&
         _dateOnly(appDateProvider.today) == date &&
         !readLetterProvider.hasDeliveredLetterOn(date);
   }
 
-  Future<void> _deliverAndAnimate(String letterId, DateTime date) async {
-    final didDeliver = await context.read<ReadLetterProvider>().deliver(
+  Future<void> _deliverAndAnimate(
+    String letterId,
+    DateTime date,
+    int revision,
+  ) async {
+    for (
+      var pending = _pendingDeliverySave;
+      pending != null;
+      pending = _pendingDeliverySave
+    ) {
+      try {
+        await pending;
+      } catch (_) {
+        // The request that started this save handles its failure.
+      }
+    }
+    if (!mounted || !_canContinueDeliveryFor(date, revision)) {
+      return;
+    }
+
+    final appDateProvider = context.read<AppDateProvider>();
+    final save = context.read<ReadLetterProvider>().deliver(
       letterId,
       deliveredDate: date,
     );
-    if (didDeliver && mounted) {
-      _startArrivalAnimation();
+    _pendingDeliverySave = save;
+    try {
+      final didDeliver = await save;
+      if (didDeliver && mounted && appDateProvider.today == date) {
+        _startArrivalAnimation();
+      }
+    } finally {
+      _pendingDeliverySave = null;
     }
   }
 
@@ -1194,6 +1241,64 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     );
   }
 
+  void _scheduleDateMigrationNotice(AppDateProvider provider) {
+    if (_isMigrationNoticeScheduled ||
+        ModalRoute.of(context)?.isCurrent == false) {
+      return;
+    }
+    _isMigrationNoticeScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || !provider.needsMigrationNotice) {
+        _isMigrationNoticeScheduled = false;
+        return;
+      }
+      final acknowledged = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('通常プレイの日付について'),
+          content: const Text(
+            'これからは端末の日付で遊べます。これまでの記録は引き継がれます。'
+            '以前の日付は「テスト」からPrototypeモードに切り替えると使えます。',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('通常プレイを続ける'),
+            ),
+          ],
+        ),
+      );
+      if (mounted && acknowledged == true) {
+        await _setDateMode(false);
+      }
+      _isMigrationNoticeScheduled = false;
+    });
+  }
+
+  Future<void> _toggleDateMode() =>
+      _setDateMode(!context.read<AppDateProvider>().isDebugDateEnabled);
+
+  Future<void> _setDateMode(bool enabled) async {
+    if (_isPrototypeOperationRunning) {
+      return;
+    }
+    setState(() => _isPrototypeOperationRunning = true);
+    try {
+      await context.read<AppDateProvider>().setPrototypeMode(enabled);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('日付モードを保存できませんでした')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isPrototypeOperationRunning = false);
+      }
+    }
+  }
+
   Future<void> _moveToNextDay() async {
     if (_isPrototypeOperationRunning) {
       return;
@@ -1308,6 +1413,8 @@ class _RoomBackgroundLayers extends StatelessWidget {
     required this.onTapLetter,
     required this.onTapPost,
     required this.isPrototypeOperationRunning,
+    required this.isPrototypeMode,
+    required this.onToggleDateMode,
     required this.onMoveToNextDay,
     required this.onOutdoorSeasonChanged,
     required this.letterSeasonOverride,
@@ -1355,6 +1462,8 @@ class _RoomBackgroundLayers extends StatelessWidget {
   final VoidCallback onTapLetter;
   final VoidCallback onTapPost;
   final bool isPrototypeOperationRunning;
+  final bool isPrototypeMode;
+  final VoidCallback onToggleDateMode;
   final VoidCallback onMoveToNextDay;
   final ValueChanged<SeasonType?> onOutdoorSeasonChanged;
   final SeasonType? letterSeasonOverride;
@@ -1699,6 +1808,8 @@ class _RoomBackgroundLayers extends StatelessWidget {
                 top: 10,
                 child: PrototypeControls(
                   isRunning: isPrototypeOperationRunning,
+                  isPrototypeMode: isPrototypeMode,
+                  onToggleDateMode: onToggleDateMode,
                   onNextDay: onMoveToNextDay,
                   onOutdoorSeasonChanged: onOutdoorSeasonChanged,
                   letterSeasonOverride: letterSeasonOverride,

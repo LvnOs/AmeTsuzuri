@@ -3243,6 +3243,26 @@ void main() {
       );
     });
 
+    testWidgets('同日でも通常モードへ切り替えると処理中のPrototype配達を破棄する', (tester) async {
+      final date = DateTime(2026, 8, 7);
+      final harness = await _pumpRoom(
+        tester,
+        date: date,
+        now: () => date,
+        blockNextLetterLoad: true,
+      );
+      expect(harness.letterRepository.getAllCallCount, 1);
+
+      await harness.dateProvider.setPrototypeMode(false);
+      await tester.pump();
+      harness.letterRepository.completeLoad();
+      await _pumpPastFiniteAnimations(tester);
+
+      expect(harness.dateProvider.today, date);
+      expect(harness.readLetterProvider.deliveredLetters, isEmpty);
+      expect(find.byKey(const ValueKey('roomLetterLayer')), findsNothing);
+    });
+
     testWidgets('同日の再buildでは2通目を選択しない', (tester) async {
       final harness = await _pumpRoom(tester);
       await _pumpPastFiniteAnimations(tester);
@@ -5301,6 +5321,7 @@ Future<_RoomHarness> _pumpRoom(
   bool blockNextLetterLoad = false,
   List<Letter>? letters,
   DateTime? date,
+  DateTime Function()? now,
   int initialRewardedCount = 0,
   ReadLetterState? initialReadState,
   ShizukuState? initialShizukuState,
@@ -5338,6 +5359,7 @@ Future<_RoomHarness> _pumpRoom(
   final placedProvider = PlacedFurnitureProvider(placedFurnitureRepository);
   final dateProvider = AppDateProvider(
     appDateRepository ?? _FakeAppDateRepository(date ?? DateTime(2026, 8, 7)),
+    now: now,
   );
   final weatherRepository = _FakeWeatherRepository(
     weather: weather,
@@ -5963,7 +5985,8 @@ class _FakeAppDateRepository extends AppDateRepository {
   }
 
   @override
-  Future<void> clear() async {
-    savedDate = null;
-  }
+  Future<bool?> loadPrototypeMode() async => true;
+
+  @override
+  Future<void> savePrototypeMode(bool enabled) async {}
 }

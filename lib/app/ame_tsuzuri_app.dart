@@ -64,7 +64,7 @@ class AmeTsuzuriApp extends StatelessWidget {
               PlacedFurnitureProvider(PlacedFurnitureRepository())..load(),
         ),
       ],
-      child: const _AmbientSoundLifecycle(
+      child: const _AppLifecycle(
         child: MaterialApp(
           title: '雨つづり。',
           debugShowCheckedModeBanner: false,
@@ -75,27 +75,33 @@ class AmeTsuzuriApp extends StatelessWidget {
   }
 }
 
-class _AmbientSoundLifecycle extends StatefulWidget {
-  const _AmbientSoundLifecycle({required this.child});
+class _AppLifecycle extends StatefulWidget {
+  const _AppLifecycle({required this.child});
 
   final Widget child;
 
   @override
-  State<_AmbientSoundLifecycle> createState() => _AmbientSoundLifecycleState();
+  State<_AppLifecycle> createState() => _AppLifecycleState();
 }
 
-class _AmbientSoundLifecycleState extends State<_AmbientSoundLifecycle>
+class _AppLifecycleState extends State<_AppLifecycle>
     with WidgetsBindingObserver {
+  Timer? _dateRefreshTimer;
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _dateRefreshTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => context.read<AppDateProvider>().refreshLocalDate(),
+    );
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     switch (state) {
       case AppLifecycleState.resumed:
+        context.read<AppDateProvider>().refreshLocalDate();
         unawaited(context.read<AmbientSoundProvider>().updateVisibility(true));
       case AppLifecycleState.paused:
       case AppLifecycleState.hidden:
@@ -108,6 +114,7 @@ class _AmbientSoundLifecycleState extends State<_AmbientSoundLifecycle>
 
   @override
   void dispose() {
+    _dateRefreshTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
