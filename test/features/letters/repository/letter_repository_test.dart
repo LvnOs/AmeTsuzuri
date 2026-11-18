@@ -10,6 +10,47 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('一覧ではYAMLだけを読み、選択した手紙の本文だけを取得する', () async {
+    final bundle = _MemoryAssetBundle({
+      'assets/data/letters.yaml': _yamlWithWeather('rain') + _anotherLetter,
+      'assets/letters/test.md': '選んだ手紙の本文',
+    });
+    final repository = LetterRepository(assetBundle: bundle);
+
+    final summaries = await repository.getSummaries();
+
+    expect(bundle.loadedKeys, ['assets/data/letters.yaml']);
+    expect(summaries.map((summary) => summary.id), ['letter_test', 'another']);
+    expect(summaries.first.title, 'テストの手紙');
+    expect(summaries.first.requiredSeason, SeasonType.summer);
+    expect(summaries.first.requiredWeather, WeatherType.rain);
+
+    final letter = await repository.loadLetter(summaries.first);
+    expect(letter.body, '選んだ手紙の本文');
+    expect(bundle.loadedKeys, [
+      'assets/data/letters.yaml',
+      'assets/letters/test.md',
+    ]);
+  });
+
+  test('本文の取得失敗後は同じAssetBundleで再試行できる', () async {
+    final bundle = _MemoryAssetBundle({
+      'assets/data/letters.yaml': _yamlWithWeather('rain'),
+    });
+    final repository = LetterRepository(assetBundle: bundle);
+    final summary = (await repository.getSummaries()).single;
+
+    await expectLater(repository.loadLetter(summary), throwsStateError);
+    bundle.assets['assets/letters/test.md'] = '再試行で取得した本文';
+
+    expect((await repository.loadLetter(summary)).body, '再試行で取得した本文');
+    expect(bundle.loadedKeys, [
+      'assets/data/letters.yaml',
+      'assets/letters/test.md',
+      'assets/letters/test.md',
+    ]);
+  });
+
   test('実データからtutorial_001と正式本文を読み込める', () async {
     final letters = await LetterRepository().getAll();
     final tutorial = letters.singleWhere(
@@ -237,13 +278,23 @@ letters:
     body_file: letters/test.md
 ''';
 
+const _anotherLetter = '''
+  - id: another
+    title: "別の手紙"
+    season: winter
+    weather: rain
+    body_file: letters/another.md
+''';
+
 class _MemoryAssetBundle extends CachingAssetBundle {
   _MemoryAssetBundle(this.assets);
 
   final Map<String, String> assets;
+  final List<String> loadedKeys = [];
 
   @override
   Future<ByteData> load(String key) async {
+    loadedKeys.add(key);
     final value = assets[key];
     if (value == null) {
       throw StateError('Missing test asset: $key');
