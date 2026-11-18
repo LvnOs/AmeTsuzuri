@@ -122,18 +122,7 @@ Skillの記述と現在実装が食い違う場合は、現在実装を確認し
 
 ## Validation
 
-変更範囲に対応するテストを先に実行し、完了前には原則として以下を実行する。
-
-```powershell
-flutter analyze
-flutter test
-```
-
-UI・アニメーション・非同期処理を変更した場合は、関連するWidgetテストへの影響も確認する。
-
-変更内容に対応する個別テストがある場合は、全テストより先に実行する。
-
-release / tag / push / Firebase Hosting deployを含む作業では `$release-deploy` を使用し、そこで定義された追加検証を行う。
+Flutter/Dartの変更・レビュー・テストでは [`$flutter-test-scope`](.agents/skills/flutter-test-scope/SKILL.md) に従い、影響範囲に応じて検証を選定する。全件テストは毎回の必須条件にしない。release / tag / push / Firebase Hosting deployを含む作業では `$release-deploy` の検証ルールを優先する。
 
 Windowsローカル開発環境では通常Flutter SDKとして `C:\Develop\flutter` を使用する。
 
