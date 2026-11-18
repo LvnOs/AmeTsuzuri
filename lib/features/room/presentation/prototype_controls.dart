@@ -4,6 +4,7 @@ import 'package:ame_tsuzuri/shared/model/weather_type.dart';
 import 'package:flutter/material.dart';
 
 enum PrototypeOperation {
+  toggleDateMode,
   nextDay,
   outdoorAuto,
   outdoorSpring,
@@ -29,6 +30,8 @@ class PrototypeControls extends StatelessWidget {
   const PrototypeControls({
     super.key,
     required this.isRunning,
+    required this.isPrototypeMode,
+    required this.onToggleDateMode,
     required this.onNextDay,
     required this.onOutdoorSeasonChanged,
     required this.letterSeasonOverride,
@@ -39,6 +42,8 @@ class PrototypeControls extends StatelessWidget {
   });
 
   final bool isRunning;
+  final bool isPrototypeMode;
+  final VoidCallback onToggleDateMode;
   final VoidCallback onNextDay;
   final ValueChanged<SeasonType?> onOutdoorSeasonChanged;
   final SeasonType? letterSeasonOverride;
@@ -58,6 +63,9 @@ class PrototypeControls extends StatelessWidget {
       tooltip: 'テスト操作',
       onSelected: (operation) {
         switch (operation) {
+          case PrototypeOperation.toggleDateMode:
+            onToggleDateMode();
+            return;
           case PrototypeOperation.nextDay:
             onNextDay();
             return;
@@ -117,127 +125,14 @@ class PrototypeControls extends StatelessWidget {
             return;
         }
       },
-      itemBuilder: (context) => [
-        PopupMenuItem<PrototypeOperation>(
-          key: const ValueKey('prototypeNextDay'),
+      itemBuilder: (context) {
+        final modeItem = PopupMenuItem<PrototypeOperation>(
           height: _itemHeight,
-          value: PrototypeOperation.nextDay,
-          child: const Text('翌日へ進む'),
-        ),
-        const PopupMenuDivider(height: _dividerHeight),
-        PopupMenuItem<PrototypeOperation>(
-          key: const ValueKey('prototypeOutdoorAuto'),
-          height: _itemHeight,
-          value: PrototypeOperation.outdoorAuto,
-          child: const Text('背景：自動'),
-        ),
-        PopupMenuItem<PrototypeOperation>(
-          key: const ValueKey('prototypeOutdoorSpring'),
-          height: _itemHeight,
-          value: PrototypeOperation.outdoorSpring,
-          child: const Text('背景：春'),
-        ),
-        PopupMenuItem<PrototypeOperation>(
-          key: const ValueKey('prototypeOutdoorSummer'),
-          height: _itemHeight,
-          value: PrototypeOperation.outdoorSummer,
-          child: const Text('背景：夏'),
-        ),
-        PopupMenuItem<PrototypeOperation>(
-          key: const ValueKey('prototypeOutdoorAutumn'),
-          height: _itemHeight,
-          value: PrototypeOperation.outdoorAutumn,
-          child: const Text('背景：秋'),
-        ),
-        PopupMenuItem<PrototypeOperation>(
-          key: const ValueKey('prototypeOutdoorWinter'),
-          height: _itemHeight,
-          value: PrototypeOperation.outdoorWinter,
-          child: const Text('背景：冬'),
-        ),
-        const PopupMenuDivider(height: _dividerHeight),
-        PopupMenuItem<PrototypeOperation>(
-          key: const ValueKey('prototypeLetterAuto'),
-          height: _itemHeight,
-          value: PrototypeOperation.letterAuto,
-          child: _menuLabel('手紙：自動', letterSeasonOverride == null),
-        ),
-        PopupMenuItem<PrototypeOperation>(
-          key: const ValueKey('prototypeLetterSpring'),
-          height: _itemHeight,
-          value: PrototypeOperation.letterSpring,
-          child: _menuLabel('手紙：春', letterSeasonOverride == SeasonType.spring),
-        ),
-        PopupMenuItem<PrototypeOperation>(
-          key: const ValueKey('prototypeLetterSummer'),
-          height: _itemHeight,
-          value: PrototypeOperation.letterSummer,
-          child: _menuLabel('手紙：夏', letterSeasonOverride == SeasonType.summer),
-        ),
-        PopupMenuItem<PrototypeOperation>(
-          key: const ValueKey('prototypeLetterAutumn'),
-          height: _itemHeight,
-          value: PrototypeOperation.letterAutumn,
-          child: _menuLabel('手紙：秋', letterSeasonOverride == SeasonType.autumn),
-        ),
-        PopupMenuItem<PrototypeOperation>(
-          key: const ValueKey('prototypeLetterWinter'),
-          height: _itemHeight,
-          value: PrototypeOperation.letterWinter,
-          child: _menuLabel('手紙：冬', letterSeasonOverride == SeasonType.winter),
-        ),
-        const PopupMenuDivider(height: _dividerHeight),
-        PopupMenuItem<PrototypeOperation>(
-          key: const ValueKey('prototypeWeatherAuto'),
-          height: _itemHeight,
-          value: PrototypeOperation.weatherAuto,
-          child: const Text('天気：自動'),
-        ),
-        PopupMenuItem<PrototypeOperation>(
-          key: const ValueKey('prototypeWeatherRain'),
-          height: _itemHeight,
-          value: PrototypeOperation.weatherRain,
-          child: const Text('天気：雨'),
-        ),
-        PopupMenuItem<PrototypeOperation>(
-          key: const ValueKey('prototypeWeatherSunny'),
-          height: _itemHeight,
-          value: PrototypeOperation.weatherSunny,
-          child: const Text('天気：晴れ'),
-        ),
-        const PopupMenuDivider(height: _dividerHeight),
-        PopupMenuItem<PrototypeOperation>(
-          key: const ValueKey('prototypeRainAuto'),
-          height: _itemHeight,
-          value: PrototypeOperation.rainAuto,
-          child: const Text('雨量：自動'),
-        ),
-        PopupMenuItem<PrototypeOperation>(
-          key: const ValueKey('prototypeRainLight'),
-          height: _itemHeight,
-          value: PrototypeOperation.rainLight,
-          child: const Text('雨量：小雨'),
-        ),
-        PopupMenuItem<PrototypeOperation>(
-          key: const ValueKey('prototypeRainNormal'),
-          height: _itemHeight,
-          value: PrototypeOperation.rainNormal,
-          child: const Text('雨量：通常'),
-        ),
-        PopupMenuItem<PrototypeOperation>(
-          key: const ValueKey('prototypeRainHeavy'),
-          height: _itemHeight,
-          value: PrototypeOperation.rainHeavy,
-          child: const Text('雨量：大雨'),
-        ),
-        const PopupMenuDivider(height: _dividerHeight),
-        PopupMenuItem<PrototypeOperation>(
-          key: const ValueKey('prototypeReset'),
-          height: _itemHeight,
-          value: PrototypeOperation.reset,
-          child: const Text('最初からやり直す'),
-        ),
-      ],
+          value: PrototypeOperation.toggleDateMode,
+          child: Text(isPrototypeMode ? '通常プレイに戻る' : 'Prototypeモードに切り替える'),
+        );
+        return isPrototypeMode ? [modeItem, ..._prototypeItems()] : [modeItem];
+      },
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: const Color(0xCCFFFAEC),
@@ -254,6 +149,129 @@ class PrototypeControls extends StatelessWidget {
       ),
     );
   }
+
+  List<PopupMenuEntry<PrototypeOperation>> _prototypeItems() => [
+    const PopupMenuDivider(height: _dividerHeight),
+    PopupMenuItem<PrototypeOperation>(
+      key: const ValueKey('prototypeNextDay'),
+      height: _itemHeight,
+      value: PrototypeOperation.nextDay,
+      child: const Text('翌日へ進む'),
+    ),
+    const PopupMenuDivider(height: _dividerHeight),
+    PopupMenuItem<PrototypeOperation>(
+      key: const ValueKey('prototypeOutdoorAuto'),
+      height: _itemHeight,
+      value: PrototypeOperation.outdoorAuto,
+      child: const Text('背景：自動'),
+    ),
+    PopupMenuItem<PrototypeOperation>(
+      key: const ValueKey('prototypeOutdoorSpring'),
+      height: _itemHeight,
+      value: PrototypeOperation.outdoorSpring,
+      child: const Text('背景：春'),
+    ),
+    PopupMenuItem<PrototypeOperation>(
+      key: const ValueKey('prototypeOutdoorSummer'),
+      height: _itemHeight,
+      value: PrototypeOperation.outdoorSummer,
+      child: const Text('背景：夏'),
+    ),
+    PopupMenuItem<PrototypeOperation>(
+      key: const ValueKey('prototypeOutdoorAutumn'),
+      height: _itemHeight,
+      value: PrototypeOperation.outdoorAutumn,
+      child: const Text('背景：秋'),
+    ),
+    PopupMenuItem<PrototypeOperation>(
+      key: const ValueKey('prototypeOutdoorWinter'),
+      height: _itemHeight,
+      value: PrototypeOperation.outdoorWinter,
+      child: const Text('背景：冬'),
+    ),
+    const PopupMenuDivider(height: _dividerHeight),
+    PopupMenuItem<PrototypeOperation>(
+      key: const ValueKey('prototypeLetterAuto'),
+      height: _itemHeight,
+      value: PrototypeOperation.letterAuto,
+      child: _menuLabel('手紙：自動', letterSeasonOverride == null),
+    ),
+    PopupMenuItem<PrototypeOperation>(
+      key: const ValueKey('prototypeLetterSpring'),
+      height: _itemHeight,
+      value: PrototypeOperation.letterSpring,
+      child: _menuLabel('手紙：春', letterSeasonOverride == SeasonType.spring),
+    ),
+    PopupMenuItem<PrototypeOperation>(
+      key: const ValueKey('prototypeLetterSummer'),
+      height: _itemHeight,
+      value: PrototypeOperation.letterSummer,
+      child: _menuLabel('手紙：夏', letterSeasonOverride == SeasonType.summer),
+    ),
+    PopupMenuItem<PrototypeOperation>(
+      key: const ValueKey('prototypeLetterAutumn'),
+      height: _itemHeight,
+      value: PrototypeOperation.letterAutumn,
+      child: _menuLabel('手紙：秋', letterSeasonOverride == SeasonType.autumn),
+    ),
+    PopupMenuItem<PrototypeOperation>(
+      key: const ValueKey('prototypeLetterWinter'),
+      height: _itemHeight,
+      value: PrototypeOperation.letterWinter,
+      child: _menuLabel('手紙：冬', letterSeasonOverride == SeasonType.winter),
+    ),
+    const PopupMenuDivider(height: _dividerHeight),
+    PopupMenuItem<PrototypeOperation>(
+      key: const ValueKey('prototypeWeatherAuto'),
+      height: _itemHeight,
+      value: PrototypeOperation.weatherAuto,
+      child: const Text('天気：自動'),
+    ),
+    PopupMenuItem<PrototypeOperation>(
+      key: const ValueKey('prototypeWeatherRain'),
+      height: _itemHeight,
+      value: PrototypeOperation.weatherRain,
+      child: const Text('天気：雨'),
+    ),
+    PopupMenuItem<PrototypeOperation>(
+      key: const ValueKey('prototypeWeatherSunny'),
+      height: _itemHeight,
+      value: PrototypeOperation.weatherSunny,
+      child: const Text('天気：晴れ'),
+    ),
+    const PopupMenuDivider(height: _dividerHeight),
+    PopupMenuItem<PrototypeOperation>(
+      key: const ValueKey('prototypeRainAuto'),
+      height: _itemHeight,
+      value: PrototypeOperation.rainAuto,
+      child: const Text('雨量：自動'),
+    ),
+    PopupMenuItem<PrototypeOperation>(
+      key: const ValueKey('prototypeRainLight'),
+      height: _itemHeight,
+      value: PrototypeOperation.rainLight,
+      child: const Text('雨量：小雨'),
+    ),
+    PopupMenuItem<PrototypeOperation>(
+      key: const ValueKey('prototypeRainNormal'),
+      height: _itemHeight,
+      value: PrototypeOperation.rainNormal,
+      child: const Text('雨量：通常'),
+    ),
+    PopupMenuItem<PrototypeOperation>(
+      key: const ValueKey('prototypeRainHeavy'),
+      height: _itemHeight,
+      value: PrototypeOperation.rainHeavy,
+      child: const Text('雨量：大雨'),
+    ),
+    const PopupMenuDivider(height: _dividerHeight),
+    PopupMenuItem<PrototypeOperation>(
+      key: const ValueKey('prototypeReset'),
+      height: _itemHeight,
+      value: PrototypeOperation.reset,
+      child: const Text('最初からやり直す'),
+    ),
+  ];
 
   Widget _menuLabel(String label, bool isSelected) {
     return Row(

@@ -29,6 +29,52 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  testWidgets('旧セーブを案内して同日の履歴と進行を両モードで保持する', (tester) async {
+    final date = DateTime(2026, 8, 7);
+    final harness = await _pumpPrototypeRoom(tester, date: date, legacy: true);
+    final prefs = await SharedPreferences.getInstance();
+    final keys = prefs.getKeys();
+    final saved = {for (final key in keys) key: prefs.get(key)};
+
+    expect(harness.date.isDebugDateEnabled, isFalse);
+    expect(harness.date.today, date);
+    expect(find.text('通常プレイの日付について'), findsOneWidget);
+    await tester.tap(find.text('通常プレイを続ける'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('通常プレイの日付について'), findsNothing);
+    final reloaded = AppDateProvider(AppDateRepository(), now: () => date);
+    await reloaded.load();
+    expect(reloaded.needsMigrationNotice, isFalse);
+
+    await tester.tap(find.byKey(const ValueKey('prototypeControls')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('翌日へ進む'), findsNothing);
+    await tester.tap(find.text('Prototypeモードに切り替える'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(harness.date.isDebugDateEnabled, isTrue);
+    expect(harness.date.today, date);
+
+    await tester.tap(find.byKey(const ValueKey('prototypeControls')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.text('通常プレイに戻る'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(harness.date.isDebugDateEnabled, isFalse);
+    expect(harness.read.deliveredLetters, {'2026-08-07': 'tutorial_001'});
+    expect(harness.read.readLetterIds, contains('tutorial_001'));
+    expect(harness.read.tutorialCompleted, isTrue);
+    expect(harness.shizuku.currentShizuku, 20);
+    expect(harness.catalog.purchasedFurnitureIds, contains('wooden_mug'));
+    expect(harness.placed.placedFurnitureIds.values, contains('wooden_mug'));
+    expect({for (final key in keys) key: prefs.get(key)}, saved);
+  });
+
   testWidgets('8月に秋背景overrideを選んでも日付を変更しない', (tester) async {
     final harness = await _pumpPrototypeRoom(tester);
     final prefs = await SharedPreferences.getInstance();
@@ -425,15 +471,19 @@ Future<void> _selectPrototypeOperation(
 Future<_PrototypeHarness> _pumpPrototypeRoom(
   WidgetTester tester, {
   DateTime? date,
+  bool legacy = false,
   PurchasedFurnitureRepository? purchasedRepository,
   PlacedFurnitureRepository? placedRepository,
   bool loadPlacedProvider = true,
   WeatherRepository? weatherRepository,
 }) async {
   SharedPreferences.setMockInitialValues({
+    if (!legacy) 'prototypeDateModeEnabled': true,
     'prototypeDate': (date ?? DateTime(2026, 8, 7)).toIso8601String(),
     'readLetterState': jsonEncode({
-      'version': 2,
+      'version': legacy ? 3 : 2,
+      if (legacy) 'hasOpenedTutorialBottle': true,
+      if (legacy) 'tutorialCompleted': true,
       'receivedLetters': {'tutorial_001': '2026-08-07'},
       'deliveredLetters': {'2026-08-07': 'tutorial_001'},
     }),
@@ -457,7 +507,10 @@ Future<_PrototypeHarness> _pumpPrototypeRoom(
   final placed = PlacedFurnitureProvider(
     placedRepository ?? PlacedFurnitureRepository(),
   );
-  final appDate = AppDateProvider(AppDateRepository());
+  final appDate = AppDateProvider(
+    AppDateRepository(),
+    now: date == null ? null : () => date,
+  );
   await Future.wait([
     read.load(),
     shizuku.load(),

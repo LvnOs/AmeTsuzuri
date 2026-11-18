@@ -5,156 +5,134 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  final localDate = DateTime(2026, 11, 17);
+  const modeKey = 'prototypeDateModeEnabled';
+
+  AppDateProvider createProvider() =>
+      AppDateProvider(AppDateRepository(), now: () => localDate);
+
   setUp(() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  test('保存日付がなければ初回loadでプロトタイプ開始日を保存・反映する', () async {
-    final provider = AppDateProvider(AppDateRepository());
-    expect(provider.isLoaded, isFalse);
-
+  test('新規ユーザーは端末の実日付を使い日付送りを無視する', () async {
+    final provider = createProvider();
     await provider.load();
+    await provider.moveToNextDay();
 
     expect(provider.isLoaded, isTrue);
-    expect(provider.today, DateTime(2026, 8, 7));
-    expect(provider.isDebugDateEnabled, isTrue);
+    expect(provider.today, localDate);
+    expect(provider.isDebugDateEnabled, isFalse);
+    expect(provider.needsMigrationNotice, isFalse);
     final prefs = await SharedPreferences.getInstance();
-    expect(
-      prefs.getString('prototypeDate'),
-      DateTime(2026, 8, 7).toIso8601String(),
-    );
+    expect(prefs.containsKey('prototypeDate'), isFalse);
   });
 
-  test('保存済みのプロトタイプ日付をロードする', () async {
-    SharedPreferences.setMockInitialValues({
-      'prototypeDate': '2026-08-09T00:00:00.000',
-    });
-    final provider = AppDateProvider(AppDateRepository());
-
+  test('旧日付を保持して通常プレイで起動し、案内の確認を保存する', () async {
+    const savedDate = '2026-08-09T00:00:00.000';
+    SharedPreferences.setMockInitialValues({'prototypeDate': savedDate});
+    final provider = createProvider();
     await provider.load();
+    expect(provider.today, localDate);
+    expect(provider.needsMigrationNotice, isTrue);
 
-    expect(provider.isLoaded, isTrue);
-    expect(provider.today, DateTime(2026, 8, 9));
-    expect(provider.isDebugDateEnabled, isTrue);
-  });
-
-  test('保存済み日付を優先し保存し直さない', () async {
-    final repository = _TrackingAppDateRepository(
-      loadedDate: DateTime(2026, 8, 10),
-    );
-    final provider = AppDateProvider(repository);
-
-    await provider.load();
-
-    expect(provider.today, DateTime(2026, 8, 10));
-    expect(repository.savedDates, isEmpty);
-  });
-
-  test('初回8月7日から翌日へ進めて保存・復元できる', () async {
-    final firstProvider = AppDateProvider(AppDateRepository());
-    await firstProvider.load();
-
-    await firstProvider.moveToNextDay();
-    expect(firstProvider.today, DateTime(2026, 8, 8));
-
-    final reloadedProvider = AppDateProvider(AppDateRepository());
+    await provider.setPrototypeMode(false);
+    final reloadedProvider = createProvider();
     await reloadedProvider.load();
-    expect(reloadedProvider.today, DateTime(2026, 8, 8));
+    expect(reloadedProvider.needsMigrationNotice, isFalse);
+    expect(reloadedProvider.today, localDate);
+    await reloadedProvider.setPrototypeMode(true);
+    expect(reloadedProvider.today, DateTime(2026, 8, 9));
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('prototypeDate'), savedDate);
   });
 
-  test('保存済みの翌日を新しいProviderで復元できる', () async {
-    final firstProvider = AppDateProvider(AppDateRepository());
-    await firstProvider.load();
-    await firstProvider.setDebugDate(DateTime(2026, 8, 7));
-    await firstProvider.moveToNextDay();
-
-    final reloadedProvider = AppDateProvider(AppDateRepository());
-    await reloadedProvider.load();
-
-    expect(reloadedProvider.today, DateTime(2026, 8, 8));
-  });
-
-  test('プロトタイプ開始日を保存して復元できる', () async {
-    final provider = AppDateProvider(AppDateRepository());
+  test('Prototypeの日付送りと再起動後のモード・日付を復元する', () async {
+    final provider = createProvider();
     await provider.load();
+    await provider.setPrototypeMode(true);
+    expect(provider.today, DateTime(2026, 8, 7));
+    expect(provider.currentSeason, SeasonType.summer);
+    await provider.moveToNextDay();
+
+    final reloadedProvider = createProvider();
+    await reloadedProvider.load();
+    expect(reloadedProvider.isDebugDateEnabled, isTrue);
+    expect(reloadedProvider.today, DateTime(2026, 8, 8));
+    await reloadedProvider.setPrototypeMode(false);
+
+    final normalProvider = createProvider();
+    await normalProvider.load();
+    expect(normalProvider.today, localDate);
+    await normalProvider.setPrototypeMode(true);
+    expect(normalProvider.today, DateTime(2026, 8, 8));
+  });
+
+  test('現地日付の変更と同日でのモード切替を通知する', () async {
+    var now = DateTime(2026, 11, 17, 23, 59);
+    final provider = AppDateProvider(AppDateRepository(), now: () => now);
+    final notifications = <DateTime>[];
+    provider.addListener(() => notifications.add(provider.today));
+    await provider.load();
+    provider.refreshLocalDate();
+    now = DateTime(2026, 11, 18);
+    provider.refreshLocalDate();
+    await provider.setDebugDate(now);
+    now = DateTime(2026, 11, 19);
+    provider.refreshLocalDate();
+    await provider.setPrototypeMode(false);
+
+    expect(notifications, [
+      localDate,
+      DateTime(2026, 11, 18),
+      DateTime(2026, 11, 18),
+      DateTime(2026, 11, 19),
+    ]);
+  });
+
+  test('明示的なPrototype初期化で開始日は保存される', () async {
+    final provider = createProvider();
+    await provider.load();
+    await provider.setDebugDate(DateTime(2026, 8, 20, 12));
     await provider.startPrototypePeriod();
-
-    final reloadedProvider = AppDateProvider(AppDateRepository());
-    await reloadedProvider.load();
-
-    expect(reloadedProvider.today, DateTime(2026, 8, 7));
-    expect(reloadedProvider.currentSeason, SeasonType.summer);
-  });
-
-  test('不正なprototypeDateはプロトタイプ開始日で修復する', () async {
-    SharedPreferences.setMockInitialValues({'prototypeDate': 'invalid'});
-    final provider = AppDateProvider(AppDateRepository());
-
-    await provider.load();
+    final prefs = await SharedPreferences.getInstance();
 
     expect(provider.today, DateTime(2026, 8, 7));
-    final prefs = await SharedPreferences.getInstance();
-    expect(
-      prefs.getString('prototypeDate'),
-      DateTime(2026, 8, 7).toIso8601String(),
-    );
+    expect(prefs.getBool(modeKey), isTrue);
+    expect(prefs.getString('prototypeDate'), '2026-08-07T00:00:00.000');
   });
 
-  test('初回日付の保存失敗時はProvider状態を更新せず例外を伝播する', () async {
-    final repository = _TrackingAppDateRepository(failSave: true);
-    final provider = AppDateProvider(repository);
+  test('不正な旧日付でも起動でき、Prototypeでは開始日に戻る', () async {
+    SharedPreferences.setMockInitialValues({'prototypeDate': 'invalid'});
+    final provider = createProvider();
+    await provider.load();
+    expect(provider.today, localDate);
+
+    await provider.setPrototypeMode(true);
+    expect(provider.today, DateTime(2026, 8, 7));
+  });
+
+  test('日付モードの保存が失敗したときは状態を更新しない', () async {
+    final provider = AppDateProvider(
+      _FailingModeRepository(),
+      now: () => localDate,
+    );
+    await provider.load();
     var notificationCount = 0;
     provider.addListener(() => notificationCount++);
 
-    await expectLater(provider.load(), throwsA(isA<StateError>()));
+    await expectLater(provider.setPrototypeMode(true), throwsStateError);
 
-    expect(provider.isLoaded, isFalse);
     expect(provider.isDebugDateEnabled, isFalse);
-    expect(repository.savedDates, [DateTime(2026, 8, 7)]);
+    expect(provider.today, localDate);
     expect(notificationCount, 0);
-  });
-
-  test('デバッグ日付をクリアすると現在のProviderでは実日付へ戻る', () async {
-    final provider = AppDateProvider(AppDateRepository());
-    await provider.load();
-    await provider.clearDebugDate();
-
-    final now = DateTime.now();
-    expect(
-      provider.today.difference(now).abs(),
-      lessThan(const Duration(seconds: 2)),
-    );
-    expect(provider.isDebugDateEnabled, isFalse);
-  });
-
-  test('clear後の新しいProviderはプロトタイプ開始日を再初期化する', () async {
-    final provider = AppDateProvider(AppDateRepository());
-    await provider.load();
-    await provider.clearDebugDate();
-
-    final reloadedProvider = AppDateProvider(AppDateRepository());
-    await reloadedProvider.load();
-
-    expect(reloadedProvider.today, DateTime(2026, 8, 7));
-    expect(reloadedProvider.isDebugDateEnabled, isTrue);
   });
 }
 
-class _TrackingAppDateRepository extends AppDateRepository {
-  _TrackingAppDateRepository({this.loadedDate, this.failSave = false});
-
-  final DateTime? loadedDate;
-  final bool failSave;
-  final List<DateTime> savedDates = [];
-
+class _FailingModeRepository extends AppDateRepository {
   @override
-  Future<DateTime?> load() async => loadedDate;
-
-  @override
-  Future<void> save(DateTime date) async {
-    savedDates.add(date);
-    if (failSave) {
-      throw StateError('save failed');
-    }
+  Future<void> savePrototypeMode(bool enabled) async {
+    throw StateError('save failed');
   }
 }

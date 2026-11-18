@@ -2,6 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class AppDateRepository {
   static const String _key = 'prototypeDate';
+  static const String _modeKey = 'prototypeDateModeEnabled';
 
   Future<DateTime?> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -30,11 +31,15 @@ class AppDateRepository {
     }
   }
 
-  Future<void> clear() async {
+  Future<bool?> loadPrototypeMode() async {
     final prefs = await SharedPreferences.getInstance();
-    final didRemove = await prefs.remove(_key);
-    if (!didRemove && prefs.containsKey(_key)) {
-      throw StateError('Failed to clear prototype date.');
+    return prefs.getBool(_modeKey);
+  }
+
+  Future<void> savePrototypeMode(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!await prefs.setBool(_modeKey, enabled)) {
+      throw StateError('Failed to save date mode.');
     }
   }
 }

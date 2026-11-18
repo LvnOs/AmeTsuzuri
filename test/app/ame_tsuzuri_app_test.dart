@@ -5,6 +5,7 @@ import 'package:ame_tsuzuri/features/ambient_sound/provider/ambient_sound_provid
 import 'package:ame_tsuzuri/features/ambient_sound/repository/ambient_sound_repository.dart';
 import 'package:ame_tsuzuri/features/ambient_sound/service/ambient_audio_platform.dart';
 import 'package:ame_tsuzuri/features/ambient_sound/service/ambient_audio_service.dart';
+import 'package:ame_tsuzuri/features/letters/provider/read_letter_provider.dart';
 import 'package:ame_tsuzuri/features/room/presentation/prototype_controls.dart';
 import 'package:ame_tsuzuri/shared/model/weather_type.dart';
 import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
@@ -19,8 +20,33 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({
+      'prototypeDateModeEnabled': true,
       'prototypeDate': DateTime(2026, 8, 7).toIso8601String(),
     });
+  });
+
+  testWidgets('新規ユーザーには端末の日付でチュートリアルの手紙が届く', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(
+      AmeTsuzuriApp(
+        ambientAudioService: AmbientAudioService.withPlatform(
+          _FakeAudioPlatform(),
+        ),
+        weatherRepository: _RainWeatherRepository(),
+      ),
+    );
+    final context = tester.element(find.byType(PrototypeControls));
+    final dateProvider = context.read<AppDateProvider>();
+    final read = context.read<ReadLetterProvider>();
+
+    await _pumpUntil(
+      tester,
+      () => read.hasDeliveredLetterOn(dateProvider.today),
+    );
+    expect(dateProvider.isDebugDateEnabled, isFalse);
+    expect(dateProvider.today, DateUtils.dateOnly(DateTime.now()));
+    expect(read.deliveredLetterIdOn(dateProvider.today), 'tutorial_001');
+    expect(find.text('通常プレイの日付について'), findsNothing);
   });
 
   testWidgets('rootで単一Providerを生成しload一回とdisposeを管理する', (tester) async {
