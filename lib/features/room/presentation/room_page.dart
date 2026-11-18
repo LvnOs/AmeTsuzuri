@@ -7,7 +7,6 @@ import 'package:ame_tsuzuri/features/furniture/presentation/catalog_page.dart';
 import 'package:ame_tsuzuri/features/furniture/provider/catalog_provider.dart';
 import 'package:ame_tsuzuri/features/furniture/provider/placed_furniture_provider.dart';
 import 'package:ame_tsuzuri/features/furniture/repository/furniture_repository.dart';
-import 'package:ame_tsuzuri/features/letters/model/letter.dart';
 import 'package:ame_tsuzuri/features/letters/presentation/letter_page.dart';
 import 'package:ame_tsuzuri/features/letters/provider/read_letter_provider.dart';
 import 'package:ame_tsuzuri/features/letters/provider/shizuku_provider.dart';
@@ -813,7 +812,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     final readLetterProvider = context.read<ReadLetterProvider>();
     final weatherProvider = context.read<WeatherProvider>();
     try {
-      final letters = await _letterRepository.getAll();
+      final summaries = await _letterRepository.getSummaries();
       if (!_canContinueDeliveryFor(date, revision)) {
         return;
       }
@@ -821,8 +820,8 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
       if (!readLetterProvider.readLetterIds.contains(
         RoomPage._tutorialLetterId,
       )) {
-        final tutorialLetter = _findLetterById(
-          letters,
+        final tutorialLetter = _findLetterSummaryById(
+          summaries,
           RoomPage._tutorialLetterId,
         );
         if (tutorialLetter != null) {
@@ -853,7 +852,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
         return;
       }
 
-      final normalLetters = letters
+      final normalLetters = summaries
           .where((letter) => letter.id != RoomPage._tutorialLetterId)
           .toList();
       final excludedLetterIds = <String>{
@@ -996,33 +995,25 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
         return;
       }
 
-      final initialToday = _dateOnly(appDateProvider.today);
-      final initialDeliveredLetterId = readLetterProvider.deliveredLetterIdOn(
-        initialToday,
-      );
-      if (initialDeliveredLetterId == null) {
+      final today = _dateOnly(appDateProvider.today);
+      final deliveredLetterId = readLetterProvider.deliveredLetterIdOn(today);
+      if (deliveredLetterId == null) {
         return;
       }
+
+      bool isCurrentDelivery() =>
+          mounted &&
+          _dateOnly(appDateProvider.today) == today &&
+          readLetterProvider.deliveredLetterIdOn(today) == deliveredLetterId;
 
       final shizukuProvider = context.read<ShizukuProvider>();
       if (!shizukuProvider.isLoaded) {
         await shizukuProvider.load();
       }
-      if (!mounted || !shizukuProvider.isLoaded) {
+      if (!isCurrentDelivery() || !shizukuProvider.isLoaded) {
         return;
       }
 
-      final today = _dateOnly(context.read<AppDateProvider>().today);
-      if (today != initialToday) {
-        return;
-      }
-      final currentDeliveredLetterId = readLetterProvider.deliveredLetterIdOn(
-        today,
-      );
-      if (currentDeliveredLetterId != initialDeliveredLetterId) {
-        return;
-      }
-      final deliveredLetterId = initialDeliveredLetterId;
       final wasUnreadBeforeOpening = !readLetterProvider.readLetterIds.contains(
         deliveredLetterId,
       );
@@ -1030,21 +1021,17 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
           deliveredLetterId == RoomPage._tutorialLetterId &&
           wasUnreadBeforeOpening;
 
-      final letters = await _letterRepository.getAll();
-      if (!mounted ||
-          _dateOnly(context.read<AppDateProvider>().today) != today ||
-          readLetterProvider.deliveredLetterIdOn(today) != deliveredLetterId) {
+      final summaries = await _letterRepository.getSummaries();
+      if (!isCurrentDelivery()) {
+        return;
+      }
+      final summary = _findLetterSummaryById(summaries, deliveredLetterId);
+      if (summary == null) {
         return;
       }
 
-      Letter? deliveredLetter;
-      for (final letter in letters) {
-        if (letter.id == deliveredLetterId) {
-          deliveredLetter = letter;
-          break;
-        }
-      }
-      if (deliveredLetter == null) {
+      final deliveredLetter = await _letterRepository.loadLetter(summary);
+      if (!isCurrentDelivery()) {
         return;
       }
 
@@ -1083,7 +1070,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (context) => LetterPage(
-            letter: deliveredLetter!,
+            letter: deliveredLetter,
             rewardAmount: rewardFeedbackAmount,
           ),
         ),
@@ -2146,10 +2133,13 @@ double _letterArrivalOpacity(double animationValue) {
 
 DateTime _dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
 
-Letter? _findLetterById(List<Letter> letters, String letterId) {
-  for (final letter in letters) {
-    if (letter.id == letterId) {
-      return letter;
+LetterSummary? _findLetterSummaryById(
+  List<LetterSummary> summaries,
+  String letterId,
+) {
+  for (final summary in summaries) {
+    if (summary.id == letterId) {
+      return summary;
     }
   }
   return null;

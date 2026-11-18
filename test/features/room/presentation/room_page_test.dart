@@ -1738,7 +1738,7 @@ void main() {
         ),
       );
 
-      expect(harness.letterRepository.getAllCallCount, 0);
+      expect(harness.letterRepository.summariesCallCount, 0);
       expect(harness.weatherRepository.requestedDates, [
         DateTime(2026, 8, 7),
         DateTime(2026, 8, 6),
@@ -3098,7 +3098,7 @@ void main() {
   });
 
   group('今日の手紙の配達表示', () {
-    testWidgets('未配達で候補があれば配達してletterレイヤーを表示する', (tester) async {
+    testWidgets('Prototypeの通常配達では本文を取得せずletterレイヤーを表示する', (tester) async {
       final harness = await _pumpRoom(tester);
       await _pumpPastFiniteAnimations(tester);
 
@@ -3107,7 +3107,8 @@ void main() {
         'letterA',
       );
       expect(find.byKey(const ValueKey('roomLetterLayer')), findsOneWidget);
-      expect(harness.letterRepository.getAllCallCount, 1);
+      expect(harness.letterRepository.summariesCallCount, 1);
+      expect(harness.letterRepository.requestedBodyPaths, isEmpty);
       expect(harness.weatherRepository.requestedDates, [
         DateTime(2026, 8, 7),
         DateTime(2026, 8, 6),
@@ -3125,7 +3126,7 @@ void main() {
       );
 
       expect(find.byKey(const ValueKey('roomLetterLayer')), findsOneWidget);
-      expect(harness.letterRepository.getAllCallCount, 0);
+      expect(harness.letterRepository.summariesCallCount, 0);
       expect(harness.weatherRepository.requestedDates, [
         DateTime(2026, 8, 7),
         DateTime(2026, 8, 6),
@@ -3142,7 +3143,7 @@ void main() {
       );
 
       expect(find.byKey(const ValueKey('roomLetterLayer')), findsOneWidget);
-      expect(harness.letterRepository.getAllCallCount, 0);
+      expect(harness.letterRepository.summariesCallCount, 0);
     });
 
     testWidgets('今日の候補がなければ配達せずletterレイヤーを表示しない', (tester) async {
@@ -3159,7 +3160,7 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(harness.letterRepository.getAllCallCount, 1);
+      expect(harness.letterRepository.summariesCallCount, 1);
     });
 
     testWidgets('別日の配達IDだけでは今日のletterレイヤーを表示しない', (tester) async {
@@ -3180,7 +3181,7 @@ void main() {
       final harness = await _pumpRoom(tester, loadProviders: false);
       await _pumpPastFiniteAnimations(tester);
 
-      expect(harness.letterRepository.getAllCallCount, 0);
+      expect(harness.letterRepository.summariesCallCount, 0);
       expect(harness.weatherRepository.requestedDates, isEmpty);
       expect(harness.readLetterProvider.deliveredLetters, isEmpty);
       expect(find.byKey(const ValueKey('roomLetterLayer')), findsNothing);
@@ -3192,10 +3193,10 @@ void main() {
       final harness = await _pumpRoom(
         tester,
         letters: [_letter('tutorial_001'), _letter('letterA')],
-        failNextLetterLoad: true,
+        failNextLetterSummariesLoad: true,
       );
 
-      expect(harness.letterRepository.getAllCallCount, 2);
+      expect(harness.letterRepository.summariesCallCount, 2);
       expect(harness.readLetterProvider.deliveredLetters, {
         '2026-08-07': 'tutorial_001',
       });
@@ -3204,7 +3205,7 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(harness.letterRepository.getAllCallCount, 2);
+      expect(harness.letterRepository.summariesCallCount, 2);
       expect(harness.readLetterProvider.deliveredLetters.length, 1);
     });
 
@@ -3225,12 +3226,15 @@ void main() {
     });
 
     testWidgets('LetterRepository読込中に日付が変わると古い日付へ配達しない', (tester) async {
-      final harness = await _pumpRoom(tester, blockNextLetterLoad: true);
-      expect(harness.letterRepository.getAllCallCount, 1);
+      final harness = await _pumpRoom(
+        tester,
+        blockNextLetterSummariesLoad: true,
+      );
+      expect(harness.letterRepository.summariesCallCount, 1);
 
       await harness.dateProvider.moveToNextDay();
       await tester.pump();
-      harness.letterRepository.completeLoad();
+      harness.letterRepository.completeSummariesLoad();
       await _pumpPastFiniteAnimations(tester);
 
       expect(
@@ -3249,13 +3253,13 @@ void main() {
         tester,
         date: date,
         now: () => date,
-        blockNextLetterLoad: true,
+        blockNextLetterSummariesLoad: true,
       );
-      expect(harness.letterRepository.getAllCallCount, 1);
+      expect(harness.letterRepository.summariesCallCount, 1);
 
       await harness.dateProvider.setPrototypeMode(false);
       await tester.pump();
-      harness.letterRepository.completeLoad();
+      harness.letterRepository.completeSummariesLoad();
       await _pumpPastFiniteAnimations(tester);
 
       expect(harness.dateProvider.today, date);
@@ -3266,12 +3270,12 @@ void main() {
     testWidgets('同日の再buildでは2通目を選択しない', (tester) async {
       final harness = await _pumpRoom(tester);
       await _pumpPastFiniteAnimations(tester);
-      expect(harness.letterRepository.getAllCallCount, 1);
+      expect(harness.letterRepository.summariesCallCount, 1);
 
       await tester.pump();
       await tester.pump();
 
-      expect(harness.letterRepository.getAllCallCount, 1);
+      expect(harness.letterRepository.summariesCallCount, 1);
       expect(
         harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
         'letterA',
@@ -3466,7 +3470,10 @@ void main() {
         harness.readLetterProvider.receivedDateFor('letterB'),
         DateTime(2026, 8, 7),
       );
-      expect(harness.letterRepository.getAllCallCount, 1);
+      expect(harness.letterRepository.summariesCallCount, 1);
+      expect(harness.letterRepository.requestedBodyPaths, [
+        'assets/letters/letterB.md',
+      ]);
       expect(harness.weatherRepository.requestedDates, [
         DateTime(2026, 8, 7),
         DateTime(2026, 8, 6),
@@ -3503,7 +3510,7 @@ void main() {
       expect(harness.shizukuProvider.currentShizuku, 40);
       expect(harness.shizukuRepository.saveCallCount, 0);
       expect(harness.readLetterRepository.saveCallCount, 0);
-      expect(harness.letterRepository.getAllCallCount, 2);
+      expect(harness.letterRepository.summariesCallCount, 2);
     });
 
     testWidgets('未読でも報酬済みのLetterではfeedbackを表示しない', (tester) async {
@@ -3537,15 +3544,17 @@ void main() {
           deliveredLetters: {'2026-08-07': 'letterA'},
         ),
       );
-      harness.letterRepository.blockNextLoad = true;
+      final bodyLoad = Completer<void>();
+      harness.letterRepository.bodyLoadBlock = bodyLoad.future;
 
       await tester.tap(find.byKey(const ValueKey('letterTapArea')));
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('letterTapArea')));
       await tester.pump();
-      expect(harness.letterRepository.getAllCallCount, 1);
+      expect(harness.letterRepository.summariesCallCount, 1);
+      expect(harness.letterRepository.requestedBodyPaths, hasLength(1));
 
-      harness.letterRepository.completeLoad();
+      bodyLoad.complete();
       await _pumpPastFiniteAnimations(tester);
 
       expect(find.byType(LetterPage), findsOneWidget);
@@ -3557,7 +3566,7 @@ void main() {
       final harness = await _pumpRoom(tester, loadProviders: false);
 
       expect(find.byKey(const ValueKey('letterTapArea')), findsNothing);
-      expect(harness.letterRepository.getAllCallCount, 0);
+      expect(harness.letterRepository.summariesCallCount, 0);
       expect(harness.shizukuRepository.saveCallCount, 0);
       expect(harness.readLetterRepository.saveCallCount, 0);
     });
@@ -3580,7 +3589,7 @@ void main() {
       await tester.pump();
 
       expect(harness.shizukuRepository.loadCallCount, 1);
-      expect(harness.letterRepository.getAllCallCount, 0);
+      expect(harness.letterRepository.summariesCallCount, 0);
 
       harness.shizukuRepository.completeLoad();
       await _pumpPastFiniteAnimations(tester);
@@ -3588,7 +3597,7 @@ void main() {
       expect(find.byType(LetterPage), findsOneWidget);
       expect(harness.shizukuRepository.saveCallCount, 1);
       expect(harness.readLetterRepository.saveCallCount, 1);
-      expect(harness.letterRepository.getAllCallCount, 1);
+      expect(harness.letterRepository.summariesCallCount, 1);
     });
 
     testWidgets('Shizukuロード失敗後は状態を変えず再タップで再試行できる', (tester) async {
@@ -3665,6 +3674,39 @@ void main() {
       expect(find.byType(LetterPage), findsNothing);
       expect(harness.shizukuRepository.saveCallCount, 0);
       expect(harness.readLetterRepository.saveCallCount, 0);
+    });
+
+    testWidgets('本文取得中に当日の配達IDが変わったら古い手紙を開かない', (tester) async {
+      final harness = await _pumpRoom(
+        tester,
+        initialReadState: ReadLetterState(
+          receivedLetters: {},
+          deliveredLetters: {'2026-08-07': 'letterA'},
+        ),
+      );
+      final bodyLoad = Completer<void>();
+      harness.letterRepository.bodyLoadBlock = bodyLoad.future;
+
+      await tester.tap(find.byKey(const ValueKey('letterTapArea')));
+      await tester.pump();
+      expect(harness.letterRepository.requestedBodyPaths, [
+        'assets/letters/letterA.md',
+      ]);
+
+      harness.readLetterRepository.state = ReadLetterState(
+        receivedLetters: {},
+        deliveredLetters: {'2026-08-07': 'letterB'},
+      );
+      await harness.readLetterProvider.load();
+      bodyLoad.complete();
+      await _pumpPastFiniteAnimations(tester);
+
+      expect(find.byType(LetterPage), findsNothing);
+      expect(harness.shizukuRepository.saveCallCount, 0);
+      expect(harness.readLetterRepository.saveCallCount, 0);
+
+      await _tapLetter(tester);
+      expect(find.text('letterB'), findsWidgets);
     });
 
     testWidgets('既読手紙もShizuku未ロード時の最初のタップで再読できる', (tester) async {
@@ -3752,6 +3794,7 @@ void main() {
       expect(find.byType(LetterPage), findsNothing);
       expect(harness.shizukuRepository.saveCallCount, 0);
       expect(harness.readLetterRepository.saveCallCount, 0);
+      expect(harness.letterRepository.requestedBodyPaths, isEmpty);
       expect(
         harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
         'missing_letter',
@@ -3759,7 +3802,7 @@ void main() {
       expect(find.byKey(const ValueKey('roomLetterLayer')), findsOneWidget);
     });
 
-    testWidgets('確定手紙のRepository取得失敗では状態を維持して次回タップで再試行できる', (tester) async {
+    testWidgets('本文取得失敗では既読・雫・配達IDを維持し次回タップで再試行できる', (tester) async {
       final harness = await _pumpRoom(
         tester,
         initialReadState: ReadLetterState(
@@ -3767,14 +3810,17 @@ void main() {
           deliveredLetters: {'2026-08-07': 'letterB'},
         ),
       );
-      harness.letterRepository.failNextLoad = true;
+      harness.letterRepository.failNextBodyLoad = true;
 
       await tester.tap(find.byKey(const ValueKey('letterTapArea')));
       await _pumpPastFiniteAnimations(tester);
 
       expect(find.byType(LetterPage), findsNothing);
+      expect(find.byKey(const ValueKey('letterTapArea')), findsOneWidget);
       expect(harness.shizukuRepository.saveCallCount, 0);
+      expect(harness.shizukuProvider.rewardedLetterIds, isEmpty);
       expect(harness.readLetterRepository.saveCallCount, 0);
+      expect(harness.readLetterProvider.readLetterIds, isEmpty);
       expect(
         harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
         'letterB',
@@ -3784,7 +3830,13 @@ void main() {
 
       expect(find.byType(LetterPage), findsOneWidget);
       expect(find.text('letterB'), findsWidgets);
-      expect(harness.letterRepository.getAllCallCount, 2);
+      expect(harness.letterRepository.summariesCallCount, 2);
+      expect(harness.letterRepository.requestedBodyPaths, [
+        'assets/letters/letterB.md',
+        'assets/letters/letterB.md',
+      ]);
+      expect(harness.shizukuProvider.rewardedLetterIds, {'letterB'});
+      expect(harness.readLetterProvider.readLetterIds, {'letterB'});
     });
 
     testWidgets('確定済み手紙の閲覧では天候を再ロードせず候補を再選択しない', (tester) async {
@@ -3808,7 +3860,7 @@ void main() {
         harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
         'letterB',
       );
-      expect(harness.letterRepository.getAllCallCount, 1);
+      expect(harness.letterRepository.summariesCallCount, 1);
     });
   });
 
@@ -4232,7 +4284,7 @@ void main() {
   });
 
   group('初回チュートリアル手紙の配達', () {
-    testWidgets('未読なら通常候補よりtutorial_001を優先する', (tester) async {
+    testWidgets('初回は本文を取得せず通常候補よりtutorial_001を優先する', (tester) async {
       final harness = await _pumpRoom(
         tester,
         letters: [_letter('letterA'), _letter('tutorial_001')],
@@ -4242,6 +4294,8 @@ void main() {
         harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
         'tutorial_001',
       );
+      expect(harness.letterRepository.summariesCallCount, 1);
+      expect(harness.letterRepository.requestedBodyPaths, isEmpty);
       expect(harness.weatherRepository.requestedDates, [
         DateTime(2026, 8, 7),
         DateTime(2026, 8, 6),
@@ -4288,7 +4342,7 @@ void main() {
         harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
         'tutorial_001',
       );
-      expect(harness.letterRepository.getAllCallCount, 0);
+      expect(harness.letterRepository.summariesCallCount, 0);
     });
 
     testWidgets('当日に通常手紙が配達済みならtutorial_001で上書きしない', (tester) async {
@@ -4305,7 +4359,7 @@ void main() {
         harness.readLetterProvider.deliveredLetterIdOn(DateTime(2026, 8, 7)),
         'letterA',
       );
-      expect(harness.letterRepository.getAllCallCount, 0);
+      expect(harness.letterRepository.summariesCallCount, 0);
     });
 
     testWidgets('tutorial_001読了後は通常の季節天候候補を配達する', (tester) async {
@@ -4476,7 +4530,7 @@ void main() {
     });
 
     testWidgets('既存の当日配達は演出なしで手紙とtapAreaを即表示する', (tester) async {
-      await _pumpRoom(
+      final harness = await _pumpRoom(
         tester,
         initialReadState: ReadLetterState(
           receivedLetters: {},
@@ -4488,6 +4542,9 @@ void main() {
       expect(find.byKey(const ValueKey('arrivalMovingLight')), findsNothing);
       expect(find.byKey(const ValueKey('roomLetterLayer')), findsOneWidget);
       expect(find.byKey(const ValueKey('letterTapArea')), findsOneWidget);
+      expect(_opacityForKey(tester, 'roomLetterLayer'), 1);
+      expect(harness.letterRepository.summariesCallCount, 0);
+      expect(harness.letterRepository.requestedBodyPaths, isEmpty);
     });
 
     testWidgets('新規配達時はpost発光から光移動を経て手紙を表示する', (tester) async {
@@ -5317,8 +5374,8 @@ Future<_RoomHarness> _pumpRoom(
   WeatherType? weather = WeatherType.rain,
   bool failNextWeatherLoad = false,
   int weatherLoadFailureCount = 0,
-  bool failNextLetterLoad = false,
-  bool blockNextLetterLoad = false,
+  bool failNextLetterSummariesLoad = false,
+  bool blockNextLetterSummariesLoad = false,
   List<Letter>? letters,
   DateTime? date,
   DateTime Function()? now,
@@ -5368,8 +5425,8 @@ Future<_RoomHarness> _pumpRoom(
   );
   final weatherProvider = WeatherProvider(weatherRepository);
   final letterRepository = _FakeLetterRepository(letters ?? _defaultLetters)
-    ..failNextLoad = failNextLetterLoad
-    ..blockNextLoad = blockNextLetterLoad;
+    ..failNextSummariesLoad = failNextLetterSummariesLoad
+    ..blockNextSummariesLoad = blockNextLetterSummariesLoad;
 
   if (loadProviders) {
     await Future.wait([
@@ -5739,28 +5796,54 @@ class _FakeLetterRepository extends LetterRepository {
   _FakeLetterRepository(List<Letter> letters) : letters = List.of(letters);
 
   final List<Letter> letters;
-  int getAllCallCount = 0;
-  bool failNextLoad = false;
-  bool blockNextLoad = false;
-  Completer<void>? _loadCompleter;
+  int summariesCallCount = 0;
+  final List<String> requestedBodyPaths = [];
+  bool failNextSummariesLoad = false;
+  bool blockNextSummariesLoad = false;
+  bool failNextBodyLoad = false;
+  Future<void>? bodyLoadBlock;
+  Completer<void>? _summariesLoadCompleter;
 
   @override
-  Future<List<Letter>> getAll() async {
-    getAllCallCount++;
-    if (failNextLoad) {
-      failNextLoad = false;
-      throw StateError('letter load failed');
+  Future<List<LetterSummary>> getSummaries() async {
+    summariesCallCount++;
+    if (failNextSummariesLoad) {
+      failNextSummariesLoad = false;
+      throw StateError('letter summaries load failed');
     }
-    if (blockNextLoad) {
-      blockNextLoad = false;
-      _loadCompleter = Completer<void>();
-      await _loadCompleter!.future;
+    if (blockNextSummariesLoad) {
+      blockNextSummariesLoad = false;
+      _summariesLoadCompleter = Completer<void>();
+      await _summariesLoadCompleter!.future;
     }
-    return letters;
+    return [
+      for (final letter in letters)
+        LetterSummary(
+          id: letter.id,
+          title: letter.title,
+          requiredSeason: letter.requiredSeason,
+          requiredWeather: letter.requiredWeather,
+          bodyAssetPath: 'assets/letters/${letter.id}.md',
+        ),
+    ];
   }
 
-  void completeLoad() {
-    final completer = _loadCompleter;
+  @override
+  Future<Letter> loadLetter(LetterSummary summary) async {
+    requestedBodyPaths.add(summary.bodyAssetPath);
+    if (failNextBodyLoad) {
+      failNextBodyLoad = false;
+      throw StateError('letter body load failed');
+    }
+    final block = bodyLoadBlock;
+    if (block != null) {
+      await block;
+    }
+    return letters.firstWhere((letter) => letter.id == summary.id);
+  }
+
+  void completeSummariesLoad() {
+    final completer = _summariesLoadCompleter;
     if (completer != null && !completer.isCompleted) {
       completer.complete();
     }

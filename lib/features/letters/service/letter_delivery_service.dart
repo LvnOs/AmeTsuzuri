@@ -1,12 +1,12 @@
 import '../../../shared/model/season_type.dart';
 import '../../../shared/model/weather_type.dart';
-import '../model/letter.dart';
+import '../repository/letter_repository.dart';
 
 class LetterDeliveryService {
   const LetterDeliveryService();
 
-  Letter? selectLetter({
-    required List<Letter> letters,
+  LetterSummary? selectLetter({
+    required List<LetterSummary> letters,
     required SeasonType currentSeason,
     required WeatherType currentWeather,
     required Set<String> readLetterIds,
@@ -29,8 +29,8 @@ class LetterDeliveryService {
     );
   }
 
-  Letter? _selectFirstMatching({
-    required List<Letter> letters,
+  LetterSummary? _selectFirstMatching({
+    required List<LetterSummary> letters,
     required SeasonType requiredSeason,
     required WeatherType currentWeather,
     required Set<String> readLetterIds,

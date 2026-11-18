@@ -160,7 +160,7 @@ void main() {
   });
 
   test('実データのsummer・autumn・winterを季節ごとのYAML順で選択する', () async {
-    final letters = (await LetterRepository().getAll())
+    final letters = (await LetterRepository().getSummaries())
         .where((letter) => letter.id != 'tutorial_001')
         .toList();
     const service = LetterDeliveryService();
