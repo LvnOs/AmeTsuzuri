@@ -24,20 +24,25 @@ class BookshelfPage extends StatefulWidget {
 }
 
 class _BookshelfPageState extends State<BookshelfPage> {
-  late Future<List<Letter>> _lettersFuture;
+  late LetterRepository _letterRepository;
+  late Future<List<LetterSummary>> _summariesFuture;
+  ({String id, Future<Letter> future})? _openingLetter;
   SeasonType? _selectedSeason;
 
   @override
   void initState() {
     super.initState();
-    _lettersFuture = (widget.letterRepository ?? LetterRepository()).getAll();
+    _letterRepository = widget.letterRepository ?? LetterRepository();
+    _summariesFuture = _letterRepository.getSummaries();
   }
 
   @override
   void didUpdateWidget(covariant BookshelfPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.letterRepository != oldWidget.letterRepository) {
-      _lettersFuture = (widget.letterRepository ?? LetterRepository()).getAll();
+      _letterRepository = widget.letterRepository ?? LetterRepository();
+      _summariesFuture = _letterRepository.getSummaries();
+      _openingLetter = null;
     }
   }
 
@@ -118,7 +123,7 @@ class _BookshelfPageState extends State<BookshelfPage> {
                     ),
                     Expanded(
                       child: FutureBuilder(
-                        future: _lettersFuture,
+                        future: _summariesFuture,
                         builder: (context, snapshot) {
                           if (snapshot.connectionState ==
                               ConnectionState.waiting) {
@@ -216,14 +221,8 @@ class _BookshelfPageState extends State<BookshelfPage> {
                                 receivedDate: _formatReceivedDate(
                                   readLetterProvider.receivedDateFor(letter.id),
                                 ),
-                                onTap: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (context) =>
-                                          LetterPage(letter: letter),
-                                    ),
-                                  );
-                                },
+                                isLoading: _openingLetter?.id == letter.id,
+                                onTap: () => _openLetter(letter),
                               );
                             },
                           );
@@ -238,6 +237,51 @@ class _BookshelfPageState extends State<BookshelfPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _openLetter(LetterSummary summary) async {
+    final route = ModalRoute.of(context);
+    if (_openingLetter != null || route?.isCurrent == false) {
+      return;
+    }
+
+    final request = (
+      id: summary.id,
+      future: _letterRepository.loadLetter(summary),
+    );
+    setState(() => _openingLetter = request);
+
+    try {
+      final letter = await request.future;
+      if (!mounted || _openingLetter != request || route?.isCurrent == false) {
+        return;
+      }
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => LetterPage(letter: letter)),
+      );
+    } catch (_) {
+      if (!mounted || _openingLetter != request || route?.isCurrent == false) {
+        return;
+      }
+      final repository = _letterRepository;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('手紙の本文を読み込めませんでした'),
+          action: SnackBarAction(
+            label: '再試行',
+            onPressed: () {
+              if (mounted && identical(repository, _letterRepository)) {
+                _openLetter(summary);
+              }
+            },
+          ),
+        ),
+      );
+    } finally {
+      if (mounted && _openingLetter == request) {
+        setState(() => _openingLetter = null);
+      }
+    }
   }
 
   String _formatReceivedDate(DateTime? date) {
@@ -340,12 +384,14 @@ class _BookshelfLetterRow extends StatelessWidget {
     required this.letterId,
     required this.title,
     required this.receivedDate,
+    required this.isLoading,
     required this.onTap,
   });
 
   final String letterId;
   final String title;
   final String receivedDate;
+  final bool isLoading;
   final VoidCallback onTap;
 
   @override
@@ -357,30 +403,46 @@ class _BookshelfLetterRow extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: 72),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 2),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Row(
             children: [
-              Text(
-                receivedDate,
-                style: const TextStyle(
-                  color: BookshelfPage._secondaryInkColor,
-                  fontSize: 12.5,
-                  height: 1.3,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      receivedDate,
+                      style: const TextStyle(
+                        color: BookshelfPage._secondaryInkColor,
+                        fontSize: 12.5,
+                        height: 1.3,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: BookshelfPage._inkColor,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 6),
-              Text(
-                title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: BookshelfPage._inkColor,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                  height: 1.35,
+              if (isLoading) ...[
+                const SizedBox(width: 12),
+                const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    semanticsLabel: '手紙の本文を読み込み中',
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),

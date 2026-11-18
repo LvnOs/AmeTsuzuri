@@ -17,6 +17,83 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
+  testWidgets('本文待機中も一覧を表示し、連打しても選んだ1通だけを読む', (tester) async {
+    final pending = Completer<Letter>();
+    final selected = _letter('selected', '選んだ手紙');
+    final repository = _FakeLetterRepository([
+      selected,
+      _letter('other', '別の手紙'),
+    ], onLoadLetter: (_) => pending.future);
+    await _pumpBookshelf(
+      tester,
+      letterRepository: repository,
+      receivedLetters: {'selected': DateTime(2026, 8, 9), 'other': null},
+    );
+
+    expect(repository.requestedLetterIds, isEmpty);
+    expect(find.text('選んだ手紙'), findsOneWidget);
+    expect(find.text('2026年8月9日'), findsOneWidget);
+
+    final row = find.byKey(const ValueKey('bookshelfLetterRow-selected'));
+    await tester.tap(row);
+    await tester.tap(row);
+    await tester.pump();
+
+    expect(repository.requestedLetterIds, ['selected']);
+    expect(
+      tester
+          .widget<CircularProgressIndicator>(
+            find.descendant(
+              of: row,
+              matching: find.byType(CircularProgressIndicator),
+            ),
+          )
+          .semanticsLabel,
+      '手紙の本文を読み込み中',
+    );
+    expect(find.text('別の手紙'), findsOneWidget);
+    expect(find.byType(LetterPage), findsNothing);
+
+    pending.complete(selected);
+    await tester.pumpAndSettle();
+    expect(tester.widget<LetterPage>(find.byType(LetterPage)).letter, selected);
+  });
+
+  testWidgets('本文取得に失敗しても一覧と季節フィルターが残り再試行できる', (tester) async {
+    var shouldFail = true;
+    final repository = _FakeLetterRepository(
+      [_letter('spring', '春の手紙', season: SeasonType.spring)],
+      onLoadLetter: (letter) async {
+        if (shouldFail) {
+          throw StateError('一時エラー');
+        }
+        return letter;
+      },
+    );
+    await _pumpBookshelf(
+      tester,
+      letterRepository: repository,
+      receivedLetters: {'spring': DateTime(2026, 8, 9)},
+    );
+    await _selectSeason(tester, 'spring');
+    await tester.tap(find.byKey(const ValueKey('bookshelfLetterRow-spring')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('手紙の本文を読み込めませんでした'), findsOneWidget);
+    expect(find.text('春の手紙'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.text('春')).style?.fontWeight,
+      FontWeight.w600,
+    );
+
+    shouldFail = false;
+    await tester.tap(find.text('再試行'));
+    await tester.pumpAndSettle();
+
+    expect(repository.requestedLetterIds, ['spring', 'spring']);
+    expect(find.byType(LetterPage), findsOneWidget);
+  });
+
   group('季節フィルター', () {
     final letters = [
       _letter('any', '季節なし', season: SeasonType.any),
@@ -655,19 +732,39 @@ Letter _letter(String id, String title, {SeasonType season = SeasonType.any}) {
 }
 
 class _FakeLetterRepository extends LetterRepository {
-  _FakeLetterRepository(this.letters);
+  _FakeLetterRepository(this.letters, {this.onLoadLetter});
 
   final List<Letter> letters;
+  final Future<Letter> Function(Letter)? onLoadLetter;
+  final List<String> requestedLetterIds = [];
 
   @override
-  Future<List<Letter>> getAll() async => letters;
+  Future<List<LetterSummary>> getSummaries() async => [
+    for (final letter in letters)
+      LetterSummary(
+        id: letter.id,
+        title: letter.title,
+        requiredSeason: letter.requiredSeason,
+        requiredWeather: letter.requiredWeather,
+        bodyAssetPath: 'assets/letters/${letter.id}.md',
+      ),
+  ];
+
+  @override
+  Future<Letter> loadLetter(LetterSummary summary) async {
+    requestedLetterIds.add(summary.id);
+    final letter = letters.singleWhere((letter) => letter.id == summary.id);
+    final load = onLoadLetter;
+    return load == null ? letter : await load(letter);
+  }
 }
 
 class _PendingLetterRepository extends LetterRepository {
-  final Completer<List<Letter>> _completer = Completer<List<Letter>>();
+  final Completer<List<LetterSummary>> _completer =
+      Completer<List<LetterSummary>>();
 
   @override
-  Future<List<Letter>> getAll() => _completer.future;
+  Future<List<LetterSummary>> getSummaries() => _completer.future;
 
   void complete() {
     if (!_completer.isCompleted) {
@@ -678,7 +775,7 @@ class _PendingLetterRepository extends LetterRepository {
 
 class _ErrorLetterRepository extends LetterRepository {
   @override
-  Future<List<Letter>> getAll() => Future.error('test error');
+  Future<List<LetterSummary>> getSummaries() => Future.error('test error');
 }
 
 class _FakeReadLetterRepository extends ReadLetterRepository {
