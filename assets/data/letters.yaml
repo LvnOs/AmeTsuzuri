@@ -490,3 +490,123 @@ letters:
       - 窓
       - 暮らし
     body_file: letters/2026-09-15.md
+
+  - id: letter_20260916
+    title: 傘立て
+    season: spring
+    weather: rain
+    tutorial: false
+    tags:
+      - 春
+      - 傘
+      - 街
+      - 暮らし
+    body_file: letters/2026-09-16.md
+
+  - id: letter_20260917
+    title: 苔の道
+    season: spring
+    weather: rain
+    tutorial: false
+    tags:
+      - 春
+      - 苔
+      - 石段
+      - 雨
+    body_file: letters/2026-09-17.md
+
+  - id: letter_20260918
+    title: 電車の窓
+    season: spring
+    weather: rain
+    tutorial: false
+    tags:
+      - 春
+      - 電車
+      - 窓
+      - 街
+    body_file: letters/2026-09-18.md
+
+  - id: letter_20260919
+    title: モンシロチョウ
+    season: spring
+    weather: rain
+    tutorial: false
+    tags:
+      - 春
+      - モンシロチョウ
+      - 生き物
+      - 葉
+    body_file: letters/2026-09-19.md
+
+  - id: letter_20260920
+    title: 雨の日のおやつ
+    season: spring
+    weather: rain
+    tutorial: false
+    tags:
+      - 春
+      - おやつ
+      - 暮らし
+      - 家
+    body_file: letters/2026-09-20.md
+
+  - id: letter_20260921
+    title: バス停
+    season: spring
+    weather: rain
+    tutorial: false
+    tags:
+      - 春
+      - バス
+      - 街
+      - 雨宿り
+    body_file: letters/2026-09-21.md
+
+  - id: letter_20260922
+    title: すみれ
+    season: spring
+    weather: rain
+    tutorial: false
+    tags:
+      - 春
+      - 花
+      - 足元
+      - 石垣
+    body_file: letters/2026-09-22.md
+
+  - id: letter_20260923
+    title: 小さな本屋
+    season: spring
+    weather: rain
+    tutorial: false
+    tags:
+      - 春
+      - 本
+      - 街
+      - 雨宿り
+    body_file: letters/2026-09-23.md
+
+  - id: letter_20260924
+    title: 巣作り
+    season: spring
+    weather: rain
+    tutorial: false
+    tags:
+      - 春
+      - 鳥
+      - 巣作り
+      - 小枝
+    body_file: letters/2026-09-24.md
+
+  - id: letter_20260925
+    title: 公園のベンチ
+    season: spring
+    weather: rain
+    tutorial: false
+    tags:
+      - 春
+      - 公園
+      - ベンチ
+      - 雨上がり
+    body_file: letters/2026-09-25.md
