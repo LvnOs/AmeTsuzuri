@@ -730,3 +730,123 @@ letters:
       - 列車
       - 雨音
     body_file: letters/2026-10-05.md
+
+  - id: letter_20261006
+    title: 濡れた手袋
+    season: winter
+    weather: rain
+    tutorial: false
+    tags:
+      - 冬
+      - 手袋
+      - 玄関
+      - 暮らし
+    body_file: letters/2026-10-06.md
+
+  - id: letter_20261007
+    title: 松ぼっくり
+    season: winter
+    weather: rain
+    tutorial: false
+    tags:
+      - 冬
+      - 松
+      - 木の実
+      - 雨上がり
+    body_file: letters/2026-10-07.md
+
+  - id: letter_20261008
+    title: 雨の歩道橋
+    season: winter
+    weather: rain
+    tutorial: false
+    tags:
+      - 冬
+      - 歩道橋
+      - 街
+      - 傘
+    body_file: letters/2026-10-08.md
+
+  - id: letter_20261009
+    title: みかんの皮
+    season: winter
+    weather: rain
+    tutorial: false
+    tags:
+      - 冬
+      - みかん
+      - 香り
+      - 家
+    body_file: letters/2026-10-09.md
+
+  - id: letter_20261010
+    title: 冬の池の鴨
+    season: winter
+    weather: rain
+    tutorial: false
+    tags:
+      - 冬
+      - 池
+      - 水鳥
+      - 雨
+    body_file: letters/2026-10-10.md
+
+  - id: letter_20261011
+    title: 花屋の包み紙
+    season: winter
+    weather: rain
+    tutorial: false
+    tags:
+      - 冬
+      - 花
+      - 包み紙
+      - 店
+    body_file: letters/2026-10-11.md
+
+  - id: letter_20261012
+    title: 眼鏡のくもり
+    season: winter
+    weather: rain
+    tutorial: false
+    tags:
+      - 冬
+      - 眼鏡
+      - 食堂
+      - 暮らし
+    body_file: letters/2026-10-12.md
+
+  - id: letter_20261013
+    title: 畑の白い覆い
+    season: winter
+    weather: rain
+    tutorial: false
+    tags:
+      - 冬
+      - 畑
+      - 布
+      - 畝
+    body_file: letters/2026-10-13.md
+
+  - id: letter_20261014
+    title: ガード下
+    season: winter
+    weather: rain
+    tutorial: false
+    tags:
+      - 冬
+      - 高架
+      - 足音
+      - 道
+    body_file: letters/2026-10-14.md
+
+  - id: letter_20261015
+    title: 玄関マット
+    season: winter
+    weather: rain
+    tutorial: false
+    tags:
+      - 冬
+      - 玄関
+      - 靴
+      - 雨
+    body_file: letters/2026-10-15.md
