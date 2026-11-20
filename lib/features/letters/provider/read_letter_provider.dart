@@ -11,6 +11,21 @@ class ReadLetterProvider extends ChangeNotifier {
   ReadLetterState _state = ReadLetterState(receivedLetters: {});
   bool _isLoaded = false;
   Future<void>? _loadFuture;
+  Future<void> _pendingOperation = Future.value();
+
+  Future<T> _enqueue<T>(Future<T> Function() operation) {
+    final result = _pendingOperation.then((_) => operation());
+    // Keep the caller's error while allowing the next operation to run.
+    _pendingOperation = result.then<void>((_) {}, onError: (Object _) {});
+    return result;
+  }
+
+  Future<bool> _update(Future<bool> Function() operation) => _enqueue(() async {
+    if (!_isLoaded) {
+      await _loadInternal();
+    }
+    return operation();
+  });
 
   Set<String> get readLetterIds => _state.readLetterIds;
   Map<String, DateTime?> get receivedLetters => _state.receivedLetters;
@@ -52,7 +67,7 @@ class ReadLetterProvider extends ChangeNotifier {
     }
 
     late final Future<void> operation;
-    operation = _loadInternal().whenComplete(() {
+    operation = _enqueue(_loadInternal).whenComplete(() {
       if (identical(_loadFuture, operation)) {
         _loadFuture = null;
       }
@@ -69,40 +84,44 @@ class ReadLetterProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> markAsRead(
-    String letterId, {
-    required DateTime receivedDate,
-  }) async {
-    if (_state.receivedLetters.containsKey(letterId)) {
-      return false;
-    }
+  Future<bool> markAsRead(String letterId, {required DateTime receivedDate}) =>
+      _update(() async {
+        if (_state.receivedLetters.containsKey(letterId)) {
+          return false;
+        }
 
-    final normalizedDate = DateTime(
-      receivedDate.year,
-      receivedDate.month,
-      receivedDate.day,
-    );
-    final nextState = ReadLetterState(
-      receivedLetters: {..._state.receivedLetters, letterId: normalizedDate},
-      deliveredLetters: _state.deliveredLetters,
-      hasOpenedTutorialBottle: _state.hasOpenedTutorialBottle,
-      tutorialCompleted: _state.tutorialCompleted,
-    );
+        final normalizedDate = DateTime(
+          receivedDate.year,
+          receivedDate.month,
+          receivedDate.day,
+        );
+        final nextState = ReadLetterState(
+          receivedLetters: {
+            ..._state.receivedLetters,
+            letterId: normalizedDate,
+          },
+          deliveredLetters: _state.deliveredLetters,
+          hasOpenedTutorialBottle: _state.hasOpenedTutorialBottle,
+          tutorialCompleted: _state.tutorialCompleted,
+        );
 
-    await _repository.saveState(nextState);
+        await _repository.saveState(nextState);
 
-    _state = nextState;
-    notifyListeners();
+        _state = nextState;
+        notifyListeners();
 
-    return true;
-  }
+        return true;
+      });
 
+  /// [canDeliver] checks the candidate synchronously when the save can begin.
   Future<bool> deliver(
     String letterId, {
     required DateTime deliveredDate,
-  }) async {
+    bool Function()? canDeliver,
+  }) => _update(() async {
     final dateKey = _formatDate(deliveredDate);
-    if (_state.deliveredLetters.containsKey(dateKey)) {
+    if (_state.deliveredLetters.containsKey(dateKey) ||
+        (canDeliver != null && !canDeliver())) {
       return false;
     }
 
@@ -119,9 +138,9 @@ class ReadLetterProvider extends ChangeNotifier {
     notifyListeners();
 
     return true;
-  }
+  });
 
-  Future<bool> markTutorialBottleOpened() async {
+  Future<bool> markTutorialBottleOpened() => _update(() async {
     if (_state.hasOpenedTutorialBottle) {
       return false;
     }
@@ -138,9 +157,9 @@ class ReadLetterProvider extends ChangeNotifier {
     _state = nextState;
     notifyListeners();
     return true;
-  }
+  });
 
-  Future<bool> completeTutorial() async {
+  Future<bool> completeTutorial() => _update(() async {
     if (_state.tutorialCompleted) {
       return false;
     }
@@ -157,13 +176,13 @@ class ReadLetterProvider extends ChangeNotifier {
     _state = nextState;
     notifyListeners();
     return true;
-  }
+  });
 
-  Future<void> reset() async {
+  Future<void> reset() => _enqueue(() async {
     await _repository.resetState();
     _state = ReadLetterState(receivedLetters: {}, deliveredLetters: {});
     notifyListeners();
-  }
+  });
 
   String _formatDate(DateTime date) {
     final year = date.year.toString().padLeft(4, '0');

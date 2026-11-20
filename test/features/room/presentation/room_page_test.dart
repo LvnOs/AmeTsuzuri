@@ -3267,6 +3267,84 @@ void main() {
       expect(find.byKey(const ValueKey('roomLetterLayer')), findsNothing);
     });
 
+    testWidgets('別の保存の後ろで待機中に通常モードへ切り替えた候補は保存しない', (tester) async {
+      final date = DateTime(2026, 8, 7);
+      final harness = await _pumpRoom(
+        tester,
+        date: date,
+        now: () => date,
+        blockNextLetterSummariesLoad: true,
+      );
+      final gate = Completer<void>();
+      harness.readLetterRepository.nextSaveGate = gate.future;
+      final reading = harness.readLetterProvider.markAsRead(
+        'oldLetter',
+        receivedDate: date,
+      );
+      await tester.pump();
+      harness.letterRepository.completeSummariesLoad();
+      await tester.pump();
+      expect(harness.readLetterRepository.saveCallCount, 1);
+
+      await harness.dateProvider.setPrototypeMode(false);
+      await tester.pump();
+      gate.complete();
+      expect(await reading, isTrue);
+      await _pumpPastFiniteAnimations(tester);
+
+      expect(harness.readLetterRepository.saveCallCount, 1);
+      expect(harness.readLetterProvider.deliveredLetters, isEmpty);
+      expect(find.byKey(const ValueKey('roomLetterLayer')), findsNothing);
+    });
+
+    testWidgets('保存開始後に同日でモードを切り替えると履歴だけを反映する', (tester) async {
+      final date = DateTime(2026, 8, 7);
+      final gate = Completer<void>();
+      final harness = await _pumpRoom(
+        tester,
+        date: date,
+        now: () => date,
+        nextReadSaveGate: gate.future,
+      );
+      expect(harness.readLetterRepository.saveCallCount, 1);
+      expect(harness.readLetterProvider.deliveredLetters, isEmpty);
+
+      await harness.dateProvider.setPrototypeMode(false);
+      await tester.pump();
+      gate.complete();
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(harness.readLetterRepository.saveCallCount, 1);
+      expect(harness.readLetterProvider.deliveredLetterIdOn(date), 'letterA');
+      expect(find.byKey(const ValueKey('postArrivalGlow')), findsNothing);
+      expect(find.byKey(const ValueKey('letterTapArea')), findsOneWidget);
+    });
+
+    testWidgets('連続で日付を進めると進行中の保存と最新日の候補だけを反映する', (tester) async {
+      final gate = Completer<void>();
+      final harness = await _pumpRoom(tester, nextReadSaveGate: gate.future);
+      expect(harness.readLetterRepository.saveCallCount, 1);
+      await harness.dateProvider.moveToNextDay();
+      await tester.pump();
+      expect(harness.letterRepository.summariesCallCount, 2);
+      await harness.dateProvider.moveToNextDay();
+      await tester.pump();
+      expect(harness.letterRepository.summariesCallCount, 3);
+
+      gate.complete();
+      await tester.pump();
+      await tester.pump();
+      await _pumpPastFiniteAnimations(tester);
+
+      expect(harness.readLetterRepository.saveCallCount, 2);
+      expect(harness.readLetterProvider.deliveredLetters, {
+        '2026-08-07': 'letterA',
+        '2026-08-09': 'letterB',
+      });
+      expect(harness.letterRepository.requestedBodyPaths, isEmpty);
+    });
+
     testWidgets('同日の再buildでは2通目を選択しない', (tester) async {
       final harness = await _pumpRoom(tester);
       await _pumpPastFiniteAnimations(tester);
@@ -5384,6 +5462,7 @@ Future<_RoomHarness> _pumpRoom(
   ShizukuState? initialShizukuState,
   bool dismissInitialGuide = true,
   bool failNextReadSave = false,
+  Future<void>? nextReadSaveGate,
   bool blockNextReadLoad = false,
   bool failNextReadLoad = false,
   AppDateRepository? appDateRepository,
@@ -5403,6 +5482,7 @@ Future<_RoomHarness> _pumpRoom(
   final readLetterRepository = _FakeReadLetterRepository(initialReadState);
   readLetterRepository
     ..failNextSave = failNextReadSave
+    ..nextSaveGate = nextReadSaveGate
     ..blockNextLoad = blockNextReadLoad
     ..failNextLoad = failNextReadLoad;
   final shizukuProvider = ShizukuProvider(shizukuRepository);
@@ -5945,6 +6025,7 @@ class _FakeReadLetterRepository extends ReadLetterRepository {
 
   ReadLetterState state;
   bool failNextSave = false;
+  Future<void>? nextSaveGate;
   bool blockNextLoad = false;
   bool failNextLoad = false;
   int saveCallCount = 0;
@@ -5974,6 +6055,11 @@ class _FakeReadLetterRepository extends ReadLetterRepository {
     if (failNextSave) {
       failNextSave = false;
       throw StateError('save failed');
+    }
+    final gate = nextSaveGate;
+    nextSaveGate = null;
+    if (gate != null) {
+      await gate;
     }
     state = nextState;
   }

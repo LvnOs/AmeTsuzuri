@@ -288,7 +288,6 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
       const LetterDeliveryService();
   DateTime? _attemptedDeliveryDate;
   int? _dateRevision;
-  Future<bool>? _pendingDeliverySave;
   bool _isMigrationNoticeScheduled = false;
   DateTime? _requestedWeatherDate;
   Future<void>? _requestedWeatherLoad;
@@ -859,9 +858,11 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
         ...readLetterProvider.readLetterIds,
         ...readLetterProvider.deliveredLetters.values,
       };
+      final currentSeason =
+          _letterSeasonOverride ?? appDateProvider.currentSeason;
       final letter = _letterDeliveryService.selectLetter(
         letters: normalLetters,
-        currentSeason: _letterSeasonOverride ?? appDateProvider.currentSeason,
+        currentSeason: currentSeason,
         currentWeather: currentWeather,
         readLetterIds: excludedLetterIds,
       );
@@ -869,7 +870,16 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
         return;
       }
 
-      await _deliverAndAnimate(letter.id, date, revision);
+      await _deliverAndAnimate(
+        letter.id,
+        date,
+        revision,
+        matchesConditions: () =>
+            (_weatherOverride ?? weatherProvider.currentWeather) ==
+                currentWeather &&
+            (_letterSeasonOverride ?? appDateProvider.currentSeason) ==
+                currentSeason,
+      );
     } catch (_) {
       if (_dateRevision == revision && _attemptedDeliveryDate == date) {
         _attemptedDeliveryDate = null;
@@ -923,36 +933,36 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
   Future<void> _deliverAndAnimate(
     String letterId,
     DateTime date,
-    int revision,
-  ) async {
-    for (
-      var pending = _pendingDeliverySave;
-      pending != null;
-      pending = _pendingDeliverySave
-    ) {
-      try {
-        await pending;
-      } catch (_) {
-        // The request that started this save handles its failure.
-      }
-    }
-    if (!mounted || !_canContinueDeliveryFor(date, revision)) {
+    int revision, {
+    bool Function()? matchesConditions,
+  }) async {
+    if (!_canContinueDeliveryFor(date, revision)) {
       return;
     }
 
     final appDateProvider = context.read<AppDateProvider>();
-    final save = context.read<ReadLetterProvider>().deliver(
+    final readLetterProvider = context.read<ReadLetterProvider>();
+    final isTutorialLetter = letterId == RoomPage._tutorialLetterId;
+    final didDeliver = await readLetterProvider.deliver(
       letterId,
       deliveredDate: date,
+      canDeliver: () =>
+          _canContinueDeliveryFor(date, revision) &&
+          (matchesConditions?.call() ?? true) &&
+          !readLetterProvider.readLetterIds.contains(letterId) &&
+          (isTutorialLetter ||
+              !readLetterProvider.deliveredLetters.containsValue(letterId)),
     );
-    _pendingDeliverySave = save;
-    try {
-      final didDeliver = await save;
-      if (didDeliver && mounted && appDateProvider.today == date) {
+    if (didDeliver) {
+      if (mounted &&
+          appDateProvider.dateRevision == revision &&
+          _dateOnly(appDateProvider.today) == date &&
+          readLetterProvider.deliveredLetterIdOn(date) == letterId) {
         _startArrivalAnimation();
       }
-    } finally {
-      _pendingDeliverySave = null;
+    } else if (_canContinueDeliveryFor(date, revision)) {
+      // A queued candidate can become ineligible while another save finishes.
+      setState(() => _attemptedDeliveryDate = null);
     }
   }
 

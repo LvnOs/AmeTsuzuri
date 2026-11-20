@@ -14,9 +14,15 @@ class ReadLetterRepository {
   static const int _currentVersion = 3;
 
   final SetStringOverride? setStringOverride;
+  bool _stateCacheMayBeStale = false;
 
   Future<ReadLetterState> loadState() async {
     final prefs = await SharedPreferences.getInstance();
+    if (_stateCacheMayBeStale) {
+      // setString can update the cache before the platform write fails.
+      await prefs.reload();
+      _stateCacheMayBeStale = false;
+    }
     final savedState = prefs.get(_stateKey);
 
     if (savedState is String) {
@@ -45,14 +51,20 @@ class ReadLetterRepository {
       'tutorialCompleted': state.tutorialCompleted,
     });
 
-    final didSave = setStringOverride != null
-        ? await setStringOverride!(_stateKey, json)
-        : await (await SharedPreferences.getInstance()).setString(
-            _stateKey,
-            json,
-          );
-    if (!didSave) {
-      throw StateError('Failed to save read letter state.');
+    try {
+      final didSave = setStringOverride != null
+          ? await setStringOverride!(_stateKey, json)
+          : await (await SharedPreferences.getInstance()).setString(
+              _stateKey,
+              json,
+            );
+      if (!didSave) {
+        throw StateError('Failed to save read letter state.');
+      }
+      _stateCacheMayBeStale = false;
+    } catch (_) {
+      _stateCacheMayBeStale = true;
+      rethrow;
     }
   }
 

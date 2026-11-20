@@ -169,6 +169,7 @@ void main() {
     final second = provider.load();
 
     expect(identical(first, second), isTrue);
+    await Future<void>.delayed(Duration.zero);
     expect(repository.loadCallCount, 1);
 
     repository.completeLoad(_emptyState());
@@ -182,12 +183,14 @@ void main() {
     final provider = ReadLetterProvider(repository);
 
     final failedLoad = provider.load();
+    await Future<void>.delayed(Duration.zero);
     repository.failLoad(StateError('load failed'));
     await expectLater(failedLoad, throwsA(isA<StateError>()));
 
     expect(provider.isLoaded, isFalse);
 
     final retry = provider.load();
+    await Future<void>.delayed(Duration.zero);
     expect(repository.loadCallCount, 2);
     repository.completeLoad(
       ReadLetterState(receivedLetters: {'letterA': DateTime(2026, 8, 8)}),
@@ -571,6 +574,147 @@ void main() {
       expect(provider.deliveredLetters, isEmpty);
     });
   });
+  group('保存とロードの直列化', () {
+    final today = DateTime(2026, 8, 8);
+    final tomorrow = DateTime(2026, 8, 9);
+
+    test('同日の並行配達は先頭の1通だけを保存する', () async {
+      final repository = _FakeReadLetterRepository(_emptyState());
+      final provider = await _loadProvider(repository);
+      final gate = repository.blockNextSave();
+
+      final first = provider.deliver('first', deliveredDate: today);
+      final second = provider.deliver('second', deliveredDate: today);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.saveCallCount, 1);
+      expect(provider.deliveredLetters, isEmpty);
+      gate.complete();
+      expect(await Future.wait([first, second]), [true, false]);
+      expect(repository.saveCallCount, 1);
+      expect(repository.state.deliveredLetters, {'2026-08-08': 'first'});
+    });
+
+    test('別日への配達と既読・チュートリアル更新がすべて残る', () async {
+      final repository = _FakeReadLetterRepository(_emptyState());
+      final provider = await _loadProvider(repository);
+      final gate = repository.blockNextSave();
+
+      final operations = [
+        provider.deliver('first', deliveredDate: today),
+        provider.deliver('second', deliveredDate: tomorrow),
+        provider.markAsRead('first', receivedDate: today),
+        provider.markTutorialBottleOpened(),
+        provider.completeTutorial(),
+      ];
+      await Future<void>.delayed(Duration.zero);
+      expect(repository.saveCallCount, 1);
+
+      gate.complete();
+      expect(await Future.wait(operations), everyElement(isTrue));
+      expect(repository.state.deliveredLetters, {
+        '2026-08-08': 'first',
+        '2026-08-09': 'second',
+      });
+      expect(repository.state.receivedLetters, {'first': today});
+      expect(repository.state.hasOpenedTutorialBottle, isTrue);
+      expect(repository.state.tutorialCompleted, isTrue);
+      expect(provider.deliveredLetters, repository.state.deliveredLetters);
+    });
+
+    test('失敗した配達を反映せず、待機中の同日配達を保存する', () async {
+      final repository = _FakeReadLetterRepository(_emptyState());
+      final provider = await _loadProvider(repository);
+      final gate = repository.blockNextSave();
+      final first = provider.deliver('failed', deliveredDate: today);
+      final failed = expectLater(first, throwsStateError);
+      final retry = provider.deliver('retry', deliveredDate: today);
+      final observedIds = <String?>[];
+      provider.addListener(
+        () => observedIds.add(provider.deliveredLetterIdOn(today)),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      gate.completeError(StateError('save failed'));
+      await failed;
+      expect(await retry, isTrue);
+      expect(observedIds, ['retry']);
+      expect(repository.state.deliveredLetters, {'2026-08-08': 'retry'});
+    });
+
+    test('resetの前後に並んだ保存を呼び出し順に反映する', () async {
+      final repository = _FakeReadLetterRepository(_emptyState());
+      final provider = await _loadProvider(repository);
+      final gate = repository.blockNextSave();
+      final first = provider.deliver('before', deliveredDate: today);
+      final reset = provider.reset();
+      final last = provider.deliver('after', deliveredDate: today);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.resetCallCount, 0);
+      gate.complete();
+      expect(await first, isTrue);
+      await reset;
+      expect(await last, isTrue);
+      expect(repository.resetCallCount, 1);
+      expect(provider.deliveredLetters, {'2026-08-08': 'after'});
+      expect(repository.state.deliveredLetters, provider.deliveredLetters);
+    });
+
+    test('初回loadの完了を待ち、復元した旧既読IDを含めて保存する', () async {
+      final repository = _FakeReadLetterRepository(_emptyState());
+      final provider = ReadLetterProvider(repository);
+      final gate = Completer<void>();
+      repository.loadGate = gate.future;
+      final load = provider.load();
+      final delivery = provider.deliver('new', deliveredDate: today);
+      await Future<void>.delayed(Duration.zero);
+      expect(repository.saveCallCount, 0);
+
+      repository.state = ReadLetterState(receivedLetters: {'legacy': null});
+      gate.complete();
+      await load;
+      expect(await delivery, isTrue);
+      expect(repository.state.receivedLetters, {'legacy': null});
+      expect(repository.state.deliveredLetters, {'2026-08-08': 'new'});
+    });
+
+    test('保存中の再loadは保存完了を待ち最新の状態を読む', () async {
+      final repository = _FakeReadLetterRepository(_emptyState());
+      final provider = await _loadProvider(repository);
+      final gate = repository.blockNextSave();
+      final delivery = provider.deliver('new', deliveredDate: today);
+      final load = provider.load();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.loadCallCount, 1);
+      gate.complete();
+      expect(await delivery, isTrue);
+      await load;
+      expect(repository.loadCallCount, 2);
+      expect(provider.deliveredLetters, {'2026-08-08': 'new'});
+    });
+
+    test('初回loadを再試行しても失敗する間は空の状態で上書きしない', () async {
+      final repository = _FakeReadLetterRepository(
+        ReadLetterState(receivedLetters: {'legacy': null}),
+      )..failLoad = true;
+      final provider = ReadLetterProvider(repository);
+      final failedLoad = expectLater(provider.load(), throwsStateError);
+      final failedDelivery = expectLater(
+        provider.deliver('new', deliveredDate: today),
+        throwsStateError,
+      );
+      await Future.wait([failedLoad, failedDelivery]);
+
+      expect(repository.saveCallCount, 0);
+      expect(provider.isLoaded, isFalse);
+      repository.failLoad = false;
+      expect(await provider.deliver('new', deliveredDate: today), isTrue);
+      expect(repository.state.receivedLetters, {'legacy': null});
+      expect(repository.state.deliveredLetters, {'2026-08-08': 'new'});
+    });
+  });
 }
 
 Future<ReadLetterProvider> _loadProvider(
@@ -589,14 +733,21 @@ class _FakeReadLetterRepository extends ReadLetterRepository {
   ReadLetterState state;
   bool failLoad = false;
   bool failSave = false;
+  int loadCallCount = 0;
   int saveCallCount = 0;
   int resetCallCount = 0;
+  Future<void>? loadGate;
+  Completer<void>? _nextSaveGate;
+
+  Completer<void> blockNextSave() => _nextSaveGate = Completer<void>();
 
   @override
   Future<ReadLetterState> loadState() async {
+    loadCallCount++;
     if (failLoad) {
       throw StateError('load failed');
     }
+    await loadGate;
     return state;
   }
 
@@ -605,6 +756,11 @@ class _FakeReadLetterRepository extends ReadLetterRepository {
     saveCallCount++;
     if (failSave) {
       throw StateError('save failed');
+    }
+    final gate = _nextSaveGate;
+    _nextSaveGate = null;
+    if (gate != null) {
+      await gate.future;
     }
     state = nextState;
   }
