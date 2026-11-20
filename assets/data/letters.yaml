@@ -610,3 +610,123 @@ letters:
       - ベンチ
       - 雨上がり
     body_file: letters/2026-09-25.md
+
+  - id: letter_20260926
+    title: 柿の実
+    season: autumn
+    weather: rain
+    tutorial: false
+    tags:
+      - 秋
+      - 柿
+      - 木の実
+      - 枝
+    body_file: letters/2026-09-26.md
+
+  - id: letter_20260927
+    title: きのこ
+    season: autumn
+    weather: rain
+    tutorial: false
+    tags:
+      - 秋
+      - きのこ
+      - 木陰
+      - 雨上がり
+    body_file: letters/2026-09-27.md
+
+  - id: letter_20260928
+    title: 稲刈り後の田んぼ
+    season: autumn
+    weather: rain
+    tutorial: false
+    tags:
+      - 秋
+      - 田んぼ
+      - 稲刈り
+      - 雨
+    body_file: letters/2026-09-28.md
+
+  - id: letter_20260929
+    title: コオロギの声
+    season: autumn
+    weather: rain
+    tutorial: false
+    tags:
+      - 秋
+      - コオロギ
+      - 虫の声
+      - 夕暮れ
+    body_file: letters/2026-09-29.md
+
+  - id: letter_20260930
+    title: 梨を切る
+    season: autumn
+    weather: rain
+    tutorial: false
+    tags:
+      - 秋
+      - 梨
+      - 台所
+      - 果物
+    body_file: letters/2026-09-30.md
+
+  - id: letter_20261001
+    title: 焼き芋の紙袋
+    season: autumn
+    weather: rain
+    tutorial: false
+    tags:
+      - 秋
+      - 焼き芋
+      - 帰り道
+      - 暮らし
+    body_file: letters/2026-10-01.md
+
+  - id: letter_20261002
+    title: 衣替え
+    season: autumn
+    weather: rain
+    tutorial: false
+    tags:
+      - 秋
+      - 衣替え
+      - 服
+      - 家
+    body_file: letters/2026-10-02.md
+
+  - id: letter_20261003
+    title: 八百屋の軒先
+    season: autumn
+    weather: rain
+    tutorial: false
+    tags:
+      - 秋
+      - 八百屋
+      - 商店街
+      - 仕事
+    body_file: letters/2026-10-03.md
+
+  - id: letter_20261004
+    title: 校庭の白線
+    season: autumn
+    weather: rain
+    tutorial: false
+    tags:
+      - 秋
+      - 校庭
+      - 白線
+      - 雨上がり
+    body_file: letters/2026-10-04.md
+
+  - id: letter_20261005
+    title: 雨の踏切
+    season: autumn
+    weather: rain
+    tutorial: false
+    tags:
+      - 秋
+      - 踏切
+      - 列車
+      - 雨音
+    body_file: letters/2026-10-05.md
