@@ -5,6 +5,9 @@ import 'package:ame_tsuzuri/features/letters/repository/read_letter_repository.d
 import 'package:ame_tsuzuri/features/letters/repository/shizuku_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+// Uses the plugin's store interface to simulate a failed platform write.
+// ignore: depend_on_referenced_packages
+import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
 
 void main() {
   const stateKey = 'readLetterState';
@@ -266,6 +269,29 @@ void main() {
     );
   });
 
+  test('保存失敗後のloadは先に更新されたキャッシュを使用しない', () async {
+    final repository = ReadLetterRepository();
+    final today = DateTime(2026, 8, 8);
+    await repository.saveState(
+      ReadLetterState(receivedLetters: {'old': today}),
+    );
+    final store = _RejectingPreferencesStore(
+      await SharedPreferencesStorePlatform.instance.getAll(),
+    );
+    SharedPreferencesStorePlatform.instance = store;
+
+    await expectLater(
+      repository.saveState(ReadLetterState(receivedLetters: {'new': today})),
+      throwsStateError,
+    );
+    final prefs = await SharedPreferences.getInstance();
+    expect(jsonDecode(prefs.getString(stateKey)!)['receivedLetters'], {
+      'new': '2026-08-08',
+    });
+
+    expect((await repository.loadState()).receivedLetters, {'old': today});
+  });
+
   test('resetStateは空の新Stateを保存し旧キーも削除する', () async {
     SharedPreferences.setMockInitialValues({
       legacyKey: ['legacyLetter'],
@@ -329,4 +355,12 @@ void main() {
     );
     expect(() => state.readLetterIds.add('letterB'), throwsUnsupportedError);
   });
+}
+
+class _RejectingPreferencesStore extends InMemorySharedPreferencesStore {
+  _RejectingPreferencesStore(super.data) : super.withData();
+
+  @override
+  Future<bool> setValue(String valueType, String key, Object value) async =>
+      false;
 }
