@@ -14,6 +14,9 @@ import '../features/letters/provider/read_letter_provider.dart';
 import '../features/letters/provider/shizuku_provider.dart';
 import '../features/letters/repository/read_letter_repository.dart';
 import '../features/letters/repository/shizuku_repository.dart';
+import '../features/real_weather/provider/real_weather_provider.dart';
+import '../features/real_weather/repository/weather_location_repository.dart';
+import '../features/real_weather/service/real_weather_service.dart';
 import '../features/room/presentation/room_page.dart';
 import '../shared/provider/app_data_provider.dart';
 import '../shared/provider/weather_provider.dart';
@@ -26,11 +29,13 @@ class AmeTsuzuriApp extends StatelessWidget {
     this.ambientSoundRepository,
     this.ambientAudioService,
     this.weatherRepository,
+    this.realWeatherService,
   });
 
   final AmbientSoundRepository? ambientSoundRepository;
   final AmbientAudioService? ambientAudioService;
   final WeatherRepository? weatherRepository;
+  final RealWeatherService? realWeatherService;
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +53,23 @@ class AmeTsuzuriApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) =>
               WeatherProvider(weatherRepository ?? WeatherRepository()),
+        ),
+        ChangeNotifierProvider(
+          lazy: false,
+          create: (context) {
+            final provider = RealWeatherProvider(
+              context.read<AppDateProvider>(),
+              WeatherLocationRepository(),
+              realWeatherService ?? RealWeatherService(),
+            );
+            final lifecycle = WidgetsBinding.instance.lifecycleState;
+            provider.updateForeground(
+              lifecycle == null ||
+                  lifecycle == AppLifecycleState.resumed ||
+                  lifecycle == AppLifecycleState.inactive,
+            );
+            return provider..load();
+          },
         ),
         ChangeNotifierProvider(
           create: (_) => AmbientSoundProvider(
@@ -102,10 +124,12 @@ class _AppLifecycleState extends State<_AppLifecycle>
     switch (state) {
       case AppLifecycleState.resumed:
         context.read<AppDateProvider>().refreshLocalDate();
+        context.read<RealWeatherProvider>().updateForeground(true);
         unawaited(context.read<AmbientSoundProvider>().updateVisibility(true));
       case AppLifecycleState.paused:
       case AppLifecycleState.hidden:
       case AppLifecycleState.detached:
+        context.read<RealWeatherProvider>().updateForeground(false);
         unawaited(context.read<AmbientSoundProvider>().updateVisibility(false));
       case AppLifecycleState.inactive:
         break;
