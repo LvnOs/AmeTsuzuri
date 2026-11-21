@@ -850,3 +850,123 @@ letters:
       - 靴
       - 雨
     body_file: letters/2026-10-15.md
+
+  - id: letter_20261016
+    title: 夕立と洗濯物
+    season: summer
+    weather: rain
+    tutorial: false
+    tags:
+      - 夏
+      - 夕立
+      - 洗濯物
+      - 物干し
+    body_file: letters/2026-10-16.md
+
+  - id: letter_20261017
+    title: セミの抜け殻
+    season: summer
+    weather: rain
+    tutorial: false
+    tags:
+      - 夏
+      - セミ
+      - 木
+      - 雨上がり
+    body_file: letters/2026-10-17.md
+
+  - id: letter_20261018
+    title: 麦茶の氷
+    season: summer
+    weather: rain
+    tutorial: false
+    tags:
+      - 夏
+      - 麦茶
+      - 氷
+      - グラス
+    body_file: letters/2026-10-18.md
+
+  - id: letter_20261019
+    title: すだれの端
+    season: summer
+    weather: rain
+    tutorial: false
+    tags:
+      - 夏
+      - すだれ
+      - 窓
+      - 葦
+    body_file: letters/2026-10-19.md
+
+  - id: letter_20261020
+    title: 雨のプール
+    season: summer
+    weather: rain
+    tutorial: false
+    tags:
+      - 夏
+      - プール
+      - 水面
+      - 雨
+    body_file: letters/2026-10-20.md
+
+  - id: letter_20261021
+    title: とうもろこしの皮
+    season: summer
+    weather: rain
+    tutorial: false
+    tags:
+      - 夏
+      - とうもろこし
+      - 台所
+      - 皮
+    body_file: letters/2026-10-21.md
+
+  - id: letter_20261022
+    title: 水やりを休む日
+    season: summer
+    weather: rain
+    tutorial: false
+    tags:
+      - 夏
+      - じょうろ
+      - 庭
+      - 鉢
+    body_file: letters/2026-10-22.md
+
+  - id: letter_20261023
+    title: 氷の旗
+    season: summer
+    weather: rain
+    tutorial: false
+    tags:
+      - 夏
+      - かき氷
+      - 旗
+      - 商店街
+    body_file: letters/2026-10-23.md
+
+  - id: letter_20261024
+    title: 蚊取り線香
+    season: summer
+    weather: rain
+    tutorial: false
+    tags:
+      - 夏
+      - 線香
+      - 縁側
+      - 渦
+    body_file: letters/2026-10-24.md
+
+  - id: letter_20261025
+    title: 遠雷
+    season: summer
+    weather: rain
+    tutorial: false
+    tags:
+      - 夏
+      - 雷
+      - 雨音
+      - 窓
+    body_file: letters/2026-10-25.md
