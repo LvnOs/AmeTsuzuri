@@ -34,6 +34,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../ambient_sound/provider/ambient_sound_provider.dart';
+import '../../real_weather/presentation/real_weather_panel.dart';
 
 enum _TutorialTarget { none, letter, bottle, bookshelf }
 
@@ -458,64 +459,76 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
-        child: Center(
-          child: AspectRatio(
-            aspectRatio: RoomPage._designWidth / RoomPage._designHeight,
-            child: _RoomBackgroundLayers(
-              season:
-                  (isPrototypeMode ? _outdoorSeasonOverride : null) ??
-                  appDateProvider.currentSeason,
-              effectiveWeather: effectiveWeather,
-              previousWeather: previousWeather,
-              weatherDate: hasWeatherForToday ? today : null,
-              isTutorialCompleted: readLetterProvider.tutorialCompleted,
-              rainIntensityOverride: isPrototypeMode
-                  ? _rainIntensityOverride
-                  : null,
-              hasDeliveredLetter: showLetter,
-              isArrivalAnimating: _isArrivalAnimating,
-              arrivalAnimation: _arrivalController,
-              tutorialTarget: visibleTutorialTarget,
-              tutorialGlowAnimation: _tutorialGlowController,
-              tutorialMove: _tutorialMove,
-              tutorialMoveAnimation: _tutorialMoveController,
-              isRearrangeMode: _isRearrangeMode,
-              selectedRearrangeSlotId: _selectedRearrangeSlotId,
-              isRearrangeSaving: _isRearrangeSaving,
-              showRearrangeButton: showRearrangeButton,
-              onToggleRearrangeMode: _toggleRearrangeMode,
-              onSelectRearrangeSlot: _selectRearrangeSlot,
-              purchasedFurnitureIds: catalogProvider.purchasedFurnitureIds,
-              placedFurnitureIds: placedFurnitureProvider.placedFurnitureIds,
-              furnituresFuture: _furnituresFuture,
-              deskSurfaceLeftFurnitureId: deskSurfaceLeftFurnitureId,
-              deskSurfaceRightFurnitureId: deskSurfaceRightFurnitureId,
-              windowShelfDecorFurnitureId: windowShelfDecorFurnitureId,
-              windowHangingDecorFurnitureId: windowHangingDecorFurnitureId,
-              flowerFurnitureId: flowerFurnitureId,
-              floorRugFurnitureId: floorRugFurnitureId,
-              chairFurnitureId: chairFurnitureId,
-              curtainFurnitureId: curtainFurnitureId,
-              windowHangingReactionKey: _windowHangingReactionKey,
-              flowerReactionKey: _flowerReactionKey,
-              chairReactionKey: _chairReactionKey,
-              onTapBottle: _onTapBottle,
-              onTapBookshelf: _onTapBookshelf,
-              onTapLetter: _onTapLetter,
-              onTapPost: _onTapPost,
-              isPrototypeOperationRunning:
-                  _isPrototypeOperationRunning || !appDateProvider.isLoaded,
-              isPrototypeMode: isPrototypeMode,
-              onToggleDateMode: _toggleDateMode,
-              onMoveToNextDay: _moveToNextDay,
-              onOutdoorSeasonChanged: _setOutdoorSeasonOverride,
-              letterSeasonOverride: _letterSeasonOverride,
-              onLetterSeasonChanged: _setLetterSeasonOverride,
-              onWeatherChanged: _setWeatherOverride,
-              onRainIntensityChanged: _setRainIntensityOverride,
-              onResetPrototype: _confirmPrototypeReset,
+        child: Column(
+          children: [
+            Expanded(
+              child: Center(
+                child: AspectRatio(
+                  aspectRatio: RoomPage._designWidth / RoomPage._designHeight,
+                  child: _RoomBackgroundLayers(
+                    season:
+                        (isPrototypeMode ? _outdoorSeasonOverride : null) ??
+                        appDateProvider.currentSeason,
+                    effectiveWeather: effectiveWeather,
+                    previousWeather: previousWeather,
+                    weatherDate: hasWeatherForToday ? today : null,
+                    isTutorialCompleted: readLetterProvider.tutorialCompleted,
+                    rainIntensityOverride: isPrototypeMode
+                        ? _rainIntensityOverride
+                        : null,
+                    hasDeliveredLetter: showLetter,
+                    isArrivalAnimating: _isArrivalAnimating,
+                    arrivalAnimation: _arrivalController,
+                    tutorialTarget: visibleTutorialTarget,
+                    tutorialGlowAnimation: _tutorialGlowController,
+                    tutorialMove: _tutorialMove,
+                    tutorialMoveAnimation: _tutorialMoveController,
+                    isRearrangeMode: _isRearrangeMode,
+                    selectedRearrangeSlotId: _selectedRearrangeSlotId,
+                    isRearrangeSaving: _isRearrangeSaving,
+                    showRearrangeButton: showRearrangeButton,
+                    onToggleRearrangeMode: _toggleRearrangeMode,
+                    onSelectRearrangeSlot: _selectRearrangeSlot,
+                    purchasedFurnitureIds:
+                        catalogProvider.purchasedFurnitureIds,
+                    placedFurnitureIds:
+                        placedFurnitureProvider.placedFurnitureIds,
+                    furnituresFuture: _furnituresFuture,
+                    deskSurfaceLeftFurnitureId: deskSurfaceLeftFurnitureId,
+                    deskSurfaceRightFurnitureId: deskSurfaceRightFurnitureId,
+                    windowShelfDecorFurnitureId: windowShelfDecorFurnitureId,
+                    windowHangingDecorFurnitureId:
+                        windowHangingDecorFurnitureId,
+                    flowerFurnitureId: flowerFurnitureId,
+                    floorRugFurnitureId: floorRugFurnitureId,
+                    chairFurnitureId: chairFurnitureId,
+                    curtainFurnitureId: curtainFurnitureId,
+                    windowHangingReactionKey: _windowHangingReactionKey,
+                    flowerReactionKey: _flowerReactionKey,
+                    chairReactionKey: _chairReactionKey,
+                    onTapBottle: _onTapBottle,
+                    onTapBookshelf: _onTapBookshelf,
+                    onTapLetter: _onTapLetter,
+                    onTapPost: _onTapPost,
+                    isPrototypeOperationRunning:
+                        _isPrototypeOperationRunning ||
+                        !appDateProvider.isLoaded,
+                    isPrototypeMode: isPrototypeMode,
+                    onToggleDateMode: _toggleDateMode,
+                    onMoveToNextDay: _moveToNextDay,
+                    onOutdoorSeasonChanged: _setOutdoorSeasonOverride,
+                    letterSeasonOverride: _letterSeasonOverride,
+                    onLetterSeasonChanged: _setLetterSeasonOverride,
+                    onWeatherChanged: _setWeatherOverride,
+                    onRainIntensityChanged: _setRainIntensityOverride,
+                    onResetPrototype: _confirmPrototypeReset,
+                  ),
+                ),
+              ),
             ),
-          ),
+            if (showRearrangeButton && !isPrototypeMode && !_isRearrangeMode)
+              const RealWeatherPanel(),
+          ],
         ),
       ),
     );
