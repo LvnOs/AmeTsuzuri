@@ -5,8 +5,16 @@ import 'package:ame_tsuzuri/features/ambient_sound/provider/ambient_sound_provid
 import 'package:ame_tsuzuri/features/ambient_sound/repository/ambient_sound_repository.dart';
 import 'package:ame_tsuzuri/features/ambient_sound/service/ambient_audio_platform.dart';
 import 'package:ame_tsuzuri/features/ambient_sound/service/ambient_audio_service.dart';
+import 'package:ame_tsuzuri/features/bookshelf/presentation/bookshelf_page.dart';
+import 'package:ame_tsuzuri/features/furniture/presentation/catalog_page.dart';
+import 'package:ame_tsuzuri/features/letters/model/letter.dart';
+import 'package:ame_tsuzuri/features/letters/presentation/letter_page.dart';
 import 'package:ame_tsuzuri/features/letters/provider/read_letter_provider.dart';
+import 'package:ame_tsuzuri/features/real_weather/provider/real_weather_provider.dart';
+import 'package:ame_tsuzuri/features/real_weather/service/real_weather_service.dart';
 import 'package:ame_tsuzuri/features/room/presentation/prototype_controls.dart';
+import 'package:ame_tsuzuri/features/room/presentation/widgets/last_raindrop.dart';
+import 'package:ame_tsuzuri/shared/model/season_type.dart';
 import 'package:ame_tsuzuri/shared/model/weather_type.dart';
 import 'package:ame_tsuzuri/shared/provider/app_data_provider.dart';
 import 'package:ame_tsuzuri/shared/repository/weather_repository.dart';
@@ -157,7 +165,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Weather読込中のnullを挟んでもrain→sunny→rainを維持する', (tester) async {
+  testWidgets('Prototypeの日付変更で未確定を挟む場合は再生操作を待つ', (tester) async {
     final repository = _CountingAmbientSoundRepository(isEnabled: true);
     final platform = _FakeAudioPlatform();
     final service = AmbientAudioService.withPlatform(platform);
@@ -196,10 +204,144 @@ void main() {
       tester,
       () =>
           provider.effectiveWeather == WeatherType.rain &&
-          provider.uiState == AmbientSoundUiState.playing,
+          provider.uiState == AmbientSoundUiState.resumeRequired,
     );
-    expect(platform.startCount, 2);
+    expect(platform.startCount, 1);
   });
+
+  testWidgets('Prototypeの雨上がりとOverrideは通常モードに引き継がない', (tester) async {
+    final today = DateTime(2026, 8, 7);
+    await tester.pumpWidget(
+      AmeTsuzuriApp(
+        now: () => today,
+        weatherRepository: _DateWeatherRepository({
+          DateTime(2026, 8, 6): WeatherType.rain,
+          today: WeatherType.sunny,
+        }),
+      ),
+    );
+    final controls = find.byType(PrototypeControls);
+    final context = tester.element(controls);
+    final date = context.read<AppDateProvider>();
+    final ambient = context.read<AmbientSoundProvider>();
+    await _pumpUntil(
+      tester,
+      () => ambient.effectiveWeather == WeatherType.sunny,
+    );
+    expect(find.byType(LastRaindrop), findsOneWidget);
+    tester
+        .widget<PrototypeControls>(controls)
+        .onWeatherChanged(WeatherType.rain);
+    await tester.pump();
+    expect(ambient.effectiveWeather, WeatherType.rain);
+
+    await date.setPrototypeMode(false);
+    await tester.pump();
+    expect(ambient.effectiveWeather, isNull);
+    expect(find.byType(LastRaindrop), findsNothing);
+    await date.setPrototypeMode(true);
+    await tester.pump();
+    expect(ambient.effectiveWeather, WeatherType.rain);
+  });
+
+  for (final (description, elapsed, page) in [
+    (
+      '手紙でのキャッシュ期限切れ',
+      const Duration(minutes: 31),
+      const LetterPage(
+        letter: Letter(
+          id: 'test',
+          title: '手紙',
+          body: '本文',
+          requiredSeason: SeasonType.any,
+          requiredWeather: WeatherType.rain,
+        ),
+      ),
+    ),
+    ('目録でのキャッシュ期限切れ', const Duration(minutes: 31), const CatalogPage()),
+    ('本棚での日付跨ぎ', const Duration(minutes: 2), const BookshelfPage()),
+  ]) {
+    testWidgets('$description後に旧い雨音を再開しない', (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'weatherLocationSetting': 'enabled',
+      });
+      var now = DateTime(2026, 8, 7, 23, elapsed.inMinutes == 2 ? 59 : 0);
+      final platform = _FakeAudioPlatform();
+      var fetches = 0;
+      final staleResponse = Completer<WeatherResponse>();
+      final nextResponse = Completer<WeatherResponse>();
+      await tester.pumpWidget(
+        AmeTsuzuriApp(
+          now: () => now,
+          ambientSoundRepository: _CountingAmbientSoundRepository(),
+          ambientAudioService: AmbientAudioService.withPlatform(platform),
+          realWeatherService: RealWeatherService(
+            locate: () async => (latitude: 35.0, longitude: 139.0),
+            request: (_) async {
+              fetches++;
+              if (fetches == 2) return staleResponse.future;
+              if (fetches == 3) return nextResponse.future;
+              return (
+                status: 200,
+                body: '{"current":{"weather_code":61,"rain":1,"showers":0}}',
+              );
+            },
+          ),
+        ),
+      );
+      final ambient = _ambientSoundProvider(tester);
+      await _pumpUntil(
+        tester,
+        () => ambient.isLoaded && ambient.effectiveWeather == WeatherType.rain,
+      );
+      await ambient.handleUserTap();
+      expect(platform.startCount, 1);
+
+      final roomContext = tester.element(find.byType(PrototypeControls));
+      unawaited(
+        Navigator.of(
+          roomContext,
+        ).push(MaterialPageRoute<void>(builder: (_) => page)),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+      expect(find.byType(page.runtimeType), findsOneWidget);
+      expect(ambient.uiState, AmbientSoundUiState.playing);
+
+      final weather = roomContext.read<RealWeatherProvider>();
+      final stale = weather.refresh(force: true);
+      await tester.pump();
+      expect(fetches, 2);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      // Advance the clock without pumping a frame or the expiry timer.
+      now = now.add(elapsed);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      expect(ambient.effectiveWeather, isNull);
+      expect(ambient.uiState, AmbientSoundUiState.weatherPaused);
+      expect(platform.startCount, 1);
+      expect(fetches, 3);
+      staleResponse.complete((
+        status: 200,
+        body: '{"current":{"weather_code":0,"rain":0,"showers":0}}',
+      ));
+      await stale;
+      await tester.pump();
+      expect(ambient.effectiveWeather, isNull);
+
+      nextResponse.complete((
+        status: 200,
+        body: '{"current":{"weather_code":61,"rain":1,"showers":0}}',
+      ));
+      await _pumpUntil(
+        tester,
+        () => ambient.effectiveWeather == WeatherType.rain,
+      );
+      expect(ambient.uiState, AmbientSoundUiState.resumeRequired);
+      expect(platform.startCount, 1);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
 }
 
 AmbientSoundProvider _ambientSoundProvider(WidgetTester tester) {

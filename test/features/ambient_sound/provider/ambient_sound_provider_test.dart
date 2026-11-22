@@ -133,11 +133,11 @@ void main() {
   });
 
   test('同じWeatherの繰り返し通知ではplayを増やさない', () async {
-    final harness = _ProviderHarness(savedEnabled: true);
+    final harness = _ProviderHarness();
     addTearDown(harness.provider.dispose);
     await harness.provider.load();
-    await harness.provider.updateEffectiveWeather(WeatherType.sunny);
     await harness.provider.updateEffectiveWeather(WeatherType.rain);
+    await harness.provider.handleUserTap();
 
     await harness.provider.updateEffectiveWeather(WeatherType.rain);
 
@@ -158,7 +158,7 @@ void main() {
     expect(harness.provider.uiState, AmbientSoundUiState.weatherPaused);
   });
 
-  test('sunnyからrainへの変化は保存ONならplayを試す', () async {
+  test('リロード後は保存ONでもsunnyからrainへの変化で再生を試さない', () async {
     final harness = _ProviderHarness(savedEnabled: true);
     addTearDown(harness.provider.dispose);
     await harness.provider.load();
@@ -166,8 +166,26 @@ void main() {
 
     await harness.provider.updateEffectiveWeather(WeatherType.rain);
 
-    expect(harness.audioPlatform.activateCount, 1);
-    expect(harness.provider.uiState, AmbientSoundUiState.playing);
+    expect(harness.audioPlatform.activateCount, 0);
+    expect(harness.provider.uiState, AmbientSoundUiState.resumeRequired);
+  });
+
+  test('rainから未確定で停止し、rainに戻っても手動再開を待つ', () async {
+    final harness = _ProviderHarness();
+    addTearDown(harness.provider.dispose);
+    await harness.provider.load();
+    await harness.provider.updateEffectiveWeather(WeatherType.rain);
+    await harness.provider.handleUserTap();
+
+    await harness.provider.updateEffectiveWeather(null);
+    expect(harness.audioService.state.isPlaying, isFalse);
+    expect(harness.provider.uiState, AmbientSoundUiState.weatherPaused);
+    await harness.provider.updateEffectiveWeather(WeatherType.rain);
+    expect(harness.audioPlatform.startCount, 1);
+    expect(harness.provider.uiState, AmbientSoundUiState.resumeRequired);
+
+    await harness.provider.handleUserTap();
+    expect(harness.audioPlatform.startCount, 2);
   });
 
   test('hiddenでpauseしresumedで許可済み再生を再開する', () async {
@@ -214,6 +232,27 @@ void main() {
     expect(harness.provider.isEnabled, isTrue);
     expect(harness.provider.requiresUserResume, isTrue);
     expect(harness.provider.lastError, same(error));
+    expect(harness.provider.uiState, AmbientSoundUiState.resumeRequired);
+  });
+
+  test('再生拒否の後に晴れてON保存が完了しても、自動再生を再試行しない', () async {
+    final gate = Completer<void>();
+    final harness = _ProviderHarness(
+      saveCompleter: gate,
+      activateError: StateError('autoplay rejected'),
+    );
+    addTearDown(harness.provider.dispose);
+    await harness.provider.load();
+    await harness.provider.updateEffectiveWeather(WeatherType.rain);
+
+    final enabling = harness.provider.handleUserTap();
+    await Future<void>.delayed(Duration.zero);
+    await harness.provider.updateEffectiveWeather(WeatherType.sunny);
+    gate.complete();
+    await enabling;
+    await harness.provider.updateEffectiveWeather(WeatherType.rain);
+
+    expect(harness.audioPlatform.activateCount, 1);
     expect(harness.provider.uiState, AmbientSoundUiState.resumeRequired);
   });
 
