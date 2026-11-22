@@ -35,6 +35,15 @@ import 'package:provider/provider.dart';
 
 import '../../ambient_sound/provider/ambient_sound_provider.dart';
 import '../../real_weather/presentation/real_weather_panel.dart';
+import '../../real_weather/provider/real_weather_provider.dart';
+
+typedef _DeliveryConditions = ({
+  DateTime date,
+  int revision,
+  WeatherType? weather,
+  SeasonType season,
+  bool tutorialPending,
+});
 
 enum _TutorialTarget { none, letter, bottle, bookshelf }
 
@@ -287,7 +296,9 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
   late final Future<List<Furniture>> _furnituresFuture;
   final LetterDeliveryService _letterDeliveryService =
       const LetterDeliveryService();
-  DateTime? _attemptedDeliveryDate;
+  Object? _deliveryInProgress;
+  _DeliveryConditions? _completedDelivery;
+  _DeliveryConditions? _failedDelivery;
   int? _dateRevision;
   bool _isMigrationNoticeScheduled = false;
   DateTime? _requestedWeatherDate;
@@ -313,8 +324,6 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
   _TutorialTarget _requestedTutorialTarget = _TutorialTarget.none;
   bool _isTutorialGlowSyncScheduled = false;
   bool _isAmbientWeatherSyncScheduled = false;
-  WeatherType? _requestedAmbientWeather;
-  WeatherType? _lastSyncedAmbientWeather;
   _TutorialMove _tutorialMove = _TutorialMove.none;
 
   @override
@@ -355,7 +364,11 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     final isPrototypeMode = appDateProvider.isDebugDateEnabled;
     if (_dateRevision != appDateProvider.dateRevision) {
       _dateRevision = appDateProvider.dateRevision;
-      _attemptedDeliveryDate = null;
+      _deliveryInProgress = null;
+      _requestedWeatherDate = null;
+      _requestedWeatherLoad = null;
+      _isArrivalAnimating = false;
+      _arrivalController.stop();
     }
     if (appDateProvider.needsMigrationNotice) {
       _scheduleDateMigrationNotice(appDateProvider);
@@ -363,22 +376,26 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     final readLetterProvider = context.watch<ReadLetterProvider>();
     final catalogProvider = context.watch<CatalogProvider>();
     final placedFurnitureProvider = context.watch<PlacedFurnitureProvider>();
-    final weatherProvider = context.watch<WeatherProvider>();
+    final weatherProvider = isPrototypeMode
+        ? context.watch<WeatherProvider>()
+        : null;
+    final realWeather = isPrototypeMode
+        ? null
+        : context.watch<RealWeatherProvider?>()?.current;
     final today = appDateProvider.isLoaded
         ? _dateOnly(appDateProvider.today)
         : null;
     final hasWeatherForToday =
-        isPrototypeMode && today != null && weatherProvider.loadedDate == today;
-    final effectiveWeather = isPrototypeMode
-        ? _weatherOverride ??
-              (hasWeatherForToday ? weatherProvider.currentWeather : null)
-        : null;
+        today != null && weatherProvider?.loadedDate == today;
+    final effectiveWeather = _effectiveWeather(
+      today,
+      prototypeWeather: weatherProvider,
+      realWeather: realWeather,
+    );
     final previousWeather = hasWeatherForToday
-        ? weatherProvider.previousWeather
+        ? weatherProvider?.previousWeather
         : null;
-    if (effectiveWeather != null || !isPrototypeMode) {
-      _scheduleAmbientWeatherSync(effectiveWeather);
-    }
+    _scheduleAmbientWeatherSync(effectiveWeather);
 
     final deskSurfaceLeftFurnitureId = placedFurnitureProvider.isLoaded
         ? placedFurnitureProvider.placedFurnitureIds[RoomPage
@@ -413,11 +430,17 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     if (isPrototypeMode && today != null) {
       _scheduleWeatherLoad(today);
     }
-    if (appDateProvider.isLoaded && readLetterProvider.isLoaded) {
-      final today = _dateOnly(appDateProvider.today);
+    if (today != null && readLetterProvider.isLoaded) {
       showLetter = readLetterProvider.hasDeliveredLetterOn(today);
       if (!showLetter) {
-        _scheduleDelivery(today);
+        _scheduleDelivery(
+          _deliveryConditions(
+            appDateProvider,
+            readLetterProvider,
+            effectiveWeather,
+          ),
+          isPrototypeMode: isPrototypeMode,
+        );
       }
     }
 
@@ -543,10 +566,7 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
   }
 
   void _setWeatherOverride(WeatherType? weather) {
-    setState(() {
-      _weatherOverride = weather;
-      _attemptedDeliveryDate = null;
-    });
+    setState(() => _weatherOverride = weather);
   }
 
   void _setRainIntensityOverride(RainIntensity? intensity) {
@@ -709,15 +729,10 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     }
 
     _requestedWeatherDate = date;
+    final revision = context.read<AppDateProvider>().dateRevision;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted ||
-          _requestedWeatherDate != date ||
-          !context.read<AppDateProvider>().isDebugDateEnabled ||
-          context.read<AppDateProvider>().today != date) {
-        if (_requestedWeatherDate == date) {
-          _requestedWeatherDate = null;
-          _requestedWeatherLoad = null;
-        }
+          context.read<AppDateProvider>().dateRevision != revision) {
         return;
       }
       final load = context.read<WeatherProvider>().loadForDate(date);
@@ -728,30 +743,45 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     });
   }
 
+  WeatherType? _effectiveWeather(
+    DateTime? date, {
+    required WeatherProvider? prototypeWeather,
+    required RealWeatherSnapshot? realWeather,
+  }) {
+    if (date == null) return null;
+    if (prototypeWeather != null) {
+      return _weatherOverride ??
+          (prototypeWeather.loadedDate == date
+              ? prototypeWeather.currentWeather
+              : null);
+    }
+    return realWeather?.date == date ? realWeather?.weather : null;
+  }
+
+  WeatherType? _readEffectiveWeather() {
+    final date = context.read<AppDateProvider>();
+    final isPrototype = date.isDebugDateEnabled;
+    return _effectiveWeather(
+      date.isLoaded ? _dateOnly(date.today) : null,
+      prototypeWeather: isPrototype ? context.read<WeatherProvider>() : null,
+      realWeather: isPrototype
+          ? null
+          : context.read<RealWeatherProvider?>()?.current,
+    );
+  }
+
   void _scheduleAmbientWeatherSync(WeatherType? weather) {
-    _requestedAmbientWeather = weather;
-    if (_isAmbientWeatherSyncScheduled ||
-        weather == _lastSyncedAmbientWeather) {
+    final ambient = context.read<AmbientSoundProvider?>();
+    if (ambient == null ||
+        ambient.effectiveWeather == weather ||
+        _isAmbientWeatherSyncScheduled) {
       return;
     }
-
     _isAmbientWeatherSyncScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _isAmbientWeatherSyncScheduled = false;
-      if (!mounted) {
-        return;
-      }
-
-      final requestedWeather = _requestedAmbientWeather;
-      if (requestedWeather == _lastSyncedAmbientWeather) {
-        return;
-      }
-      _lastSyncedAmbientWeather = requestedWeather;
-      final ambientSoundProvider = context.read<AmbientSoundProvider?>();
-      if (ambientSoundProvider != null) {
-        unawaited(
-          ambientSoundProvider.updateEffectiveWeather(requestedWeather),
-        );
+      if (mounted) {
+        unawaited(ambient.updateEffectiveWeather(_readEffectiveWeather()));
       }
     });
   }
@@ -803,101 +833,156 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     }
   }
 
-  void _scheduleDelivery(DateTime date) {
-    if (_attemptedDeliveryDate == date) {
+  _DeliveryConditions _deliveryConditions(
+    AppDateProvider date,
+    ReadLetterProvider letters,
+    WeatherType? weather,
+  ) => (
+    date: _dateOnly(date.today),
+    revision: date.dateRevision,
+    weather: weather,
+    season:
+        (date.isDebugDateEnabled ? _letterSeasonOverride : null) ??
+        date.currentSeason,
+    tutorialPending: !letters.readLetterIds.contains(
+      RoomPage._tutorialLetterId,
+    ),
+  );
+
+  _DeliveryConditions _readDeliveryConditions() => _deliveryConditions(
+    context.read<AppDateProvider>(),
+    context.read<ReadLetterProvider>(),
+    _readEffectiveWeather(),
+  );
+
+  void _scheduleDelivery(
+    _DeliveryConditions conditions, {
+    required bool isPrototypeMode,
+  }) {
+    if (_completedDelivery == conditions || _failedDelivery == conditions) {
+      return;
+    }
+    _completedDelivery = null;
+    _failedDelivery = null;
+    if (_deliveryInProgress != null ||
+        (!conditions.tutorialPending &&
+            !isPrototypeMode &&
+            conditions.weather != WeatherType.rain)) {
       return;
     }
 
-    _attemptedDeliveryDate = date;
-    final revision = context.read<AppDateProvider>().dateRevision;
+    final attempt = Object();
+    _deliveryInProgress = attempt;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _deliverLetterFor(date, revision);
+      try {
+        // Recover from one transient summary or save failure without a build loop.
+        for (var retry = 0; retry < 2; retry++) {
+          if (!_canContinueDeliveryFor(conditions.date, conditions.revision)) {
+            return;
+          }
+          try {
+            final evaluated = await _deliverLetterFor(conditions);
+            if (mounted && identical(_deliveryInProgress, attempt)) {
+              _completedDelivery = evaluated;
+            }
+            return;
+          } catch (_) {
+            if (!_canContinueDeliveryFor(
+              conditions.date,
+              conditions.revision,
+            )) {
+              return;
+            }
+            final current = _readDeliveryConditions();
+            if (current != conditions) return;
+            if (retry == 1 && identical(_deliveryInProgress, attempt)) {
+              _failedDelivery = current;
+            }
+          }
+        }
+      } finally {
+        if (mounted && identical(_deliveryInProgress, attempt)) {
+          setState(() => _deliveryInProgress = null);
+        }
+      }
     });
   }
 
-  Future<void> _deliverLetterFor(DateTime date, int revision) async {
-    if (!_canContinueDeliveryFor(date, revision)) {
-      return;
+  Future<_DeliveryConditions?> _deliverLetterFor(
+    _DeliveryConditions scheduled,
+  ) async {
+    final (:date, :revision, :weather, :season, :tutorialPending) = scheduled;
+    final appDate = context.read<AppDateProvider>();
+    final readLetters = context.read<ReadLetterProvider>();
+    final isPrototype = appDate.isDebugDateEnabled;
+    final prototypeWeather = isPrototype
+        ? context.read<WeatherProvider>()
+        : null;
+    if (!tutorialPending &&
+        !isPrototype &&
+        _readDeliveryConditions() != scheduled) {
+      return null;
     }
 
-    final appDateProvider = context.read<AppDateProvider>();
-    final readLetterProvider = context.read<ReadLetterProvider>();
-    final weatherProvider = context.read<WeatherProvider>();
-    try {
-      final summaries = await _letterRepository.getSummaries();
-      if (!_canContinueDeliveryFor(date, revision)) {
-        return;
-      }
+    final summaries = await _letterRepository.getSummaries();
+    if (!_canContinueDeliveryFor(date, revision)) return null;
 
-      if (!readLetterProvider.readLetterIds.contains(
+    if (!readLetters.readLetterIds.contains(RoomPage._tutorialLetterId)) {
+      final tutorial = _findLetterSummaryById(
+        summaries,
         RoomPage._tutorialLetterId,
-      )) {
-        final tutorialLetter = _findLetterSummaryById(
-          summaries,
-          RoomPage._tutorialLetterId,
-        );
-        if (tutorialLetter != null) {
-          await _deliverAndAnimate(tutorialLetter.id, date, revision);
-          return;
-        }
+      );
+      if (tutorial != null) {
+        await _deliverAndAnimate(tutorial.id, date, revision);
+        return null;
       }
+    }
 
-      if (!appDateProvider.isDebugDateEnabled) {
-        return;
-      }
-
-      final didLoadWeather = await _loadWeatherForNormalDelivery(
-        weatherProvider: weatherProvider,
+    if (prototypeWeather != null && _weatherOverride == null) {
+      final loaded = await _loadWeatherForNormalDelivery(
+        weatherProvider: prototypeWeather,
         date: date,
         revision: revision,
       );
-      if (!didLoadWeather) {
-        return;
-      }
-
-      if (!_canContinueDeliveryFor(date, revision)) {
-        return;
-      }
-
-      final currentWeather = _weatherOverride ?? weatherProvider.currentWeather;
-      if (currentWeather == null) {
-        return;
-      }
-
-      final normalLetters = summaries
-          .where((letter) => letter.id != RoomPage._tutorialLetterId)
-          .toList();
-      final excludedLetterIds = <String>{
-        ...readLetterProvider.readLetterIds,
-        ...readLetterProvider.deliveredLetters.values,
-      };
-      final currentSeason =
-          _letterSeasonOverride ?? appDateProvider.currentSeason;
-      final letter = _letterDeliveryService.selectLetter(
-        letters: normalLetters,
-        currentSeason: currentSeason,
-        currentWeather: currentWeather,
-        readLetterIds: excludedLetterIds,
-      );
-      if (letter == null) {
-        return;
-      }
-
-      await _deliverAndAnimate(
-        letter.id,
-        date,
-        revision,
-        matchesConditions: () =>
-            (_weatherOverride ?? weatherProvider.currentWeather) ==
-                currentWeather &&
-            (_letterSeasonOverride ?? appDateProvider.currentSeason) ==
-                currentSeason,
-      );
-    } catch (_) {
-      if (_dateRevision == revision && _attemptedDeliveryDate == date) {
-        _attemptedDeliveryDate = null;
+      if (!_canContinueDeliveryFor(date, revision)) return null;
+      if (!loaded) {
+        _failedDelivery = _readDeliveryConditions();
+        return null;
       }
     }
+
+    final evaluated = _readDeliveryConditions();
+    final currentWeather = evaluated.weather;
+    if (!isPrototype &&
+        (currentWeather != weather || evaluated.season != season)) {
+      return null;
+    }
+    if (currentWeather == null ||
+        (!isPrototype && currentWeather != WeatherType.rain)) {
+      return evaluated;
+    }
+
+    final excluded = <String>{
+      ...readLetters.readLetterIds,
+      ...readLetters.deliveredLetters.values,
+    };
+    final letter = _letterDeliveryService.selectLetter(
+      letters: summaries
+          .where((letter) => letter.id != RoomPage._tutorialLetterId)
+          .toList(),
+      currentSeason: evaluated.season,
+      currentWeather: currentWeather,
+      readLetterIds: excluded,
+    );
+    if (letter == null) return evaluated;
+
+    await _deliverAndAnimate(
+      letter.id,
+      date,
+      revision,
+      matchesConditions: () => _readDeliveryConditions() == evaluated,
+    );
+    return null;
   }
 
   Future<bool> _loadWeatherForNormalDelivery({
@@ -973,9 +1058,6 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
           readLetterProvider.deliveredLetterIdOn(date) == letterId) {
         _startArrivalAnimation();
       }
-    } else if (_canContinueDeliveryFor(date, revision)) {
-      // A queued candidate can become ineligible while another save finishes.
-      setState(() => _attemptedDeliveryDate = null);
     }
   }
 

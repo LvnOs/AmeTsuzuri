@@ -21,6 +21,9 @@ import 'package:ame_tsuzuri/features/letters/provider/shizuku_provider.dart';
 import 'package:ame_tsuzuri/features/letters/repository/letter_repository.dart';
 import 'package:ame_tsuzuri/features/letters/repository/read_letter_repository.dart';
 import 'package:ame_tsuzuri/features/letters/repository/shizuku_repository.dart';
+import 'package:ame_tsuzuri/features/real_weather/provider/real_weather_provider.dart';
+import 'package:ame_tsuzuri/features/real_weather/repository/weather_location_repository.dart';
+import 'package:ame_tsuzuri/features/real_weather/service/real_weather_service.dart';
 import 'package:ame_tsuzuri/features/room/presentation/prototype_controls.dart';
 import 'package:ame_tsuzuri/features/room/presentation/room_page.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/autumn_leaf_effect.dart';
@@ -40,6 +43,151 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
+  group('通常モードの実天気配達', () {
+    final date = DateTime(2026, 8, 7);
+    final readTutorial = ReadLetterState(
+      receivedLetters: {'tutorial_001': null},
+    );
+    const rain = (
+      status: 200,
+      body: '{"current":{"weather_code":61,"rain":1,"showers":0}}',
+    );
+    const sunny = (
+      status: 200,
+      body: '{"current":{"weather_code":0,"rain":0,"showers":0}}',
+    );
+    RealWeatherService weatherService(WeatherResponse Function() response) =>
+        RealWeatherService(
+          locate: () async => (latitude: 35.0, longitude: 139.0),
+          request: (_) async => response(),
+        );
+
+    testWidgets('未確定は保留し、雨の候補なしは同じ雨で再探索しない', (tester) async {
+      var response = rain;
+      final room = await _pumpRoom(
+        tester,
+        now: () => date,
+        appDateRepository: _FakeAppDateRepository(null, prototypeMode: false),
+        realWeatherService: weatherService(() => response),
+        initialReadState: readTutorial,
+        letters: [_letter('sunny', weather: WeatherType.sunny)],
+      );
+      final weather = room.realWeatherProvider!;
+      expect(room.letterRepository.summariesCallCount, 0);
+
+      await weather.enableOrRetry();
+      await tester.pump();
+      await tester.pump();
+      expect(room.letterRepository.summariesCallCount, 1);
+      expect(room.readLetterRepository.saveCallCount, 0);
+
+      await weather.refresh(force: true);
+      await tester.pump();
+      expect(room.letterRepository.summariesCallCount, 1);
+
+      response = sunny;
+      await weather.refresh(force: true);
+      await tester.pump();
+      expect(room.letterRepository.summariesCallCount, 1);
+      response = rain;
+      await weather.refresh(force: true);
+      await tester.pump();
+      expect(room.letterRepository.summariesCallCount, 2);
+      expect(room.readLetterRepository.saveCallCount, 0);
+    });
+
+    testWidgets('summary待機中に晴れると配達せず、次の雨で配達する', (tester) async {
+      var response = rain;
+      final room = await _pumpRoom(
+        tester,
+        now: () => date,
+        appDateRepository: _FakeAppDateRepository(null, prototypeMode: false),
+        realWeatherService: weatherService(() => response),
+        initialReadState: readTutorial,
+        blockNextLetterSummariesLoad: true,
+      );
+      final weather = room.realWeatherProvider!;
+      await weather.enableOrRetry();
+      await tester.pump();
+      expect(room.letterRepository.summariesCallCount, 1);
+
+      response = sunny;
+      await weather.refresh(force: true);
+      room.letterRepository.completeSummariesLoad();
+      await tester.pump();
+      expect(room.readLetterRepository.saveCallCount, 0);
+
+      response = rain;
+      await weather.refresh(force: true);
+      await tester.pump();
+      await tester.pump();
+      expect(room.readLetterProvider.deliveredLetterIdOn(date), 'letterA');
+      expect(room.readLetterRepository.saveCallCount, 1);
+    });
+
+    testWidgets('保存キュー待機中に実天気をOFFにすると旧候補を保存しない', (tester) async {
+      final room = await _pumpRoom(
+        tester,
+        now: () => date,
+        appDateRepository: _FakeAppDateRepository(null, prototypeMode: false),
+        realWeatherService: weatherService(() => rain),
+        initialReadState: readTutorial,
+      );
+      final gate = Completer<void>();
+      room.readLetterRepository.nextSaveGate = gate.future;
+      final reading = room.readLetterProvider.markAsRead(
+        'old',
+        receivedDate: date,
+      );
+      final weather = room.realWeatherProvider!;
+      await weather.enableOrRetry();
+      await tester.pump();
+      expect(room.letterRepository.summariesCallCount, 1);
+      expect(room.readLetterRepository.saveCallCount, 1);
+
+      weather.disable();
+      gate.complete();
+      expect(await reading, isTrue);
+      await tester.pump();
+      expect(room.readLetterProvider.deliveredLetters, isEmpty);
+      expect(room.readLetterRepository.saveCallCount, 1);
+    });
+
+    testWidgets('保存開始後に晴れても元の配達を確定し、翌日は演出を引き継がない', (tester) async {
+      var now = date;
+      var response = rain;
+      final gate = Completer<void>();
+      final room = await _pumpRoom(
+        tester,
+        now: () => now,
+        appDateRepository: _FakeAppDateRepository(null, prototypeMode: false),
+        realWeatherService: weatherService(() => response),
+        initialReadState: readTutorial,
+        nextReadSaveGate: gate.future,
+      );
+      final weather = room.realWeatherProvider!;
+      await weather.enableOrRetry();
+      await tester.pump();
+      expect(room.readLetterRepository.saveCallCount, 1);
+
+      response = sunny;
+      await weather.refresh(force: true);
+      gate.complete();
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(room.readLetterProvider.deliveredLetterIdOn(date), 'letterA');
+      expect(find.byKey(const ValueKey('postArrivalGlow')), findsOneWidget);
+
+      now = date.add(const Duration(days: 1));
+      room.dateProvider.refreshLocalDate();
+      await tester.pump();
+      expect(find.byKey(const ValueKey('postArrivalGlow')), findsNothing);
+      expect(room.readLetterProvider.deliveredLetters, {
+        '2026-08-07': 'letterA',
+      });
+    });
+  });
+
   group('雨音UI', () {
     testWidgets('OFF表示からタップでON表示と再生へ切り替える', (tester) async {
       final ambient = await _createAmbientSoundHarness();
@@ -5470,6 +5618,7 @@ Future<_RoomHarness> _pumpRoom(
   Map<String, String> initialPlacedFurnitureIds = const {},
   List<Furniture> furnitures = _roomFurnitures,
   AmbientSoundProvider? ambientSoundProvider,
+  RealWeatherService? realWeatherService,
 }) async {
   final shizukuRepository = _FakeShizukuRepository(
     blockSave: blockRewardSave,
@@ -5518,6 +5667,18 @@ Future<_RoomHarness> _pumpRoom(
     ]);
   }
 
+  final realWeatherProvider = realWeatherService == null
+      ? null
+      : RealWeatherProvider(
+          dateProvider,
+          _FakeWeatherLocationRepository(),
+          realWeatherService,
+          now: now,
+        );
+  if (realWeatherProvider != null) {
+    await realWeatherProvider.load();
+  }
+
   await tester.pumpWidget(
     MultiProvider(
       providers: [
@@ -5527,6 +5688,8 @@ Future<_RoomHarness> _pumpRoom(
         ChangeNotifierProvider.value(value: placedProvider),
         ChangeNotifierProvider.value(value: dateProvider),
         ChangeNotifierProvider.value(value: weatherProvider),
+        if (realWeatherProvider != null)
+          ChangeNotifierProvider(create: (_) => realWeatherProvider),
         if (ambientSoundProvider != null)
           ChangeNotifierProvider.value(value: ambientSoundProvider),
       ],
@@ -5554,6 +5717,7 @@ Future<_RoomHarness> _pumpRoom(
     dateProvider: dateProvider,
     weatherRepository: weatherRepository,
     letterRepository: letterRepository,
+    realWeatherProvider: realWeatherProvider,
     catalogProvider: catalogProvider,
     placedFurnitureProvider: placedProvider,
     placedFurnitureRepository: placedFurnitureRepository,
@@ -5628,6 +5792,7 @@ class _RoomHarness {
     required this.dateProvider,
     required this.weatherRepository,
     required this.letterRepository,
+    required this.realWeatherProvider,
     required this.catalogProvider,
     required this.placedFurnitureProvider,
     required this.placedFurnitureRepository,
@@ -5640,6 +5805,7 @@ class _RoomHarness {
   final AppDateProvider dateProvider;
   final _FakeWeatherRepository weatherRepository;
   final _FakeLetterRepository letterRepository;
+  final RealWeatherProvider? realWeatherProvider;
   final CatalogProvider catalogProvider;
   final PlacedFurnitureProvider placedFurnitureProvider;
   final _FakePlacedFurnitureRepository placedFurnitureRepository;
@@ -6141,7 +6307,8 @@ class _FakePlacedFurnitureRepository extends PlacedFurnitureRepository {
 }
 
 class _FakeAppDateRepository extends AppDateRepository {
-  _FakeAppDateRepository(this.savedDate);
+  _FakeAppDateRepository(this.savedDate, {this.prototypeMode = true});
+  final bool prototypeMode;
 
   DateTime? savedDate;
 
@@ -6154,8 +6321,16 @@ class _FakeAppDateRepository extends AppDateRepository {
   }
 
   @override
-  Future<bool?> loadPrototypeMode() async => true;
+  Future<bool?> loadPrototypeMode() async => prototypeMode;
 
   @override
   Future<void> savePrototypeMode(bool enabled) async {}
+}
+
+class _FakeWeatherLocationRepository extends WeatherLocationRepository {
+  @override
+  Future<WeatherLocationSetting> load() async => WeatherLocationSetting.off;
+
+  @override
+  Future<void> save(WeatherLocationSetting setting) async {}
 }

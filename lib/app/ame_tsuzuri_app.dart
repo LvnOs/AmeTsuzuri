@@ -30,12 +30,14 @@ class AmeTsuzuriApp extends StatelessWidget {
     this.ambientAudioService,
     this.weatherRepository,
     this.realWeatherService,
+    this.now,
   });
 
   final AmbientSoundRepository? ambientSoundRepository;
   final AmbientAudioService? ambientAudioService;
   final WeatherRepository? weatherRepository;
   final RealWeatherService? realWeatherService;
+  final DateTime Function()? now;
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +50,7 @@ class AmeTsuzuriApp extends StatelessWidget {
           create: (_) => ShizukuProvider(ShizukuRepository())..load(),
         ),
         ChangeNotifierProvider(
-          create: (_) => AppDateProvider(AppDateRepository())..load(),
+          create: (_) => AppDateProvider(AppDateRepository(), now: now)..load(),
         ),
         ChangeNotifierProvider(
           create: (_) =>
@@ -61,6 +63,7 @@ class AmeTsuzuriApp extends StatelessWidget {
               context.read<AppDateProvider>(),
               WeatherLocationRepository(),
               realWeatherService ?? RealWeatherService(),
+              now: now,
             );
             final lifecycle = WidgetsBinding.instance.lifecycleState;
             provider.updateForeground(
@@ -109,6 +112,7 @@ class _AppLifecycle extends StatefulWidget {
 class _AppLifecycleState extends State<_AppLifecycle>
     with WidgetsBindingObserver {
   Timer? _dateRefreshTimer;
+  bool _isForeground = true;
   @override
   void initState() {
     super.initState();
@@ -123,12 +127,35 @@ class _AppLifecycleState extends State<_AppLifecycle>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     switch (state) {
       case AppLifecycleState.resumed:
-        context.read<AppDateProvider>().refreshLocalDate();
-        context.read<RealWeatherProvider>().updateForeground(true);
-        unawaited(context.read<AmbientSoundProvider>().updateVisibility(true));
+        _isForeground = true;
+        final date = context.read<AppDateProvider>()..refreshLocalDate();
+        final weather = context.read<RealWeatherProvider>()
+          ..updateForeground(true);
+        final ambient = context.read<AmbientSoundProvider>();
+        if (date.isDebugDateEnabled) {
+          // Room owns the Prototype override. Let its pending frame sync first.
+          unawaited(
+            WidgetsBinding.instance.endOfFrame.then((_) {
+              if (mounted && _isForeground) {
+                unawaited(ambient.updateVisibility(true));
+              }
+            }),
+          );
+        } else {
+          final snapshot = weather.current;
+          unawaited(
+            ambient.updateEffectiveWeather(
+              date.isLoaded && snapshot?.date == date.today
+                  ? snapshot?.weather
+                  : null,
+            ),
+          );
+          unawaited(ambient.updateVisibility(true));
+        }
       case AppLifecycleState.paused:
       case AppLifecycleState.hidden:
       case AppLifecycleState.detached:
+        _isForeground = false;
         context.read<RealWeatherProvider>().updateForeground(false);
         unawaited(context.read<AmbientSoundProvider>().updateVisibility(false));
       case AppLifecycleState.inactive:

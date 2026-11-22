@@ -116,10 +116,7 @@ class AmbientSoundProvider extends ChangeNotifier {
       return;
     }
 
-    if (previousWeather == WeatherType.sunny &&
-        _isLoaded &&
-        _isEnabled &&
-        _isVisible) {
+    if (previousWeather == WeatherType.sunny && _canResumeAutomatically) {
       await _attemptPlayback(resume: false);
       return;
     }
@@ -143,14 +140,18 @@ class AmbientSoundProvider extends ChangeNotifier {
     }
 
     _notifyListeners();
-    if (_isLoaded &&
-        _isEnabled &&
-        _effectiveWeather == WeatherType.rain &&
-        _hasSessionPlaybackPermission &&
-        !_requiresUserResume) {
+    if (_canResumeAutomatically) {
       await _attemptPlayback(resume: true);
     }
   }
+
+  bool get _canResumeAutomatically =>
+      _isLoaded &&
+      _isEnabled &&
+      _isVisible &&
+      _effectiveWeather == WeatherType.rain &&
+      _hasSessionPlaybackPermission &&
+      !_requiresUserResume;
 
   Future<void> _loadInternal() async {
     try {
@@ -217,22 +218,9 @@ class AmbientSoundProvider extends ChangeNotifier {
     }
 
     _isEnabled = true;
-    _hasSessionPlaybackPermission = true;
-
-    if (_effectiveWeather != WeatherType.rain) {
-      _cancelPlayback(pause: false);
-      _requiresUserResume = false;
-      _notifyListeners();
-      return;
-    }
-    if (!_isVisible) {
-      _cancelPlayback(pause: true);
-      _requiresUserResume = false;
-      _notifyListeners();
-      return;
-    }
     if (playbackFuture == null) {
-      _requiresUserResume = true;
+      _hasSessionPlaybackPermission = true;
+      _requiresUserResume = _effectiveWeather == WeatherType.rain;
       _notifyListeners();
       return;
     }
@@ -241,12 +229,12 @@ class AmbientSoundProvider extends ChangeNotifier {
     if (_isDisposed) {
       return;
     }
-    if (_audioService.state.status == AmbientAudioStatus.playing) {
-      _requiresUserResume = false;
-      _hasSessionPlaybackPermission = true;
-    } else {
+    // A pending save can outlast a rejected or cancelled playback attempt.
+    if (!_hasSessionPlaybackPermission ||
+        (_effectiveWeather == WeatherType.rain &&
+            _isVisible &&
+            !_audioService.state.isPlaying)) {
       _requiresUserResume = true;
-      _hasSessionPlaybackPermission = false;
     }
     _notifyListeners();
   }
