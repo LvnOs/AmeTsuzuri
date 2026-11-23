@@ -47,7 +47,8 @@ void main() {
     await reloaded.load();
     expect(reloaded.needsMigrationNotice, isFalse);
 
-    await tester.tap(find.byKey(const ValueKey('prototypeControls')));
+    expect(find.text('Prototypeモードに切り替える'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('roomSettings')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('翌日へ進む'), findsNothing);
@@ -56,6 +57,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     expect(harness.date.isDebugDateEnabled, isTrue);
     expect(harness.date.today, date);
+    expect(find.byType(BottomSheet), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('prototypeControls')));
     await tester.pump();
@@ -65,6 +67,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(harness.date.isDebugDateEnabled, isFalse);
+    expect(find.byKey(const ValueKey('roomSettings')), findsOneWidget);
     expect(harness.read.deliveredLetters, {'2026-08-07': 'tutorial_001'});
     expect(harness.read.readLetterIds, contains('tutorial_001'));
     expect(harness.read.tutorialCompleted, isTrue);

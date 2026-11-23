@@ -844,11 +844,16 @@ void main() {
         const ValueKey('rearrangeSlotTapArea-$_deskSurfaceLeftSlotId'),
       );
 
+      final slotCenter = tester.getCenter(target.hitTestable());
       await tester.tap(target);
-      await tester.tap(target);
+      await tester.tapAt(slotCenter);
       await _pumpBottomSheet(tester);
 
-      expect(find.byType(RoomFurniturePickerSheet), findsOneWidget);
+      expect(
+        find.byType(RoomFurniturePickerSheet, skipOffstage: false),
+        findsOneWidget,
+      );
+      expect(target.hitTestable(), findsNothing);
     });
 
     testWidgets('候補0件でも配置中なら復帰操作を表示できる', (tester) async {
@@ -4163,9 +4168,21 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('bottleTapArea')));
       await _pumpRouteTransition(tester);
+      await tester.tap(
+        find
+            .byKey(const ValueKey('catalogTutorialGuideContinue'))
+            .hitTestable(),
+      );
+      await _pumpRouteTransition(tester);
+      expect(find.byType(CatalogPage), findsOneWidget);
       await tester.pageBack();
       await _pumpRouteTransition(tester);
 
+      expect(find.byType(CatalogPage), findsNothing);
+      expect(
+        find.byKey(const ValueKey('bottleTapArea')).hitTestable(),
+        findsOneWidget,
+      );
       expect(harness.catalogProvider.purchasedFurnitureIds, isEmpty);
       expect(harness.readLetterProvider.hasOpenedTutorialBottle, isTrue);
       expect(find.byKey(const ValueKey('tutorialBottleGlow')), findsNothing);
