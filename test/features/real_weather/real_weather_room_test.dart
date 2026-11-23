@@ -75,7 +75,17 @@ void main() {
           'tutorialCompleted': true,
         }),
       });
-      await tester.pumpWidget(const AmeTsuzuriApp());
+      await tester.pumpWidget(
+        AmeTsuzuriApp(
+          realWeatherService: RealWeatherService(
+            locate: () async => (latitude: 35.0, longitude: 139.0),
+            request: (_) async => (
+              status: 200,
+              body: '{"current":{"weather_code":0,"rain":0,"showers":0}}',
+            ),
+          ),
+        ),
+      );
       final controls = find.byType(PrototypeControls);
       await _until(
         tester,
@@ -111,6 +121,40 @@ void main() {
       expect(tester.getRect(scene), rect);
       expect(post.hitTestable(), findsOneWidget);
       expect(audio.uiState, AmbientSoundUiState.off);
+      final credit = find.text('天気データ：Open-Meteo');
+      expect(credit, findsNothing);
+      final weather = tester.element(controls).read<RealWeatherProvider>();
+      unawaited(weather.enableOrRetry());
+      await _until(tester, () => credit.evaluate().isNotEmpty);
+      expect(credit.hitTestable(), findsOneWidget);
+      expect(tester.getRect(scene), rect);
+      final link = find.ancestor(
+        of: credit,
+        matching: find.byWidgetPredicate(
+          (widget) => widget is Semantics && widget.properties.link == true,
+        ),
+      );
+      expect(
+        tester.widget<Semantics>(link).properties.linkUrl,
+        Uri.parse('https://open-meteo.com/'),
+      );
+      final creditRect = tester.getRect(
+        find.ancestor(of: credit, matching: find.byType(InkWell)).first,
+      );
+      for (final target in [
+        sound,
+        settings,
+        post,
+        find.byKey(const ValueKey('bookshelfTapArea')),
+        find.byKey(const ValueKey('bottleTapArea')),
+      ]) {
+        expect(creditRect.overlaps(tester.getRect(target)), isFalse);
+      }
+      expect(rect.contains(creditRect.center), isTrue);
+      final date = tester.element(controls).read<AppDateProvider>();
+      await date.setPrototypeMode(true);
+      await tester.pump();
+      expect(credit, findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
@@ -218,6 +262,7 @@ void main() {
       await tester.pump();
       expect(read.deliveredLetters, {'2026-08-07': letter});
       expect(find.text('現在の天気：雨'), findsOneWidget);
+      expect(find.text('天気データ：Open-Meteo'), findsOneWidget);
       expect(find.text('ブラウザで位置情報が許可されていません'), findsOneWidget);
       expect(find.text('再試行'), findsOneWidget);
       expect(find.byType(PrototypeControls), findsOneWidget);
@@ -231,6 +276,7 @@ void main() {
       await tester.tap(stop);
       await tester.pump();
       expect(start, findsOneWidget);
+      expect(find.text('天気データ：Open-Meteo'), findsNothing);
       expect(find.byType(RainOverlay), findsNothing);
       expect(find.byType(SoftSunlight), findsNothing);
       expect(audio.effectiveWeather, isNull);

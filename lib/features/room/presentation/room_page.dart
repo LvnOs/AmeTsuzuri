@@ -35,6 +35,11 @@ import 'package:provider/provider.dart';
 
 import '../../ambient_sound/provider/ambient_sound_provider.dart';
 import '../../real_weather/provider/real_weather_provider.dart';
+import '../../real_weather/service/weather_platform_stub.dart'
+    if (dart.library.js_interop) '../../real_weather/service/weather_platform_web.dart'
+    as weather_platform;
+
+const _openMeteoUrl = 'https://open-meteo.com/';
 
 typedef _DeliveryConditions = ({
   DateTime date,
@@ -489,6 +494,9 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
                   (isPrototypeMode ? _outdoorSeasonOverride : null) ??
                   appDateProvider.currentSeason,
               effectiveWeather: effectiveWeather,
+              showWeatherCredit:
+                  effectiveWeather != null &&
+                  realWeather?.source == RealWeatherSource.openMeteo,
               previousWeather: previousWeather,
               weatherDate: hasWeatherForToday ? today : null,
               isTutorialCompleted: readLetterProvider.tutorialCompleted,
@@ -653,9 +661,8 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
     final placedFurnitureProvider = context.read<PlacedFurnitureProvider>();
     final currentFurnitureId =
         placedFurnitureProvider.placedFurnitureIds[slotId];
-    if (result case RoomFurnitureSelected(
-      :final furnitureId,
-    ) when furnitureId == currentFurnitureId) {
+    if (result case RoomFurnitureSelected(:final furnitureId)
+        when furnitureId == currentFurnitureId) {
       return;
     }
     if (result is RoomFurnitureRemovalRequested && currentFurnitureId == null) {
@@ -1367,9 +1374,8 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
       await context.read<AppDateProvider>().setPrototypeMode(enabled);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('日付モードを保存できませんでした')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('日付モードを保存できませんでした')));
       }
     } finally {
       if (mounted) {
@@ -1392,9 +1398,8 @@ class _RoomPageState extends State<RoomPage> with TickerProviderStateMixin {
       await context.read<AppDateProvider>().moveToNextDay();
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('日付を進められませんでした')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('日付を進められませんでした')));
       }
     } finally {
       if (mounted) {
@@ -1456,6 +1461,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
   const _RoomBackgroundLayers({
     required this.season,
     required this.effectiveWeather,
+    required this.showWeatherCredit,
     required this.previousWeather,
     required this.weatherDate,
     required this.isTutorialCompleted,
@@ -1505,6 +1511,7 @@ class _RoomBackgroundLayers extends StatelessWidget {
 
   final SeasonType season;
   final WeatherType? effectiveWeather;
+  final bool showWeatherCredit;
   final WeatherType? previousWeather;
   final DateTime? weatherDate;
   final bool isTutorialCompleted;
@@ -1875,6 +1882,37 @@ class _RoomBackgroundLayers extends StatelessWidget {
                   selectedSlotId: selectedRearrangeSlotId,
                   onToggleRearrangeMode: onToggleRearrangeMode,
                   onSelectSlot: onSelectRearrangeSlot,
+                ),
+              if (showWeatherCredit)
+                Positioned(
+                  left: 6,
+                  bottom: 4,
+                  child: Semantics(
+                    link: true,
+                    linkUrl: Uri.parse(_openMeteoUrl),
+                    child: Material(
+                      color: const Color(0xE6FFFAEC),
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => weather_platform.openCredit(_openMeteoUrl),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 10,
+                          ),
+                          child: Text(
+                            '天気データ：Open-Meteo',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Color(0xFF554D43),
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               if (ambientSound != null)
                 Positioned(
