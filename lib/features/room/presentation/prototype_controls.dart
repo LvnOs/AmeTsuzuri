@@ -1,3 +1,4 @@
+import 'package:ame_tsuzuri/features/real_weather/presentation/real_weather_panel.dart';
 import 'package:ame_tsuzuri/features/room/presentation/widgets/rain_overlay.dart';
 import 'package:ame_tsuzuri/shared/model/season_type.dart';
 import 'package:ame_tsuzuri/shared/model/weather_type.dart';
@@ -31,6 +32,8 @@ class PrototypeControls extends StatelessWidget {
     super.key,
     required this.isRunning,
     required this.isPrototypeMode,
+    required this.showWeather,
+    required this.compact,
     required this.onToggleDateMode,
     required this.onNextDay,
     required this.onOutdoorSeasonChanged,
@@ -43,6 +46,8 @@ class PrototypeControls extends StatelessWidget {
 
   final bool isRunning;
   final bool isPrototypeMode;
+  final bool showWeather;
+  final bool compact;
   final VoidCallback onToggleDateMode;
   final VoidCallback onNextDay;
   final ValueChanged<SeasonType?> onOutdoorSeasonChanged;
@@ -57,6 +62,72 @@ class PrototypeControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!isPrototypeMode) {
+      Future<void> openSettings() async {
+        final enterPrototype = await showModalBottomSheet<bool>(
+          context: context,
+          useSafeArea: true,
+          isScrollControlled: true,
+          backgroundColor: const Color(0xFFFFFAEC),
+          builder: (sheetContext) => SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Semantics(
+                          header: true,
+                          child: Text(
+                            '設定',
+                            style: Theme.of(sheetContext).textTheme.titleLarge,
+                          ),
+                        ),
+                      ),
+                      CloseButton(onPressed: () => Navigator.pop(sheetContext)),
+                    ],
+                  ),
+                  if (showWeather) const RealWeatherPanel(),
+                  const Divider(),
+                  Semantics(header: true, child: const Text('テスト操作')),
+                  TextButton(
+                    onPressed: () => Navigator.pop(sheetContext, true),
+                    child: const Text('Prototypeモードに切り替える'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+        if (context.mounted && enterPrototype == true) {
+          onToggleDateMode();
+        }
+      }
+
+      if (compact) {
+        return IconButton.filledTonal(
+          key: const ValueKey('roomSettings'),
+          tooltip: '設定',
+          onPressed: isRunning ? null : openSettings,
+          icon: const Icon(Icons.settings_outlined),
+        );
+      }
+      return FilledButton.tonalIcon(
+        key: const ValueKey('roomSettings'),
+        style: FilledButton.styleFrom(
+          backgroundColor: const Color(0xECFFFAEC),
+          foregroundColor: const Color(0xFF554D43),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+        ),
+        onPressed: isRunning ? null : openSettings,
+        icon: const Icon(Icons.settings_outlined, size: 16),
+        label: const Text('設定'),
+      );
+    }
     return PopupMenuButton<PrototypeOperation>(
       key: const ValueKey('prototypeControls'),
       enabled: !isRunning,
@@ -129,9 +200,9 @@ class PrototypeControls extends StatelessWidget {
         final modeItem = PopupMenuItem<PrototypeOperation>(
           height: _itemHeight,
           value: PrototypeOperation.toggleDateMode,
-          child: Text(isPrototypeMode ? '通常プレイに戻る' : 'Prototypeモードに切り替える'),
+          child: const Text('通常プレイに戻る'),
         );
-        return isPrototypeMode ? [modeItem, ..._prototypeItems()] : [modeItem];
+        return [modeItem, ..._prototypeItems()];
       },
       child: DecoratedBox(
         decoration: BoxDecoration(
