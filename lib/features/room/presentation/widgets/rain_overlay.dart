@@ -29,10 +29,8 @@ class _RainOverlayState extends State<RainOverlay>
     super.initState();
     _selectedIntensity = _selectIntensity();
     _displayedIntensity = _resolveIntensity(widget);
-    _controller = AnimationController(
-      vsync: this,
-      duration: _presetFor(_displayedIntensity).animationDuration,
-    )..repeat();
+    _controller = AnimationController(vsync: this)
+      ..repeat(period: _presetFor(_displayedIntensity).animationDuration);
   }
 
   @override
@@ -43,7 +41,8 @@ class _RainOverlayState extends State<RainOverlay>
       return;
     }
     _displayedIntensity = nextIntensity;
-    _controller.duration = _presetFor(nextIntensity).animationDuration;
+    // Restart the loop with the new period, starting at its current value.
+    _controller.repeat(period: _presetFor(nextIntensity).animationDuration);
   }
 
   @override
@@ -132,7 +131,7 @@ class _RainPainter extends CustomPainter {
         size.width * drop.topX - (travelY * progress / 3),
         top + travelY * progress,
       );
-      canvas.drawLine(start, start + _lineVector * drop.lengthScale, paint);
+      canvas.drawLine(start, start + _lineVector * _preset.lengthScale, paint);
     }
   }
 
@@ -142,15 +141,10 @@ class _RainPainter extends CustomPainter {
 }
 
 class _RainDrop {
-  const _RainDrop({
-    required this.topX,
-    required this.phase,
-    this.lengthScale = 1,
-  });
+  const _RainDrop({required this.topX, required this.phase});
 
   final double topX;
   final double phase;
-  final double lengthScale;
 }
 
 class _RainPreset {
@@ -158,15 +152,17 @@ class _RainPreset {
     required this.animationDuration,
     required this.drops,
     required this.opacity,
+    required this.lengthScale,
   });
 
   final Duration animationDuration;
   final List<_RainDrop> drops;
   final double opacity;
+  final double lengthScale;
 }
 
 const _lightPreset = _RainPreset(
-  animationDuration: Duration(milliseconds: 3600),
+  animationDuration: Duration(milliseconds: 4200),
   drops: [
     _RainDrop(topX: 0.48, phase: 0.03),
     _RainDrop(topX: 0.57, phase: 0.56),
@@ -174,31 +170,33 @@ const _lightPreset = _RainPreset(
     _RainDrop(topX: 0.75, phase: 0.78),
     _RainDrop(topX: 0.52, phase: 0.90),
     _RainDrop(topX: 0.68, phase: 0.84),
-    _RainDrop(topX: 0.77, phase: 0.63),
   ],
-  opacity: 0.56,
+  opacity: 0.50,
+  lengthScale: 0.8,
 );
 
 const _normalPreset = _RainPreset(
   animationDuration: Duration(seconds: 3),
   drops: _RainPainter._normalDrops,
-  opacity: 0.7,
+  opacity: 0.67,
+  lengthScale: 1,
 );
 
 const _heavyPreset = _RainPreset(
-  animationDuration: Duration(milliseconds: 2400),
+  animationDuration: Duration(milliseconds: 2250),
   drops: [
     ..._RainPainter._normalDrops,
-    _RainDrop(topX: 0.50, phase: 0.16, lengthScale: 0.9),
-    _RainDrop(topX: 0.60, phase: 0.73, lengthScale: 1.1),
-    _RainDrop(topX: 0.73, phase: 0.35, lengthScale: 0.85),
-    _RainDrop(topX: 0.85, phase: 0.94, lengthScale: 1.15),
-    _RainDrop(topX: 0.54, phase: 0.46, lengthScale: 0.9),
-    _RainDrop(topX: 0.64, phase: 0.08, lengthScale: 1.1),
-    _RainDrop(topX: 0.79, phase: 0.60, lengthScale: 0.85),
-    _RainDrop(topX: 0.88, phase: 0.27, lengthScale: 1.15),
+    _RainDrop(topX: 0.50, phase: 0.16),
+    _RainDrop(topX: 0.60, phase: 0.73),
+    _RainDrop(topX: 0.73, phase: 0.35),
+    _RainDrop(topX: 0.85, phase: 0.94),
+    _RainDrop(topX: 0.54, phase: 0.46),
+    _RainDrop(topX: 0.64, phase: 0.08),
+    _RainDrop(topX: 0.79, phase: 0.60),
+    _RainDrop(topX: 0.88, phase: 0.27),
   ],
-  opacity: 0.78,
+  opacity: 0.8,
+  lengthScale: 1.25,
 );
 
 _RainPreset _presetFor(RainIntensity intensity) {
