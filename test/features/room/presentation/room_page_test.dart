@@ -2066,13 +2066,15 @@ void main() {
     for (final replacement in const [
       (from: 'round_rug', to: 'rectangular_rug'),
       (from: 'rectangular_rug', to: 'round_rug'),
+      (from: 'rectangular_rug', to: 'patchwork_rug'),
+      (from: 'patchwork_rug', to: 'rectangular_rug'),
     ]) {
       testWidgets('${replacement.from}から${replacement.to}へ上書きして新ラグだけを表示する', (
         tester,
       ) async {
         final harness = await _pumpRoom(
           tester,
-          initialPurchasedFurnitureIds: const {'round_rug', 'rectangular_rug'},
+          initialPurchasedFurnitureIds: {replacement.from, replacement.to},
           initialPlacedFurnitureIds: {_floorRugSlotId: replacement.from},
         );
 
@@ -5926,6 +5928,15 @@ const List<Furniture> _roomFurnitures = [
     size: 'large',
     slotIds: [_floorRugSlotId],
     imagePath: 'furniture/rug/round_rug.png',
+    initialAvailable: true,
+  ),
+  Furniture(
+    id: 'patchwork_rug',
+    name: 'パッチワークラグ',
+    price: 100,
+    size: 'large',
+    slotIds: [_floorRugSlotId],
+    imagePath: 'furniture/rug/patchwork_rug.png',
     initialAvailable: true,
   ),
   Furniture(

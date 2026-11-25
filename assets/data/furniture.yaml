@@ -489,7 +489,7 @@ furniture:
     slots:
       - living_room_floor_rug
     image: furniture/rug/patchwork_rug.png
-    initial_available: false
+    initial_available: true
 
   - id: wool_rug
     name: 毛織りのラグ

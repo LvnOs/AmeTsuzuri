@@ -1,5 +1,8 @@
+import 'dart:ui' as ui;
+
 import 'package:ame_tsuzuri/features/furniture/model/furniture.dart';
 import 'package:ame_tsuzuri/features/furniture/repository/furniture_repository.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _deskSurfaceLeftSlotId = 'living_room_desk_surface_left';
@@ -36,6 +39,7 @@ const _publicFurnitureIds = {
   ..._curtainFurnitureIds,
   'round_rug',
   'rectangular_rug',
+  'patchwork_rug',
   'wooden_chair',
   'cushioned_chair',
   'rocking_chair',
@@ -55,7 +59,7 @@ void main() {
       expect(furnitures, hasLength(49));
     });
 
-    test('既存公開家具と花3種だけが初期公開される', () {
+    test('指定された22件の家具だけが初期公開される', () {
       final availableIds = furnitures
           .where((furniture) => furniture.initialAvailable)
           .map((furniture) => furniture.id)
@@ -176,6 +180,39 @@ void main() {
       expect(rug.initialAvailable, isTrue);
       expect(rug.slotIds, const [_floorRugSlotId]);
       expect(rug.imagePath, 'furniture/rug/check_rug.png');
+    });
+
+    test('パッチワークラグは100滴でラグslotだけに配置できる', () {
+      final rug = furnitures.singleWhere((item) => item.id == 'patchwork_rug');
+
+      expect(rug.name, 'パッチワークラグ');
+      expect(rug.price, 100);
+      expect(rug.size, 'large');
+      expect(rug.initialAvailable, isTrue);
+      expect(rug.slotIds, const [_floorRugSlotId]);
+      expect(rug.imagePath, 'furniture/rug/patchwork_rug.png');
+    });
+
+    test('パッチワークラグのAssetは768×512で周囲が透過する', () async {
+      final asset = await rootBundle.load(
+        'assets/images/furniture/rug/patchwork_rug.png',
+      );
+      final codec = await ui.instantiateImageCodec(
+        asset.buffer.asUint8List(asset.offsetInBytes, asset.lengthInBytes),
+      );
+      addTearDown(codec.dispose);
+      final image = (await codec.getNextFrame()).image;
+      addTearDown(image.dispose);
+
+      expect((image.width, image.height), (768, 512));
+      final pixels = (await image.toByteData())!;
+      for (final (x, y) in [(0, 0), (767, 0), (0, 511), (767, 511)]) {
+        expect(pixels.getUint8((y * image.width + x) * 4 + 3), 0);
+      }
+      expect(
+        pixels.getUint8((256 * image.width + 384) * 4 + 3),
+        greaterThan(240),
+      );
     });
 
     test('MVP対象外の代表家具は非公開だがマスターに残る', () {

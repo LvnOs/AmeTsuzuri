@@ -263,11 +263,11 @@ const _multiSlotFurniture = Furniture(
 
 void main() {
   group('v0.3.8 配置説明', () {
-    testWidgets('公開21家具の場所名は本番slot定義と一致する', (tester) async {
+    testWidgets('公開22家具の場所名は本番slot定義と一致する', (tester) async {
       final furnitures = (await FurnitureRepository().getAll())
           .where((furniture) => furniture.initialAvailable)
           .toList();
-      expect(furnitures, hasLength(21));
+      expect(furnitures, hasLength(22));
       final repository = PlacementSlotRepository();
       for (final furniture in furnitures) {
         final names = <String>[];
