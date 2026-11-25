@@ -182,11 +182,11 @@ void main() {
       expect(rug.imagePath, 'furniture/rug/check_rug.png');
     });
 
-    test('パッチワークラグは100滴でラグslotだけに配置できる', () {
+    test('パッチワークラグは70滴でラグslotだけに配置できる', () {
       final rug = furnitures.singleWhere((item) => item.id == 'patchwork_rug');
 
       expect(rug.name, 'パッチワークラグ');
-      expect(rug.price, 100);
+      expect(rug.price, 70);
       expect(rug.size, 'large');
       expect(rug.initialAvailable, isTrue);
       expect(rug.slotIds, const [_floorRugSlotId]);

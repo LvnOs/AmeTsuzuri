@@ -484,7 +484,7 @@ furniture:
 
   - id: patchwork_rug
     name: パッチワークラグ
-    price: 100
+    price: 70
     size: large
     slots:
       - living_room_floor_rug
@@ -493,7 +493,7 @@ furniture:
 
   - id: wool_rug
     name: 毛織りのラグ
-    price: 100
+    price: 70
     size: large
     slots:
       - living_room_floor_rug
