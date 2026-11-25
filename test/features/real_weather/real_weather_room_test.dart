@@ -58,6 +58,7 @@ void main() {
     Size(390, 700),
     Size(430, 700),
     Size(320, 360),
+    Size(1280, 800),
   ]) {
     testWidgets('設定を開閉してもRoomの配置を保つ $size', (tester) async {
       tester.view.devicePixelRatio = 1;
@@ -144,13 +145,21 @@ void main() {
       for (final target in [
         sound,
         settings,
+        find.byKey(const ValueKey('rearrangeModeButton')),
         post,
         find.byKey(const ValueKey('bookshelfTapArea')),
         find.byKey(const ValueKey('bottleTapArea')),
       ]) {
-        expect(creditRect.overlaps(tester.getRect(target)), isFalse);
+        expect(
+          creditRect.overlaps(tester.getRect(target)),
+          isFalse,
+          reason: '$target: ${tester.getRect(target)} overlaps $creditRect',
+        );
       }
       expect(rect.contains(creditRect.center), isTrue);
+      expect(creditRect.center.dx, closeTo(rect.center.dx, .01));
+      expect(creditRect.bottom, lessThan(rect.top + rect.height * .29));
+      expect(creditRect.height, closeTo(31, .01));
       final date = tester.element(controls).read<AppDateProvider>();
       await date.setPrototypeMode(true);
       await tester.pump();

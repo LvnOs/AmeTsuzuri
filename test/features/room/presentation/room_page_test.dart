@@ -1173,7 +1173,7 @@ void main() {
       expect(find.byKey(const ValueKey('prototypeNextDay')), findsOneWidget);
     });
 
-    testWidgets('320px・390px・PC幅で右端タブとvisual markerが衝突しない', (tester) async {
+    testWidgets('画面サイズ別に右端タブとvisual markerが衝突しない', (tester) async {
       tester.view.devicePixelRatio = 1;
       addTearDown(() {
         tester.view.resetDevicePixelRatio();
@@ -1181,8 +1181,12 @@ void main() {
       });
 
       for (final size in const [
+        Size(320, 360),
+        Size(320, 640),
         Size(320, 700),
+        Size(375, 640),
         Size(390, 700),
+        Size(430, 700),
         Size(1280, 800),
       ]) {
         tester.view.physicalSize = size;
@@ -1202,6 +1206,10 @@ void main() {
         );
         expect(roomCanvas, findsOneWidget);
         final roomRect = tester.getRect(roomCanvas);
+        expect(
+          buttonRect.bottom,
+          lessThan(roomRect.top + roomRect.height * .77),
+        );
         expect(buttonRect.right, closeTo(roomRect.right, 0.01));
         expect(buttonRect.width, inInclusiveRange(80, 90));
         expect(buttonRect.height, greaterThanOrEqualTo(44));
@@ -1235,6 +1243,11 @@ void main() {
             find.byKey(ValueKey('rearrangeSlotMarker-$slotId')),
           );
           expect(rect.contains(markerRect.center), isTrue);
+          expect(
+            buttonRect.overlaps(markerRect),
+            isFalse,
+            reason: '$slotId at $size',
+          );
           for (final other in markerRects) {
             expect(
               markerRect.overlaps(other.rect),
@@ -1252,8 +1265,8 @@ void main() {
           final rect = tester.getRect(
             find.byKey(ValueKey('rearrangeSlotTapArea-$slotId')),
           );
-          expect(rect.width, greaterThanOrEqualTo(55));
-          expect(rect.height, greaterThanOrEqualTo(100));
+          expect(rect.width, greaterThanOrEqualTo(roomRect.width * .17));
+          expect(rect.height, greaterThanOrEqualTo(roomRect.height * .17));
         }
         expect(tester.takeException(), isNull);
 

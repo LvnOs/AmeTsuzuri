@@ -60,9 +60,8 @@ class RoomRearrangeOverlay extends StatelessWidget {
             ],
           ),
         if (showRearrangeButton)
-          Positioned(
-            right: 0,
-            bottom: 14,
+          Align(
+            alignment: const Alignment(1, 0.40),
             child: _RearrangeModeTag(
               isRearrangeMode: isRearrangeMode,
               isSaving: isSaving,
@@ -134,7 +133,7 @@ class _RearrangeModeTag extends StatelessWidget {
               disabledForegroundColor: const Color(0x80463D33),
               backgroundColor: Colors.transparent,
               overlayColor: const Color(0x24596C51),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
               shape: RoundedRectangleBorder(borderRadius: _tabBorderRadius),
               visualDensity: VisualDensity.compact,
             ),

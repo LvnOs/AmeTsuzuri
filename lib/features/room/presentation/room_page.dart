@@ -1885,28 +1885,35 @@ class _RoomBackgroundLayers extends StatelessWidget {
                 ),
               if (showWeatherCredit)
                 Positioned(
-                  left: 6,
-                  bottom: 4,
-                  child: Semantics(
-                    link: true,
-                    linkUrl: Uri.parse(_openMeteoUrl),
-                    child: Material(
-                      color: const Color(0xE6FFFAEC),
-                      borderRadius: BorderRadius.circular(12),
-                      child: InkWell(
+                  left: 0,
+                  right: 0,
+                  // Keep the link below the top controls on a short scene.
+                  top: math.max(58.0, constraints.maxHeight * .15),
+                  child: Align(
+                    child: Semantics(
+                      link: true,
+                      linkUrl: Uri.parse(_openMeteoUrl),
+                      child: Material(
+                        color: const Color(0xE6FFFAEC),
                         borderRadius: BorderRadius.circular(12),
-                        onTap: () => weather_platform.openCredit(_openMeteoUrl),
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 10,
-                          ),
-                          child: Text(
-                            '天気データ：Open-Meteo',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Color(0xFF554D43),
-                              decoration: TextDecoration.underline,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => weather_platform.openCredit(_openMeteoUrl),
+                          child: const SizedBox(
+                            height: 31,
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 8),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  '天気データ：Open-Meteo',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Color(0xFF554D43),
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
