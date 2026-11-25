@@ -61,7 +61,7 @@ class RoomRearrangeOverlay extends StatelessWidget {
           ),
         if (showRearrangeButton)
           Align(
-            alignment: const Alignment(1, 0.40),
+            alignment: const Alignment(1, 0.50),
             child: _RearrangeModeTag(
               isRearrangeMode: isRearrangeMode,
               isSaving: isSaving,
@@ -105,81 +105,93 @@ class _RearrangeModeTag extends StatelessWidget {
       key: const ValueKey('rearrangeModeSemantics'),
       label: isRearrangeMode ? '模様替えを終了' : '模様替えを開始',
       enabled: enabled,
-      child: DecoratedBox(
-        key: const ValueKey('rearrangeModeTag'),
-        decoration: BoxDecoration(
-          color: isRearrangeMode ? _activePaperColor : _paperColor,
-          border: Border.all(
-            color: isRearrangeMode ? _activeBorderColor : _borderColor,
-            width: isRearrangeMode ? 1.2 : 1,
-          ),
-          borderRadius: _tabBorderRadius,
-          boxShadow: const [
-            BoxShadow(
-              color: _shadowColor,
-              blurRadius: 3,
-              offset: Offset(-1, 1),
+      child: SizedBox(
+        width: 64,
+        height: 44,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned.fill(
+              top: isRearrangeMode ? 3 : 6,
+              bottom: isRearrangeMode ? 3 : 6,
+              child: DecoratedBox(
+                key: const ValueKey('rearrangeModeTag'),
+                decoration: BoxDecoration(
+                  color: isRearrangeMode ? _activePaperColor : _paperColor,
+                  border: Border.all(
+                    color: isRearrangeMode ? _activeBorderColor : _borderColor,
+                    width: isRearrangeMode ? 1.2 : 1,
+                  ),
+                  borderRadius: _tabBorderRadius,
+                  boxShadow: const [
+                    BoxShadow(
+                      color: _shadowColor,
+                      blurRadius: 3,
+                      offset: Offset(-1, 1),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ],
-        ),
-        child: SizedBox(
-          width: 84,
-          height: 46,
-          child: TextButton(
-            key: const ValueKey('rearrangeModeButton'),
-            onPressed: enabled ? onPressed : null,
-            style: TextButton.styleFrom(
-              foregroundColor: _inkColor,
-              disabledForegroundColor: const Color(0x80463D33),
-              backgroundColor: Colors.transparent,
-              overlayColor: const Color(0x24596C51),
-              padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
-              shape: RoundedRectangleBorder(borderRadius: _tabBorderRadius),
-              visualDensity: VisualDensity.compact,
-            ),
-            child: ExcludeSemantics(
-              child: isRearrangeMode
-                  ? const Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          '模様替え中',
-                          key: ValueKey('rearrangeModeStatusText'),
-                          style: TextStyle(
-                            color: _mutedSageColor,
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w500,
-                            height: 1,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'おわる',
+            TextButton(
+              key: const ValueKey('rearrangeModeButton'),
+              onPressed: enabled ? onPressed : null,
+              style: TextButton.styleFrom(
+                foregroundColor: _inkColor,
+                disabledForegroundColor: const Color(0x80463D33),
+                backgroundColor: Colors.transparent,
+                overlayColor: const Color(0x24596C51),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                shape: RoundedRectangleBorder(borderRadius: _tabBorderRadius),
+                visualDensity: VisualDensity.compact,
+              ),
+              child: ExcludeSemantics(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: isRearrangeMode
+                      ? const Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              '模様替え中',
+                              key: ValueKey('rearrangeModeStatusText'),
+                              style: TextStyle(
+                                color: _mutedSageColor,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w500,
+                                height: 1,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'おわる',
+                              key: ValueKey('rearrangeModeActionText'),
+                              style: TextStyle(
+                                color: _inkColor,
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w500,
+                                height: 1,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ],
+                        )
+                      : const Text(
+                          '模様替え',
                           key: ValueKey('rearrangeModeActionText'),
                           style: TextStyle(
                             color: _inkColor,
                             fontSize: 13.5,
                             fontWeight: FontWeight.w500,
-                            height: 1,
                             letterSpacing: 0.2,
                           ),
                         ),
-                      ],
-                    )
-                  : const Text(
-                      '模様替え',
-                      key: ValueKey('rearrangeModeActionText'),
-                      style: TextStyle(
-                        color: _inkColor,
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );

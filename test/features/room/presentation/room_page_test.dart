@@ -1208,10 +1208,10 @@ void main() {
         final roomRect = tester.getRect(roomCanvas);
         expect(
           buttonRect.bottom,
-          lessThan(roomRect.top + roomRect.height * .77),
+          lessThan(roomRect.top + roomRect.height * .79),
         );
         expect(buttonRect.right, closeTo(roomRect.right, 0.01));
-        expect(buttonRect.width, inInclusiveRange(80, 90));
+        expect(buttonRect.width, 64);
         expect(buttonRect.height, greaterThanOrEqualTo(44));
         for (final key in const [
           'prototypeControls',

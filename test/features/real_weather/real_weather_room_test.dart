@@ -157,9 +157,9 @@ void main() {
         );
       }
       expect(rect.contains(creditRect.center), isTrue);
-      expect(creditRect.center.dx, closeTo(rect.center.dx, .01));
-      expect(creditRect.bottom, lessThan(rect.top + rect.height * .29));
-      expect(creditRect.height, closeTo(31, .01));
+      expect(creditRect.left, closeTo(rect.left + 6, .01));
+      expect(creditRect.bottom, closeTo(rect.bottom - 4, .01));
+      expect(creditRect.top, greaterThan(rect.top + rect.height * .7));
       final date = tester.element(controls).read<AppDateProvider>();
       await date.setPrototypeMode(true);
       await tester.pump();
