@@ -15,7 +15,11 @@ void main() {
       expect(find.bySemanticsLabel('模様替えを開始'), findsOneWidget);
       expect(
         tester.getSize(find.byKey(const ValueKey('rearrangeModeTag'))),
-        const Size(84, 46),
+        const Size(64, 32),
+      );
+      expect(
+        tester.getSize(find.byKey(const ValueKey('rearrangeModeButton'))),
+        const Size(64, 44),
       );
       expect(
         find.byKey(const ValueKey('rearrangeInteractionBlocker')),
